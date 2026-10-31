@@ -12,6 +12,8 @@
 //          Two PingFederates because an IdP must not redeem its own ID-JAG (draft §9.3).
 //   byo    An outside IdP from the trusted-IdP registry issued the ID-JAG; the user pastes it, or gets one
 //          from xaa.dev's IdenX (/xaa/*, below).
+//   gateway-redeem  The Privilege MCP gateway exchanges the caller's token (leg 1) and redeems the result at the target app's
+//          own issuer (leg 2). Ping release claim 2026-11-02, UNVERIFIED on our tenant: mock only, routes in gatewayRedeemRoutes.js.
 // A mode whose settings are missing answers 409 not_configured, naming what to set.
 
 import crypto from 'node:crypto';
@@ -27,6 +29,11 @@ import * as trustedIdps from './trustedIdps.js';
 import { SPEC, decodeJwt, inspect, scopeList, trimSlash } from './tokenChecks.js';
 import { piFlowHandlers } from './auth/piFlow.js';
 import { allowedDomains, checkEmail } from './auth/emailRules.js';
+import gatewayRedeemRoutes from './gatewayRedeemRoutes.js';
+import { LIVE_UNAVAILABLE, getSpec, resetGatewayRedeem } from './gatewayRedeem.js';
+import { currentWorkspace } from './workspace.js';
+import { ORIGINS } from './mock/env.js';
+import { API_AUDIENCE } from './mock/gatewayWorld.js';
 import { buildAssertion, describeAssertion, samlClientProblem, samlFilesProblem, samlSettings, samlUnavailableReason, signerCertPem } from './saml.js';
 
 export { decodeJwt, inspect };
@@ -42,7 +49,7 @@ const JWT_BEARER = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
 const REFRESH_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:refresh_token';
 const SAML2_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:saml2';
 const claimScopes = (c) => (Array.isArray(c?.scope) ? c.scope.map(String) : String(c?.scope || '').split(/\s+/).filter(Boolean));
-const MODES = ['pf-as', 'pf-pf', 'byo'];
+const MODES = ['pf-as', 'pf-pf', 'byo', 'gateway-redeem'];
 const DEFAULT_MODE = 'byo'; // the only mode that needs no settings to start (inspect works)
 
 const need = (pairs) => pairs.filter(([, v]) => !v).map(([k]) => k); // [name, value] pairs -> the unset names
@@ -77,6 +84,17 @@ export function settings(mode = 'pf-as') {
   };
 }
 
+/** gateway-redeem: the page's config shape, filled from the stored spec (no secret in it). */
+function gatewayRedeemSettings() {
+  const o = getSpec().OBO;
+  return {
+    target: 'gateway-redeem',
+    idp: { name: 'Exchange issuer (mock)', issuer: ORIGINS.gwIdp, jwksUrl: `${ORIGINS.gwIdp}/jwks`, tokenEndpoint: o.TokenURL, authorizationEndpoint: '', exchangeClientId: o.ClientID },
+    resourceAs: { name: 'Target app issuer (mock)', issuer: ORIGINS.gwTarget, tokenEndpoint: o.Redeem?.TokenURL || '', clientId: o.Redeem?.ClientID || '' },
+    request: { audience: o.Resource, resource: API_AUDIENCE, scope: o.Scope, subjectTokenType: o.SubjectTokenType },
+  };
+}
+
 /** byo: the outside IdP (registry entry) issues; our resource AS or PingFederate redeems. */
 function byoSettings(target = 'resource-as', entry = null) {
   const c = config();
@@ -92,6 +110,7 @@ function byoSettings(target = 'resource-as', entry = null) {
 
 /** Env vars a mode (or a byo target) still needs, in the order to set them. A SAML run never uses the refresh-token client's secret. */
 function missing(mode, target, saml = false) {
+  if (mode === 'gateway-redeem') return []; // mock only; whether it can run is the mode check below (isMock)
   const c = config();
   const pfRedeem = [['PF_URL', c.pfUrl], ['PF_REDEEMER_CLIENT_SECRET', secret('PF_REDEEMER_CLIENT_SECRET')]];
   const asRedeem = [['RESOURCE_AS_ISSUER', c.resourceAsIssuer], ['RESOURCE_AS_CLIENT_SECRET', secret('RESOURCE_AS_CLIENT_SECRET')]];
@@ -115,6 +134,7 @@ const modeOf = (req) => (MODES.includes(req?.session?.idJagPlaygroundMode) ? req
 /** Settings for the session's mode; byo reads the IdP and target stored with the pasted ID-JAG. */
 function settingsFor(req) {
   const mode = modeOf(req);
+  if (mode === 'gateway-redeem') return gatewayRedeemSettings();
   if (mode !== 'byo') return settings(mode);
   const byo = req.session?.idJagPlayground?.byo || {};
   return byoSettings(byo.target, byo.idpId ? trustedIdps.findById(byo.idpId) : null);
@@ -151,6 +171,7 @@ const decoded = (token) => {
 /** Real steps need the mode's settings and a sign-in at its issuer (byo brings its own ID-JAG); `samlOf(req)` says the run is SAML, which has no issuer sign-in. */
 const requireRealWhen = (samlOf) => (req, res, next) => {
   const mode = modeOf(req);
+  if (mode === 'gateway-redeem') return res.status(409).json({ error: 'not_applicable', message: 'Gateway redeem has no sign-in, issue or redeem steps here: use its own panel (/api/id-jag-playground/gateway-redeem).' });
   if (mode === 'byo') return next();
   const saml = samlOf(req);
   const keys = missing(mode, undefined, saml);
@@ -248,13 +269,14 @@ function redactedTokenResponse(data) {
   return out;
 }
 
-const MODE_LABELS = { 'pf-as': 'PingFederate → resource AS', 'pf-pf': 'Acme PingFederate → PingFederate', byo: 'Your IdP → our resource AS' };
+const MODE_LABELS = { 'pf-as': 'PingFederate → resource AS', 'pf-pf': 'Acme PingFederate → PingFederate', byo: 'Your IdP → our resource AS', 'gateway-redeem': 'Gateway redeems the ID-JAG (mock only)' };
 
 function configFor(req) {
   const mode = modeOf(req);
   const c = config();
   return { ...settingsFor(req), mode,
     modes: MODES.map((id) => {
+      if (id === 'gateway-redeem') return { id, label: MODE_LABELS[id], available: isMock(), reason: isMock() ? null : LIVE_UNAVAILABLE };
       const keys = id === 'byo' ? [] : missing(id);
       return { id, label: MODE_LABELS[id], available: !keys.length, reason: keys.length ? `Not configured: set ${keys.join(', ')}` : null };
     }),
@@ -275,6 +297,10 @@ function configFor(req) {
 }
 
 router.get('/config', (req, res) => res.json(configFor(req)));
+
+// Gateway redeem: its own routes (spec, scenarios, run). Mock only. A body that cannot be read gets a plain answer, never a parser message.
+router.use('/gateway-redeem', gatewayRedeemRoutes);
+router.use('/gateway-redeem', (err, _req, res, next) => (err ? res.status(err.status === 413 ? 413 : 400).json({ error: 'invalid_request', message: 'The request body could not be read.' }) : next()));
 
 router.post('/mode', (req, res) => {
   const mode = req.body?.mode;
@@ -439,9 +465,10 @@ async function preflight(req, step) {
     const target = String(req.query.mode || '');
     const known = MODES.includes(target);
     const keys = known && target !== 'byo' ? missing(target) : [];
-    add('mode', `This server can run ${known ? target : 'that mode'}`, !known || keys.length ? 'fail' : 'pass',
-      !known ? `"${target}" is not a playground mode.` : keys.length ? `Not configured: ${keys.join(', ')} unset.` : 'Available.',
-      known ? `Set ${keys.join(', ')} in .env (see .env.example), then restart the server.` : 'Pick a mode from the toolbar.');
+    const liveBlocked = target === 'gateway-redeem' && !isMock();
+    add('mode', `This server can run ${known ? target : 'that mode'}`, !known || keys.length || liveBlocked ? 'fail' : 'pass',
+      !known ? `"${target}" is not a playground mode.` : liveBlocked ? LIVE_UNAVAILABLE : keys.length ? `Not configured: ${keys.join(', ')} unset.` : 'Available.',
+      liveBlocked ? 'Switch the header toggle to Mock to use this mode.' : known ? `Set ${keys.join(', ')} in .env (see .env.example), then restart the server.` : 'Pick a mode from the toolbar.');
     return checks;
   }
 
@@ -1079,6 +1106,7 @@ router.post('/restart', (req, res) => {
 
 router.post('/reset', (req, res) => {
   if (req.session) { delete req.session.idJagPlayground; delete req.session.idJagIssuer; delete req.session.idJagXaa; }
+  resetGatewayRedeem(currentWorkspace());
   res.json({ ok: true });
 });
 

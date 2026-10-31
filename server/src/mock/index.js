@@ -9,6 +9,7 @@ import { listClients, resetClients } from './clients.js';
 import { createMockMcp } from './mcp.js';
 import { createMockPf } from './pf.js';
 import { createMockResourceAs } from './resourceAs.js';
+import { createGatewayWorld } from './gatewayWorld.js';
 
 export { MOCK_ORIGINS, MOCK_USER, ORIGINS };
 
@@ -42,7 +43,8 @@ function createWorld() {
     },
   });
   const mcp = createMockMcp({ origin: ORIGINS.mcp, asIssuer: ORIGINS.as, asKey: rs.publicKey, resource: MCP_RESOURCE });
-  for (const s of [pf, acme, rs, mcp]) services.set(s.origin, s.handle);
+  const gateway = createGatewayWorld(); // gateway redeem mode: exchange issuer, partner issuer, target issuer, target API
+  for (const s of [pf, acme, rs, mcp, ...gateway.services]) services.set(s.origin, s.handle);
 
   async function fetchMock(url, init) {
     const handle = services.get(new URL(url).origin);
@@ -54,13 +56,16 @@ function createWorld() {
   return {
     fetch: fetchMock,
     adminSend: pf.adminSend,
-    reset() { pf.reset(); acme.reset(); rs.reset(); resetClients(); },
+    gateway,
+    reset() { pf.reset(); acme.reset(); rs.reset(); resetClients(); gateway.reset(); },
   };
 }
 
 let world;
 export const mockWorld = () => (world ??= createWorld());
 export const mockFetch = (url, init) => mockWorld().fetch(url, init);
+/** The gateway redeem mode's mock servers (mock/gatewayWorld.js). */
+export const gatewayWorld = () => mockWorld().gateway;
 /** The mock PingFederate's admin API, shaped for pfAdmin's `send`. */
 export const mockAdminSend = (url, opts) => mockWorld().adminSend(url, opts);
 export const resetMock = () => { if (world) world.reset(); };
