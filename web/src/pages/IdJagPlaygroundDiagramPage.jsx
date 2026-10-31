@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ReactFlow, ReactFlowProvider, useReactFlow, useNodesInitialized, useStore, NodeResizer, BaseEdge, EdgeLabelRenderer, getSmoothStepPath,
+import { ReactFlow, ReactFlowProvider, useReactFlow, useNodesInitialized, useStore, useStoreApi, NodeResizer, BaseEdge, EdgeLabelRenderer, getSmoothStepPath,
   Background, Controls, Handle, Position, ConnectionMode, MarkerType } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "./IdJagPlaygroundDiagramPage.css";
@@ -7,6 +7,7 @@ import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES, playgroundDiagramPath, s
 import { stepDetail } from "../utils/idJagStepDetail";
 import { pathFromPoints, labelPoint } from "../utils/orthoRoute";
 import { routeEdges } from "../utils/idJagPlaygroundRouting";
+import { placeLabels } from "../utils/idJagLabelPlacement";
 
 // One diagram per ID-JAG playground mode (/diagram/:mode). ?step=N lights playground step N; the URL
 // is the step state, so every view is a deep link. Ported from AI-DEMO2 (no router here: the path is read directly).
@@ -35,23 +36,53 @@ function Note({ data, selected }) {
     </div>
   );
 }
-// Edge with a token dot travelling along the path while the simulation runs it. The orange badge always
+/**
+ * Do the words show on the diagram? For a lit arrow, or on hover (the arrow's or its entry in the step list), and only
+ * where they found a clear place: words that would cover a box or another label are not drawn, and stay in the step list
+ * and in the badge's tooltip. While a box is dragged only the badges move. An arrow with no route at all (boxes not measured
+ * yet, or no way round) has no place to choose: its words then sit on the plain path.
+ */
+export const wordsShown = ({ place, on, hover, dragging }) => !dragging && !!(hover || on) && (place ? place.ok : true);
+
+/**
+ * CSS transform of a label whose anchor is (lx, ly) in flow pixels: counter-scaled by 1 / zoom around the anchor so it keeps
+ * one size on screen, then shifted (in screen pixels) so the badge centre sits on the anchor whichever way the words grow.
+ */
+export function labelTransform(place, lx, ly, zoom) {
+  const offX = place ? (place.side === "l" ? "calc(-100% + 12px)" : "-12px") : "-50%";
+  const offY = place ? (place.valign === "u" ? "calc(-100% + 12px)" : place.valign === "d" ? "-12px" : "-50%") : "-50%";
+  return `translate(${lx}px,${ly}px) scale(${1 / zoom}) translate(${offX},${offY})`;
+}
+
+// Edge with a token dot travelling along the path while the simulation runs it. The numbered badge always
 // shows the step number; the words show only while the step lights the edge, or on hover.
+// The label keeps one size on screen whatever the zoom: it is counter-scaled by 1 / zoom around its anchor,
+// and placeLabels (see PlaygroundFlow) chose the anchor in screen pixels, so no two labels cover each other.
 const stripCircled = (label) => label.replace(/^[\u2460-\u2468\u2013]+\s*/, "");
 // data.route is the routed path around the boxes; without it (while a box is dragged, or when no route was found) the plain smooth-step path is drawn.
 function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label, markerEnd, style, data }) {
   const [smooth, sx, sy] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
+  const zoom = useStore((st) => st.transform[2]);
   const routed = data.route && data.route.ok;
   const path = routed ? pathFromPoints(data.route.pts) : smooth;
   // place = where the routed badge sits on the line and which way its words grow (see placeLabels); without it the label is centred on the path
   const place = routed ? data.place : undefined;
   const { x: lx, y: ly } = place || (routed ? labelPoint(data.route.pts) : { x: sx, y: sy });
   const [hover, setHover] = useState(false);
-  const words = data.on || hover;
+  const words = wordsShown({ place, on: data.on, hover: hover || data.listHover, dragging: data.dragging });
+  const transform = labelTransform(place, lx, ly, zoom);
+  const text = stripCircled(label);
   return (
     <>
       <g onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-        <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} className={data.dashed ? "dashed" : undefined} interactionWidth={24} />
+        {data.dashed ? (
+          <defs>
+            <marker id={`ijx-head-${id}`} className="ijx-head ijx-head--dashed" data-edge-head={id} markerWidth="12.5" markerHeight="12.5" viewBox="-10 -10 20 20" markerUnits="strokeWidth" orient="auto-start-reverse" refX="0" refY="0">
+              <polyline className="arrowclosed" strokeLinecap="round" strokeLinejoin="round" points="-5,-4 0,0 -5,4 -5,-4" />
+            </marker>
+          </defs>
+        ) : null}
+        <BaseEdge id={id} path={path} markerEnd={data.dashed ? `url(#ijx-head-${id})` : markerEnd} style={style} className={data.dashed ? "dashed" : undefined} interactionWidth={24} />
       </g>
       {data.pulse ? (
         <circle r="7" className="pkt" key={data.pulse}>
@@ -59,28 +90,33 @@ function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targ
         </circle>
       ) : null}
       <EdgeLabelRenderer>
-        <div className={`elabel nodrag nopan ${data.on ? "on" : ""} ${words ? "words" : ""} ${place ? `side-${place.side}` : ""}`} data-edge={id}
-          style={{ transform: place ? `translate(${lx}px,${ly}px) translate(var(--bx-x),-50%)` : `translate(-50%,-50%) translate(${lx}px,${ly}px)`, maxWidth: place && words ? place.w : undefined }}
+        <div className={`elabel nodrag nopan ${data.on ? "on" : ""} ${words ? "words" : ""} ${place?.side === "l" ? "side-l" : ""}`} data-edge={id} data-valign={place?.valign} data-hot={hover || data.listHover ? "" : undefined}
+          title={words ? undefined : text}
+          style={{ transform, width: place && words ? place.w : undefined, maxWidth: words && !place ? 420 : undefined }}
           onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
           <span className="enum" data-testid={`pgd-badge-${id}`}>{data.num}</span>
-          {words ? <span className="ewords">{stripCircled(label)}</span> : null}
+          {words ? <span className="ewords">{text}</span> : null}
         </div>
       </EdgeLabelRenderer>
     </>
   );
 }
 const nodeTypes = { card: Card, note: Note };
+// Labels keep one size on screen, so below this zoom the diagram is too small to hold them without covering each other.
+// The view never zooms out further (a phone shows part of the diagram and pans); the Fit button fits down to this zoom.
+const MIN_ZOOM = 0.4;
 const edgeTypes = { flow: FlowEdge };
 
 /** Computed nodes made draggable: remembers where each node was dropped (view-only, resets on reload). */
-function useDraggableNodes(computed) {
+export function useDraggableNodes(computed) {
   const [moved, setMoved] = useState({});
   const nodes = useMemo(() => computed.map((n) => (moved[n.id] ? { ...n, position: moved[n.id] } : n)), [computed, moved]);
   const onNodesChange = useCallback((changes) => {
     const drags = changes.filter((c) => c.type === "position" && c.position);
     if (drags.length) setMoved((m) => ({ ...m, ...Object.fromEntries(drags.map((c) => [c.id, c.position])) }));
   }, []);
-  return { nodes, onNodesChange };
+  const reset = useCallback(() => setMoved({}), []);
+  return { nodes, onNodesChange, reset };
 }
 
 const DETAIL_KIND = { rfc: "RFC", spec: "Spec", emerging: "Emerging" };
@@ -128,6 +164,15 @@ function StepDetail({ detail }) {
 
 const readStep = (last) => Math.min(last, Math.max(0, parseInt(new URLSearchParams(window.location.search).get("step"), 10) || 0));
 
+/** Width in px of a string in the label font, from a canvas (none in jsdom: placeLabels then estimates). */
+function textMeasure() {
+  if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) return undefined;
+  const ctx = document.createElement("canvas").getContext("2d");
+  if (!ctx) return undefined;
+  ctx.font = `700 11.52px ${getComputedStyle(document.body).fontFamily}`;
+  return (str) => ctx.measureText(str).width;
+}
+
 function PlaygroundFlow({ mode, d }) {
   const rf = useReactFlow();
   const measured = useNodesInitialized(); // a ?step deep link can only zoom once nodes have sizes
@@ -140,6 +185,7 @@ function PlaygroundFlow({ mode, d }) {
     setSel((prev) => (!n ? null : prev && stepLights(d, n, prev) ? prev : focusNode(d, n)));
     window.history.replaceState(null, "", playgroundDiagramPath(mode, n));
   };
+  const [hoverEdge, setHoverEdge] = useState(null); // the call under the pointer in the step list: its words show on the diagram too
   const [playing, setPlaying] = useState(false);
   const [panel, setPanel] = useState(true);
   const [side, setSide] = useState(380);
@@ -147,6 +193,7 @@ function PlaygroundFlow({ mode, d }) {
   const detail = step ? stepDetail(mode, step) : null;
   const asideRef = useRef(null);
   const sectionRef = useRef(null);
+  const mainRef = useRef(null);
   const detailRef = useRef(null);
   const lastDrag = useRef(0);
   const [scrollTick, setScrollTick] = useState(0);
@@ -160,7 +207,7 @@ function PlaygroundFlow({ mode, d }) {
   // lit is derived from (d, step)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [d, step, sel]);
-  const { nodes, onNodesChange } = useDraggableNodes(computed);
+  const { nodes, onNodesChange, reset: resetPositions } = useDraggableNodes(computed);
 
   // Arrows are routed around every box from React Flow's real box positions and sizes. The string key changes
   // only when a box lands or is resized, which re-routes; while a box is dragged the plain path is drawn.
@@ -175,23 +222,53 @@ function PlaygroundFlow({ mode, d }) {
     return k;
   });
   const routing = useMemo(() => {
-    if (dragging) return { routes: {}, fallbacks: null, places: {} };
+    if (dragging) return { routes: {}, fallbacks: null, rects: {} };
     const rects = {};
     for (const n of nodeLookup.values()) {
       const p = n.internals.positionAbsolute;
       rects[n.id] = { x: p.x, y: p.y, w: n.measured?.width ?? 300, h: n.measured?.height ?? 150 };
     }
-    return routeEdges(rects, d.edges);
+    return { ...routeEdges(rects, d.edges), rects };
     // nodeLookup is mutated in place; boxKey carries its changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boxKey, dragging, d]);
+
+  // Labels are placed in screen pixels, so they are placed again once the view (zoom, pan, canvas size) has stopped moving.
+  // Read from the store (not a hook per frame) so a zoom animation does not re-render the page on every frame.
+  const storeApi = useStoreApi();
+  const readView = () => { const { transform: [x, y, z], width, height } = storeApi.getState(); return `${z.toFixed(3)},${Math.round(x)},${Math.round(y)},${Math.round(width)},${Math.round(height)}`; };
+  const [settled, setSettled] = useState(readView);
+  useEffect(() => {
+    let t;
+    const unsub = storeApi.subscribe(() => { clearTimeout(t); t = setTimeout(() => setSettled(readView()), 200); });
+    return () => { clearTimeout(t); unsub(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeApi]);
+  const [fontsTick, setFontsTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setFontsTick((t) => t + 1);
+    document.fonts?.ready?.then(bump);
+    document.fonts?.addEventListener?.("loadingdone", bump);
+    return () => document.fonts?.removeEventListener?.("loadingdone", bump);
+  }, []);
+  const measure = useMemo(() => textMeasure(), [fontsTick]);
+  const places = useMemo(() => {
+    if (dragging) return {};
+    const [zoom, tx, ty, w, h] = settled.split(",").map(Number);
+    // the buttons drawn over the canvas (tools, zoom) are obstacles too: a label under one cannot be read
+    const main = mainRef.current, o = main?.getBoundingClientRect();
+    const avoid = main ? [...main.querySelectorAll(".tools, .react-flow__controls")].map((el) => { const r = el.getBoundingClientRect(); return { x: r.left - o.left, y: r.top - o.top, w: r.width, h: r.height }; }) : [];
+    return placeLabels(routing.routes, routing.rects, d.edges, { zoom, tx, ty, view: { w, h }, lit: new Set(step ? lit.edges : []), measure, avoid });
+    // lit is derived from (d, step)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routing, settled, step, d, measure, dragging, panel]);
 
   const edges = d.edges.map((e) => {
     const on = lit.edges.includes(e.id);
     return {
       id: e.id, source: e.from, target: e.to, sourceHandle: e.fh, targetHandle: e.th, label: e.label, type: "flow",
-      data: { on: !!step && on, num: edgeStepNumber(e), dashed: !!e.dashed, route: routing.routes[e.id], place: routing.places?.[e.id], pulse: step && on ? step : 0, dur: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: e.dashed ? "#1f5fbf" : undefined },
+      data: { on: !!step && on, listHover: hoverEdge === e.id, num: edgeStepNumber(e), dashed: !!e.dashed, route: routing.routes[e.id], place: places[e.id], dragging, pulse: step && on ? step : 0, dur: 2 },
+      markerEnd: { type: MarkerType.ArrowClosed },
       style: { strokeWidth: on ? 2.4 : 1.2, opacity: on ? 1 : 0.15, strokeDasharray: e.dashed ? "6 4" : undefined },
     };
   });
@@ -231,6 +308,8 @@ function PlaygroundFlow({ mode, d }) {
 
   const play = () => { if (!step || step >= last) setStep(1); setPlaying(true); };
   const go = (n) => { setPlaying(false); setStep(n); };
+  // Reset: back to the overview and every box back where it started.
+  const reset = () => { go(0); resetPositions(); setTimeout(() => rf.fitView({ padding: 0.05, duration: 300 }), 60); };
   const fullscreen = () => {
     const el = document.querySelector(".ijx");
     if (document.fullscreenElement) document.exitFullscreen();
@@ -246,7 +325,7 @@ function PlaygroundFlow({ mode, d }) {
   };
 
   return (
-    <div className="ijx-app" style={{ gridTemplateColumns: panel ? `${side}px 6px 1fr` : "0 0 1fr" }}>
+    <div className="ijx-app" style={{ "--ijx-cols": panel ? `${side}px 6px 1fr` : "0 0 1fr" }}>
       <aside ref={asideRef} style={panel ? undefined : { padding: 0, border: 0, overflow: "hidden", visibility: "hidden" }}>
         <h1>ID-JAG Playground: {d.label}</h1>
         <p className="lede">{d.lede}</p>
@@ -259,7 +338,7 @@ function PlaygroundFlow({ mode, d }) {
           <button className="pri" onClick={playing ? () => setPlaying(false) : play}>{playing ? "Pause" : "▶ Simulate"}</button>
           <button onClick={() => go(Math.max(0, step - 1))} disabled={step === 0}>◀ Back</button>
           <button onClick={() => go(Math.min(last, step + 1))} disabled={step === last}>Next ▶</button>
-          <button onClick={() => go(0)}>Reset</button>
+          <button onClick={reset}>Reset</button>
           <span className="hint">Drag nodes to rearrange</span>
         </div>
         <nav aria-label="Steps">
@@ -273,14 +352,16 @@ function PlaygroundFlow({ mode, d }) {
           <h2>{step ? `Step ${step} · ${current.t}` : current.t}</h2>
           <p>{current.text}</p>
           <h3>{step ? "Calls in this step" : "Every call"}</h3>
-          <ul data-testid="pgd-calls">{d.edges.filter((e) => lit.edges.includes(e.id)).map((e) => <li key={e.id}>{e.label}</li>)}</ul>
+          <ul data-testid="pgd-calls">{d.edges.filter((e) => lit.edges.includes(e.id)).map((e) => (
+            <li key={e.id} tabIndex={0} onMouseEnter={() => setHoverEdge(e.id)} onMouseLeave={() => setHoverEdge(null)} onFocus={() => setHoverEdge(e.id)} onBlur={() => setHoverEdge(null)}>{e.label}</li>
+          ))}</ul>
           {detail ? <div ref={detailRef}><StepDetail detail={detail} /></div> : null}
         </section>
-        <p className="legend" data-testid="pgd-legend"><span className="enum">1</span> orange number = step · solid line = request/response · <span className="blue">blue dashed</span> = trust source (JWKS or registry read) or alternate path</p>
+        <p className="legend" data-testid="pgd-legend"><span className="enum">1</span> red number = step · solid line = request/response · <span className="blue">blue dashed</span> = trust source (JWKS or registry read) or alternate path</p>
         <p className="legend"><a href="/">Open the playground</a> to run this mode for real.</p>
       </aside>
       <div className="split" style={panel ? undefined : { visibility: "hidden" }} onPointerDown={startSplit} title="Drag to resize panel" />
-      <main data-route-fallbacks={routing.fallbacks ?? undefined}>
+      <main ref={mainRef} data-route-fallbacks={routing.fallbacks ?? undefined}>
         <div className="tools">
           <button onClick={() => setPanel(!panel)}>{panel ? "◀ Hide panel" : "▶ Show panel"}</button>
           <button onClick={() => rf.fitView({ padding: 0.05, duration: 300 })}>Fit</button>
@@ -288,7 +369,7 @@ function PlaygroundFlow({ mode, d }) {
         </div>
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
           onNodesChange={onNodesChange} nodesDraggable nodeDragThreshold={5} onNodeClick={onNodeClick} onNodeDragStart={() => setDragging(true)} onNodeDragStop={() => { lastDrag.current = Date.now(); setDragging(false); }} connectionMode={ConnectionMode.Loose}
-          fitView fitViewOptions={{ padding: 0.05 }} minZoom={0.1} nodesConnectable={false} proOptions={{ hideAttribution: true }}>
+          fitView fitViewOptions={{ padding: 0.05 }} minZoom={MIN_ZOOM} nodesConnectable={false} proOptions={{ hideAttribution: true }}>
           <Background gap={24} />
           <Controls showInteractive={false} />
         </ReactFlow>

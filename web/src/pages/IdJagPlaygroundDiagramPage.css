@@ -1,13 +1,13 @@
 /* Playground diagrams (ported from AI-DEMO2). Scoped to .ijx so the generic class names cannot leak. */
-.ijx{--c-user:#64748b;--c-bff:#2563eb;--c-pf:#d20e0f;--c-as:#7c3aed;--c-rs:#b45309;--red:#d20e0f;
+.ijx{--red:var(--ping-red);
   height:calc(100vh - 3.6rem);min-height:32rem;color:var(--th-text);background:var(--th-bg);display:flex;flex-direction:column}
 .ijx *{box-sizing:border-box}
-.ijx-app{display:grid;flex:1;min-width:0;min-height:0}
+.ijx-app{display:grid;grid-template-columns:var(--ijx-cols);flex:1;min-width:0;min-height:0}
 .ijx aside{background:var(--th-bg-card);border-right:1px solid var(--th-border);padding:16px 16px 10px;overflow:auto}
 .ijx h1{font-size:1.15rem;margin:0 0 4px}.ijx .lede{color:var(--th-text-muted);margin:0 0 12px;font-size:.78rem}
 .ijx nav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
 .ijx nav button,.ijx nav.modes a{border:1px solid var(--th-border);background:transparent;color:var(--th-text);border-radius:999px;padding:4px 10px;font:inherit;font-size:.75rem;cursor:pointer;text-decoration:none}
-.ijx nav button.sel,.ijx nav.modes a[aria-current="page"]{background:var(--red);border-color:var(--red);color:#fff}
+.ijx nav button.sel,.ijx nav.modes a[aria-current="page"]{background:var(--red);border-color:var(--red);color:var(--on-accent)}
 .ijx h2{font-size:.95rem;margin:0 0 6px}.ijx h3{font-size:.72rem;margin:12px 0 4px;color:var(--th-text-muted);text-transform:uppercase;letter-spacing:.05em}
 .ijx section p{margin:0 0 10px;font-size:.85rem}
 .ijx section ul{margin:0;padding-left:16px;color:var(--th-text-muted);font-size:.75rem}
@@ -19,56 +19,51 @@
 .ijx:fullscreen{height:100vh}
 .ijx .react-flow{background:var(--th-bg)}
 .ijx .card{width:100%;height:100%;overflow:auto;background:var(--th-bg-card);color:var(--th-text);border:1.5px solid var(--th-border);border-radius:10px;padding:10px 12px;transition:opacity .2s,box-shadow .2s}
-/* Ping slide look: key services are Ping-red boxes, the rest are dark cards; the active step glows blue. */
-.ijx .card.k-bff,.ijx .card.k-pf,.ijx .card.k-as{background:#b5231a;color:#fff;border-color:#b5231a}
-.ijx .card.k-bff .cs,.ijx .card.k-pf .cs,.ijx .card.k-as .cs,.ijx .card.k-bff ul,.ijx .card.k-pf ul,.ijx .card.k-as ul{color:#ffffffd9}
-.ijx .card.dim{opacity:.28}.ijx .card.on{border-color:#4da3ff;box-shadow:0 0 0 3px #4da3ff55,0 6px 18px rgba(0,0,0,.18)}
-.ijx .k-user{--c:var(--c-user)}.ijx .k-bff{--c:var(--c-bff)}.ijx .k-pf{--c:var(--c-pf)}.ijx .k-as{--c:var(--c-as)}.ijx .k-rs{--c:var(--c-rs)}
+/* Ping slide look: key services are deep-red boxes, the rest are theme cards; the active step gets an info-colour ring. */
+.ijx .card.k-bff,.ijx .card.k-pf,.ijx .card.k-as{background:var(--ping-red-deep);color:var(--on-accent);border-color:var(--ping-red-deep)}
+.ijx .card.k-bff .cs,.ijx .card.k-pf .cs,.ijx .card.k-as .cs,.ijx .card.k-bff ul,.ijx .card.k-pf ul,.ijx .card.k-as ul{color:var(--on-accent);opacity:.85}
+.ijx .card.dim{opacity:.28}.ijx .card.on{border-color:var(--th-info);box-shadow:0 0 0 3px var(--th-info),0 6px 18px var(--th-shadow)}
 .ijx .ct{font-weight:700;font-size:.85rem}.ijx .cs{color:var(--th-text-muted);font-size:.72rem;margin-bottom:4px}
 .ijx .card ul{margin:0;padding-left:16px;font-size:.72rem}
-.ijx .note{width:100%;height:100%;overflow:auto;background:#fcefc7;color:#5a4300;border:1px dashed #a88a2a;border-radius:8px;padding:8px 10px;font-size:.72rem;transition:opacity .2s}
+.ijx .note{width:100%;height:100%;overflow:auto;background:var(--th-bg-page);color:var(--th-text);border:1px dashed var(--th-border);border-radius:8px;padding:8px 10px;font-size:.72rem;transition:opacity .2s}
 .ijx .note.dim{opacity:.2}
 .ijx .react-flow__edge-path{stroke:var(--th-text);stroke-width:1.6}
 .ijx .react-flow__controls-button{background:var(--th-bg-card);color:var(--th-text);border-color:var(--th-border)}.ijx .react-flow__controls-button svg{fill:var(--th-text)}
 .ijx .split{cursor:col-resize;background:var(--th-border)}.ijx .split:hover{background:var(--red)}
 .ijx .sim{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
 .ijx .sim button{border:1px solid var(--th-border);background:var(--th-bg);color:var(--th-text);border-radius:8px;padding:5px 10px;font:inherit;font-size:.75rem;cursor:pointer}
-.ijx .sim button.pri{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+.ijx .sim button.pri{background:var(--red);border-color:var(--red);color:var(--on-accent);font-weight:600}
 .ijx .sim button:disabled{opacity:.4;cursor:default}.ijx .hint{font-size:.75rem;color:var(--th-text-muted)}
-.ijx .elabel{position:absolute;pointer-events:none;background:var(--th-bg-card);color:var(--th-text);border:1px solid var(--th-border);border-radius:5px;padding:1px 6px;font-size:.7rem;white-space:nowrap}
-.ijx .pkt{fill:var(--red);stroke:#fff;stroke-width:2}
-.ijx button:focus-visible,.ijx a:focus-visible{outline:2px solid var(--red);outline-offset:2px}
-@media (max-width:800px){.ijx{height:auto}.ijx-app{grid-template-columns:1fr!important;grid-template-rows:auto 6px 60vh;height:auto}.ijx .split{display:none}}
+.ijx .pkt{fill:var(--red);stroke:var(--surface);stroke-width:2}
+/* Phone and tablet: the diagram sits on top and stays in view (sticky) while the panel scrolls under it. */
+@media (max-width:900px){.ijx{height:auto}.ijx-app{grid-template-columns:minmax(0,1fr);grid-template-rows:60vh auto;height:auto}.ijx .split{display:none}
+.ijx main{order:-1;position:sticky;top:0;z-index:40;height:60vh;border-bottom:1px solid var(--th-border)}}
 
 /* Match the AI-DEMO2 Ping-style diagrams: light grey canvas, thick black arrows, dark labels above the lines. */
-.ijx .react-flow{background:#e4e7ec}
-:root[data-theme="dark"] .ijx .react-flow{background:#0b0e14}
-.ijx .react-flow__edge-path{stroke:#111;stroke-width:3.2}
-.ijx .react-flow__edge:hover .react-flow__edge-path{stroke:#000;stroke-width:4.2}
-.ijx .elabel{z-index:20;background:#fff;color:#000;border:1px solid #c9ced8;font-weight:700}
-:root[data-theme="dark"] .ijx .react-flow__edge-path{stroke:#e8e8ec}
-:root[data-theme="dark"] .ijx .elabel{background:#151a24;color:#f2f2f4;border-color:#3a4256}
+.ijx .react-flow{background:var(--th-bg-page)}
+.ijx .react-flow__edge-path{stroke:var(--text);stroke-width:3.2}
+.ijx .react-flow__edge:hover .react-flow__edge-path{stroke:var(--text);stroke-width:4.2}
 
-/* Numbered arrows: an orange step badge always shows; the words appear when the step lights the edge, or on hover. */
-.ijx .elabel{display:flex;align-items:center;gap:6px;pointer-events:all;padding:2px 8px 2px 2px;border-radius:14px;max-width:420px;white-space:normal;line-height:1.25}
-.ijx .elabel:not(.words){padding:0;background:transparent;border-color:transparent}
+/* Numbered arrows: a step badge always shows; the words appear when the step lights the edge, or on hover. */
+/* The label (badge + words) is counter-scaled by the page so it keeps one size on screen; transform-origin 0 0 makes that scale pivot on the anchor. */
+.ijx .elabel{position:absolute;z-index:20;display:flex;align-items:center;gap:4px;transform-origin:0 0;pointer-events:all;max-width:420px;white-space:normal;line-height:1.25}
 .ijx .elabel.words{z-index:30}
-.ijx .enum{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:24px;height:24px;border-radius:999px;background:#ff8c00;color:#111;font-weight:800;font-size:.8rem;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35);opacity:.7}
+.ijx .elabel[data-valign="d"]{align-items:flex-start}
+.ijx .elabel[data-valign="u"]{align-items:flex-end}
+.ijx .elabel.side-l{flex-direction:row-reverse}
+.ijx .enum{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:24px;height:24px;border-radius:999px;background:var(--ping-red);color:var(--on-accent);font-weight:800;font-size:.8rem;border:2px solid var(--surface);box-shadow:0 1px 3px var(--th-shadow);opacity:.7}
 .ijx .elabel.on .enum,.ijx .elabel:hover .enum{opacity:1}
-:root[data-theme="dark"] .ijx .enum{border-color:#0b0e14}
-.ijx .ewords{font-size:.72rem;font-weight:700;color:#000}
-:root[data-theme="dark"] .ijx .ewords{color:#f2f2f4}
+/* The arrow under the pointer (or its entry in the step list) is marked, even when its words have no clear place on the diagram. */
+.ijx .elabel[data-hot] .enum{opacity:1;outline:3px solid var(--th-info);outline-offset:1px}
+.ijx .ewords{flex:1 1 auto;min-width:0;padding:3px 8px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);font-size:.72rem;font-weight:700;overflow-wrap:anywhere}
 .ijx .legend .enum{min-width:18px;height:18px;font-size:.68rem;opacity:1;vertical-align:middle}
-.ijx .legend .blue{color:#1f5fbf;font-weight:700}
-:root[data-theme="dark"] .ijx .legend .blue{color:#6fa8ff}
+.ijx .legend .blue{color:var(--th-info);font-weight:700}
 /* Trust-source and alternate paths: blue dashed. */
-.ijx .react-flow__edge-path.dashed{stroke:#1f5fbf}
-:root[data-theme="dark"] .ijx .react-flow__edge-path.dashed{stroke:#6fa8ff}
-.ijx marker[id*="1f5fbf"] polyline{stroke:#1f5fbf;fill:#1f5fbf}
-:root[data-theme="dark"] .ijx marker[id*="1f5fbf"] polyline{stroke:#6fa8ff;fill:#6fa8ff}
+.ijx .react-flow__edge-path.dashed{stroke:var(--th-info)}
+.ijx .ijx-head--dashed polyline{stroke:var(--th-info);fill:var(--th-info)}
 
 /* Selected actor ring. */
-.ijx .card.sel,.ijx .note.sel{outline:3px solid #ff8c00;outline-offset:3px}
+.ijx .card.sel,.ijx .note.sel{outline:3px solid var(--ping-red);outline-offset:3px}
 
 /* Step detail in the side panel. */
 .ijx .detail{margin-top:4px}
@@ -79,17 +74,10 @@
 .ijx .detail pre{margin:0;padding:8px 10px;overflow:auto;max-height:260px;background:var(--th-bg);border:1px solid var(--th-border);border-radius:6px;font-size:.68rem;line-height:1.4;color:var(--th-text)}
 .ijx .detail .token pre{border-style:dashed}
 .ijx .chip{display:inline-block;padding:0 7px;border-radius:999px;font-size:.62rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border:1px solid var(--th-border);color:var(--th-text-muted);vertical-align:middle}
-.ijx .chip.rfc{color:#1f5fbf;border-color:#1f5fbf}
-.ijx .chip.spec{color:#0f766e;border-color:#0f766e}
-.ijx .chip.emerging{color:#8a4b00;background:#ffe3b8;border:1px dashed #b86100}
-.ijx .chip.mock{color:#111;background:#ff8c00;border-color:#ff8c00}
-:root[data-theme="dark"] .ijx .chip.rfc{color:#6fa8ff;border-color:#6fa8ff}
-:root[data-theme="dark"] .ijx .chip.spec{color:#4fd1c5;border-color:#4fd1c5}
-:root[data-theme="dark"] .ijx .chip.emerging{color:#ffc069;background:#3a2800;border-color:#b86100}
-.ijx .refs{list-style:none;padding-left:0!important;margin:0 0 6px}
+.ijx .chip.rfc{color:var(--th-info);border-color:var(--th-info)}
+.ijx .chip.spec{color:var(--th-ok);border-color:var(--th-ok)}
+.ijx .chip.emerging{color:var(--text);background:var(--th-bg-page);border:1px dashed var(--border)}
+.ijx .chip.mock{color:var(--bg);background:var(--text);border-color:var(--text)}
+.ijx .refs{list-style:none;padding-left:0;margin:0 0 6px}
 .ijx .refs li{margin:0 0 5px;color:var(--th-text);font-size:.75rem}
-.ijx .refs li.emerging{border-left:3px solid #ff8c00;padding-left:6px}
-
-/* Routed badge: the badge stays on the line, the words pill grows to its right or left (side-r / side-l). */
-.ijx .elabel.side-r{--bx-x:-12px}.ijx .elabel.side-r.words{--bx-x:-14px}
-.ijx .elabel.side-l{--bx-x:calc(-100% + 12px);flex-direction:row-reverse}.ijx .elabel.side-l.words{--bx-x:calc(-100% + 14px);padding:2px 2px 2px 8px}
+.ijx .refs li.emerging{border-left:3px solid var(--ping-red);padding-left:6px}

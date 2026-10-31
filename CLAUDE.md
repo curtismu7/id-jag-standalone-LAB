@@ -26,4 +26,5 @@ Server 4720, resource-as 4721, mcp-sample 4722, Vite dev server 4723. Block 4720
 - No real tenant IDs, internal hostnames, personal names or customer names. Use `.invalid` or `.example` hosts. `npm run check:forbidden` must pass.
 - Never commit `.env` files or keys. The one settings file is `~/Development/.env` (mode 600).
 - CSS follows `STANDALONE-CSS-STANDARD.md`: tokens only, no colour literals, no `!important`.
+- Diagram labels (web/src/utils/idJagLabelPlacement.js) are placed in screen pixels and drawn counter-scaled, so they keep one size at any zoom. Change a diagram or its zoom limit and run the placement tests; no label may cover a box or another label.
 - Node 22 only.

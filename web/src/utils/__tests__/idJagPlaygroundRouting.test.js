@@ -1,5 +1,5 @@
 import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES } from "../idJagPlaygroundDiagrams";
-import { handleDir, handlePoint, routeEdges, separateRoutes, placeLabels, pillSizes, badgeSpots, stripLabel } from "../idJagPlaygroundRouting";
+import { handleDir, handlePoint, routeEdges, separateRoutes } from "../idJagPlaygroundRouting";
 
 const box = { x: 100, y: 200, w: 300, h: 80 };
 
@@ -98,50 +98,6 @@ describe("separateRoutes", () => {
       const lap = Math.min(Math.max(s.a[m], s.b[m]), Math.max(t.a[m], t.b[m])) - Math.max(Math.min(s.a[m], s.b[m]), Math.min(t.a[m], t.b[m]));
       expect(lap > 12 && Math.abs(s.a[c] - t.a[c]) < 6, `${s.id} + ${t.id}`).toBe(false);
     }
-  });
-});
-
-describe("label placement", () => {
-  it("strips the step circle and sizes a long label as a taller, narrower pill", () => {
-    expect(stripLabel("③ RFC 7523 jwt-bearer")).toBe("RFC 7523 jwt-bearer");
-    expect(stripLabel("①–⑤ POST /x")).toBe("POST /x");
-    const sizes = pillSizes("x".repeat(120));
-    expect(sizes[0].w).toBe(420);
-    expect(sizes.at(-1).w).toBeLessThan(sizes[0].w);
-    expect(sizes.at(-1).h).toBeGreaterThan(sizes[0].h);
-    expect(pillSizes("ok")).toHaveLength(1);
-  });
-  it("offers badge spots only well away from both boxes and from bends", () => {
-    const pts = [P(0, 0), P(14, 0), P(14, 200), P(300, 200)];
-    const spots = badgeSpots(pts);
-    expect(spots.length).toBeGreaterThan(5);
-    for (const s of spots) {
-      expect(Math.abs(s.x) + Math.abs(s.y)).toBeGreaterThanOrEqual(26);
-      expect(Math.abs(s.x - 300) + Math.abs(s.y - 200)).toBeGreaterThanOrEqual(26);
-      expect(s.x === 14 || s.y === 200).toBe(true);
-    }
-  });
-  it.each(["mock", "pf-as", "pf-pf", "byo"])("%s: every pill clears every box and every badge, and sits on its arrow", (mode) => {
-    const d = PLAYGROUND_DIAGRAMS[mode];
-    const rects = rectsOf(d);
-    const { routes, places } = routeEdges(rects, d.edges);
-    const pill = (p) => ({ x: p.side === "r" ? p.x - 14 : p.x + 14 - p.w, y: p.y - p.h / 2, w: p.w, h: p.h });
-    const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-    for (const e of d.edges) {
-      const p = places[e.id];
-      expect(p, e.id).toBeDefined();
-      const onLine = routes[e.id].pts.slice(1).some((q, i) => {
-        const a = routes[e.id].pts[i];
-        return Math.min(a.x, q.x) - 0.5 <= p.x && p.x <= Math.max(a.x, q.x) + 0.5 && Math.min(a.y, q.y) - 0.5 <= p.y && p.y <= Math.max(a.y, q.y) + 0.5;
-      });
-      expect(onLine, `${e.id} badge on its arrow`).toBe(true);
-      for (const [id, r] of Object.entries(rects)) expect(hit(pill(p), r), `${e.id} pill covers ${id}`).toBe(false);
-      for (const o of d.edges) if (o.id !== e.id) expect(hit(pill(p), { x: places[o.id].x - 12, y: places[o.id].y - 12, w: 24, h: 24 }), `${e.id} pill covers badge ${o.id}`).toBe(false);
-    }
-  });
-  it("places nothing for a fallback (straight line) route", () => {
-    const rects = { a: { x: 0, y: 0, w: 100, h: 100 }, b: { x: 500, y: 0, w: 100, h: 100 } };
-    expect(placeLabels({ e: { ok: false, pts: [P(0, 0), P(5, 5)] } }, rects, [{ id: "e", label: "x", steps: [1] }])).toEqual({});
   });
 });
 

@@ -197,7 +197,7 @@ describe("admin-only contract", () => {
 
   it("the stylesheet hides data-admin-only only under data-present", async () => {
     const css = (await import("node:fs")).readFileSync(`${process.cwd()}/src/present/present.css`, "utf8");
-    expect(css).toMatch(/:root\[data-present="1"\] \[data-admin-only\] \{ display: none !important; \}/);
+    expect(css).toMatch(/:root\[data-present="1"\] \[data-admin-only\] \{ display: none; \}/);
     expect(css).not.toMatch(/^\[data-admin-only\]/m);
   });
   // jsdom has no layout, so assert the stylesheet keeps scrolled-to step headings clear of the sticky bar.
