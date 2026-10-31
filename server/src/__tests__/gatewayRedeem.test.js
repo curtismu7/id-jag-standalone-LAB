@@ -42,6 +42,7 @@ describe('the two legs', () => {
     expect(r.controls).toHaveLength(2);
     expect(r.controls[0]).toMatchObject({ status: 401, failedCheck: 'signature' });
     expect(r.controls[1]).toMatchObject({ status: 401, failedCheck: 'token type' });
+    expect(r.controls[1].detail).toMatch(/This is an ID-JAG/); // the API knows an assertion when it sees one, it does not just fail on typ
     expect(r.callerToken.token).not.toBe(r.leg2.token);
     expect(r.leg2.token).not.toBe(r.leg1.token);
   });
@@ -246,6 +247,10 @@ const MUTATIONS = {
   },
   'OBO.Redeem.ClientID': async () => {
     expect((await run(mutate((o) => { o.Redeem.ClientID = 'nobody'; }))).refusal).toMatchObject({ stage: 'leg2', error: 'invalid_client' });
+    // A client the target issuer does know, but that the ID-JAG does not name: refused by client binding.
+    const peer = gatewayWorld()._peerClient();
+    const other = await run(mutate((o) => { o.Redeem.ClientID = peer.id; o.Redeem.ClientSecret = peer.secret; o.Redeem.AuthMethod = 'client_secret_post'; }));
+    expect(other.refusal).toMatchObject({ stage: 'leg2', error: 'invalid_grant', check: 'client binding' });
   },
   'OBO.Redeem.ClientSecret': async () => {
     expect((await run(mutate((o) => { o.Redeem.AuthMethod = 'client_secret_post'; }))).refusal).toBeNull();

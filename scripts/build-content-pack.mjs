@@ -23,12 +23,23 @@ function readGuides() {
   return [...block[1].matchAll(/\[\s*"([^"]+)",\s*"([^"]+)"\s*\]/g)].map(([, id, title]) => [id, title]);
 }
 
+// The deck's value panel for slide 48 (Intent, Purpose, Behaviour; the same slide as On-Behalf-Of and ID-JAG), as Ping wrote it.
+// Section 10 of the feature prompt has no separate On-Behalf-Of or ID-JAG row, so this is the slide 48 row. Ping claims, UNVERIFIED on our tenant.
+const WHY_IT_MATTERS = [
+  'Ping claim (deck slide 48, release 2026-11-02), UNVERIFIED on our tenant.',
+  'Challenge: A tool name and arguments cannot say what was asked for, whether the agent was meant to do it, or whether it normally does.',
+  'Technical: Three separable signals: deterministic intent patterns and purpose declarations refuse hard; learned behaviour baselines drive alerts and approval.',
+  'Business: The enforceable declaration "this agent exists to reconcile invoices" unblocks unattended agents in processes that could not otherwise approve them.',
+].join(' ');
+
 export async function buildPack({ commit } = {}) {
   const glossary = JSON.parse(read('web/src/data/terms.json')).sort(byId);
   const sources = JSON.parse(read('web/src/data/sources.json')).sort(byId);
   const cards = [
     ...readGuides().map(([id, label]) => ({ id: `guide-${id}`, label, group: 'setup', action: { type: 'route', href: `/guides#${id}` } })),
     { id: 'playground', label: 'ID-JAG Playground', description: 'The flow one step at a time, with every request, response and the code behind it.', group: 'try-it', action: { type: 'route', href: '/' }, terms: ['id-jag', 'jwt-bearer-grant', 'token-exchange'] },
+    { id: 'gateway-redeem', label: 'Gateway redeems the ID-JAG (Ping release claim, mock only)', description: 'The gateway exchanges the caller token (leg 1) and redeems the result at the target app\'s own issuer (leg 2). Ping release claim (2026-11-02), UNVERIFIED on our tenant.', group: 'try-it', action: { type: 'route', href: '/' }, terms: ['id-jag', 'token-exchange', 'jwt-bearer-grant'] },
+    { id: 'why-it-matters-gateway-redeem', label: 'Why it matters: the gateway redeems the ID-JAG (Ping claims, unverified)', description: WHY_IT_MATTERS, group: 'concept', action: { type: 'route', href: '/' }, terms: ['id-jag'] },
     { id: 'trusted-idps', label: 'Trusted IdPs', description: 'Register your IdP so our resource authorization server accepts its ID-JAGs.', group: 'try-it', action: { type: 'route', href: '/trusted-idps' }, terms: ['resource-authorization-server'] },
     { id: 'inspector', label: 'Inspector', description: 'Check an ID-JAG against the draft and the trust registry.', group: 'try-it', action: { type: 'route', href: '/inspect' }, terms: ['jti-replay', 'strict-client-binding'] },
   ].sort(byId);

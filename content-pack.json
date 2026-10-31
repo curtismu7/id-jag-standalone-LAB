@@ -442,6 +442,21 @@
   ],
   "cards": [
     {
+      "id": "gateway-redeem",
+      "label": "Gateway redeems the ID-JAG (Ping release claim, mock only)",
+      "description": "The gateway exchanges the caller token (leg 1) and redeems the result at the target app's own issuer (leg 2). Ping release claim (2026-11-02), UNVERIFIED on our tenant.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/"
+      },
+      "terms": [
+        "id-jag",
+        "token-exchange",
+        "jwt-bearer-grant"
+      ]
+    },
+    {
       "id": "guide-desktop",
       "label": "Use mcpc or VS Code as the client",
       "group": "setup",
@@ -536,6 +551,19 @@
       "terms": [
         "resource-authorization-server"
       ]
+    },
+    {
+      "id": "why-it-matters-gateway-redeem",
+      "label": "Why it matters: the gateway redeems the ID-JAG (Ping claims, unverified)",
+      "description": "Ping claim (deck slide 48, release 2026-11-02), UNVERIFIED on our tenant. Challenge: A tool name and arguments cannot say what was asked for, whether the agent was meant to do it, or whether it normally does. Technical: Three separable signals: deterministic intent patterns and purpose declarations refuse hard; learned behaviour baselines drive alerts and approval. Business: The enforceable declaration \"this agent exists to reconcile invoices\" unblocks unattended agents in processes that could not otherwise approve them.",
+      "group": "concept",
+      "action": {
+        "type": "route",
+        "href": "/"
+      },
+      "terms": [
+        "id-jag"
+      ]
     }
   ],
   "diagrams": [
@@ -544,6 +572,12 @@
       "label": "Your IdP → our resource AS diagram",
       "href": "/diagram/byo",
       "mode": "byo"
+    },
+    {
+      "id": "flow-gateway-redeem",
+      "label": "Gateway redeems the ID-JAG at the target app diagram",
+      "href": "/diagram/gateway-redeem",
+      "mode": "gateway-redeem"
     },
     {
       "id": "flow-mock",

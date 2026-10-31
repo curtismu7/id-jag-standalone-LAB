@@ -78,10 +78,34 @@ Say: "Among Ping products, PingFederate is the one that supports ID-JAG, and it 
 
 Say what Mock mode does not cover: signing in with xaa.dev's free IdP, the SAML option and the interop panel need real servers, so they are Live only and are greyed out or explain why.
 
-## Step 12: Make it the customer's story
+## Step 12: The gateway redeems the ID-JAG (a Ping release claim, mock only)
+
+Choose **Gateway redeems the ID-JAG (mock only)**. Point at the banner: "Ping release claim (2026-11-02), UNVERIFIED on our tenant". Say: "This is a feature of Ping's 2026-11-02 Privilege release. Our tenant does not have it, so I have not measured it. What you see is a mock inside this app that shows the shape of the claim." Point at the **Live** button in the header and read its note: gateway redeem has no Live mode, because the release is not on our tenant.
+
+Click **Run both legs**. Say: "The agent calls the gateway with a caller token. The gateway, configured with an On-Behalf-Of spec, exchanges that token at the exchange issuer (leg 1, RFC 8693). The result is an ID-JAG addressed to the target app's own issuer, naming the user and, in `act`, the calling client. Because a Redeem spec with a TokenURL is set, the gateway then redeems the ID-JAG at the target app's own issuer (leg 2, RFC 7523). The target app's API sees the user, and nobody shared a credential." Open the decoded ID-JAG and the decoded access token. Point at `aud` and `sub` in each; they come from this run.
+
+Scroll to the controls table. Say: "The API refused the caller's original token and the raw ID-JAG, and it names the check that failed. Neither was ever the API's to accept."
+
+Untick **send the second leg**, press **Save the spec** and run again. Say: "With no Redeem TokenURL there is no leg 2. The exchange result is not redeemed, it goes to the API as it is, and the API refuses it because an ID-JAG is a grant and not an access token." Press **Reset the spec**.
+
+Point at the field names and their tags. Say: "Every field name here is tagged: a console swagger name from 2026-10-31 (schema only, nothing was called), the lab's own reading, or something we made up. Open **Where every claim on this page comes from** for the full list." Say: "`ClientSecret` and `PrivateKeyPEM` are write-only. Type a value, save, and the server never shows it again, in any answer or trace."
+
+Click **Run all ten**. Walk the refusals: an assertion from an issuer the target does not trust, one addressed to another audience, an expired one, a replayed one, a tampered signature, a token URL on a host that is not allow-listed, a token URL that redirects, and the wrong client authentication method. Say: "Each one stops at a named stage for a named check, and no token is issued."
+
+## Step 13: Why it matters (Ping's claims, unverified)
+
+Say: "These three lines are from Ping's deck, slide 48. They are Ping claims, and we have not verified them on our tenant. The deck puts On-Behalf-Of and ID-JAG on the same slide as intent, purpose and behaviour."
+
+Challenge: "A tool name and arguments cannot say what was asked for, whether the agent was meant to do it, or whether it normally does."
+
+Technical: "Three separable signals: deterministic intent patterns and purpose declarations refuse hard; learned behaviour baselines drive alerts and approval."
+
+Business: "The enforceable declaration 'this agent exists to reconcile invoices' unblocks unattended agents in processes that could not otherwise approve them."
+
+## Step 14: Make it the customer's story
 
 Open the story panel under the mode picker. Pick another vertical in the picker (Airline, Super Banking, CareConnect, Great Buy or Generic) and read the goal and the first step aloud. Say: "The cast and the nouns come from data. The stories hold tokens like the cast member's name, not names. A `customer.config.json` can rename the cast, so the same demo tells the customer's story with their vocabulary."
 
-## Step 13: Close and reset
+## Step 15: Close and reset
 
 Say: "Everything you saw ran offline in Mock mode. To clear this demo for the next visitor, press **Start over** to clear the results and keep the sign-in, or run `npm run reset` to clear the run state. Your saved settings stay."

@@ -96,6 +96,10 @@ const nodeTypes = { card: Card };
 // Labels keep one size on screen, so below this zoom the diagram is too small to hold them without covering each other.
 // The view never zooms out further (a phone shows part of the diagram and pans); the Fit button fits down to this zoom.
 const MIN_ZOOM = 0.4;
+// A diagram whose text must stay readable never zooms out below this: a card's smallest text is 11.52px, so at 0.9 it is 10.4px on screen
+// (10px is the floor). Its boxes sit close together so the whole map still fits a desktop canvas; a phone pans.
+const READABLE_MIN_ZOOM = 0.9;
+const READABLE_MODES = new Set(["gateway-redeem"]);
 const edgeTypes = { flow: FlowEdge };
 
 /** Computed nodes made draggable: remembers where each node was dropped (view-only, resets on reload). */
@@ -275,6 +279,18 @@ function PlaygroundFlow({ mode, d }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, panel, measured]);
 
+  // Refit when the window changes size (a rotated phone, a resized window, the browser's own zoom): same fit as the step asks for.
+  useEffect(() => {
+    let t;
+    const refit = () => {
+      clearTimeout(t);
+      t = setTimeout(() => rf.fitView({ nodes: step ? lit.focus.map((id) => ({ id })) : undefined, padding: step ? 0.4 : 0.05, duration: 200, maxZoom: 1 }), 150);
+    };
+    window.addEventListener("resize", refit);
+    return () => { clearTimeout(t); window.removeEventListener("resize", refit); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
   useEffect(() => {
     if (!playing) return undefined;
     const t = setTimeout(() => (step >= last ? setPlaying(false) : setStep(step + 1)), SPEEDS.find((s) => s.id === speed).ms);
@@ -369,7 +385,7 @@ function PlaygroundFlow({ mode, d }) {
         </div>
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
           onNodesChange={onNodesChange} nodesDraggable nodeDragThreshold={5} onNodeClick={onNodeClick} onNodeDragStart={() => setDragging(true)} onNodeDragStop={() => { lastDrag.current = Date.now(); setDragging(false); }} connectionMode={ConnectionMode.Loose}
-          fitView fitViewOptions={{ padding: 0.05 }} minZoom={MIN_ZOOM} nodesConnectable={false} proOptions={{ hideAttribution: true }}>
+          fitView fitViewOptions={{ padding: 0.05 }} minZoom={READABLE_MODES.has(mode) ? READABLE_MIN_ZOOM : MIN_ZOOM} nodesConnectable={false} proOptions={{ hideAttribution: true }}>
           <Background gap={24} />
           <Controls showInteractive={false} />
         </ReactFlow>
