@@ -8,3 +8,4 @@
 .signin-actions button { padding: 0.45rem 1rem; border-radius: 6px; font: inherit; font-size: var(--font-size-xs); font-weight: 600; cursor: pointer; }
 .signin-cancel { border: 1px solid var(--th-border); background: transparent; color: var(--th-text); }
 .signin-submit { border: 0; background: var(--ping-grad); color: var(--brand-on, var(--on-accent)); }
+.signin-hint { margin: 0.75rem 0 0; font-size: var(--font-size-xs); overflow-wrap: anywhere; }

@@ -1,0 +1,13 @@
+/* The Mock/Live toggle and its banner. Colours come from the shared tokens; the shared stylesheet draws the buttons and
+   the banner (and the accent fill of aria-pressed), so this file is layout only. */
+.mode-toggle { display: inline-flex; align-items: center; gap: 0.35rem; }
+.mode-toggle__label { color: var(--brand-header-soft, var(--muted)); font-size: var(--font-size-2xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.mode-toggle__button { min-height: 0; padding: 0.3rem 0.8rem; border-radius: 6px; font-size: var(--font-size-2xs); }
+.mode-toggle__button[aria-disabled="true"] { opacity: 0.75; cursor: not-allowed; }
+
+.mode-banner { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; }
+.mode-banner__badge { font-weight: 800; letter-spacing: 0.06em; }
+.mode-banner__text { min-width: 0; }
+.mode-banner__hint { flex-basis: 100%; min-width: 0; color: var(--text); font-weight: 600; }
+.mode-banner[data-state="mock"] .mode-banner__badge { color: var(--danger-text); }
+.mode-banner[data-state="live"] .mode-banner__badge { color: var(--status-info); }
