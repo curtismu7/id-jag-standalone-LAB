@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import IdJagPlaygroundDiagramPage from "../IdJagPlaygroundDiagramPage";
+import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import IdJagPlaygroundDiagramPage, { labelTransform, useDraggableNodes, wordsShown } from "../IdJagPlaygroundDiagramPage";
 import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES, playgroundDiagramPath, stepParts } from "../../utils/idJagPlaygroundDiagrams";
 
 const open = (url) => {
@@ -106,5 +106,49 @@ describe("ID-JAG playground diagram page", () => {
   it("falls back to the pf-as diagram for an unknown mode", () => {
     open("/diagram/nope");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("PingFederate → resource AS");
+  });
+});
+
+describe("diagram labels and Reset", () => {
+  it("Reset puts every box back where it started", () => {
+    const computed = [{ id: "a", position: { x: 0, y: 0 } }, { id: "b", position: { x: 300, y: 40 } }];
+    const { result } = renderHook(() => useDraggableNodes(computed));
+    act(() => result.current.onNodesChange([{ type: "position", id: "a", position: { x: 55, y: 66 } }]));
+    expect(result.current.nodes[0].position).toEqual({ x: 55, y: 66 });
+    expect(result.current.nodes[1].position).toEqual({ x: 300, y: 40 });
+    act(() => result.current.reset());
+    expect(result.current.nodes.map((n) => n.position)).toEqual([{ x: 0, y: 0 }, { x: 300, y: 40 }]);
+  });
+
+  it("the Reset button clears the step and the moved boxes", () => {
+    open(playgroundDiagramPath("pf-as", 3));
+    expect(pressed()).toEqual(["3 · Redeem at resource-as"]);
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    expect(pressed()).toEqual(["Overview"]);
+  });
+
+  it("the step list holds every call of the step, as focusable entries that mark the arrow", () => {
+    open(playgroundDiagramPath("pf-as", 3));
+    const items = [...screen.getByTestId("pgd-calls").querySelectorAll("li")];
+    expect(items.map((li) => li.textContent)).toEqual(PLAYGROUND_DIAGRAMS["pf-as"].edges.filter((e) => e.steps.includes(3)).map((e) => e.label));
+    for (const li of items) expect(li).toHaveAttribute("tabindex", "0");
+  });
+});
+
+describe("label words and scale", () => {
+  const place = { x: 10, y: 20, side: "r", valign: "c", w: 200, h: 30, ok: true };
+  it("shows the words for a lit or hovered arrow that has a clear place, and never while a box is dragged", () => {
+    expect(wordsShown({ place, on: true })).toBe(true);
+    expect(wordsShown({ place, hover: true })).toBe(true);
+    expect(wordsShown({ place })).toBe(false);
+    expect(wordsShown({ place, on: true, dragging: true })).toBe(false);
+    expect(wordsShown({ place: { ...place, ok: false }, on: true, hover: true })).toBe(false);
+    expect(wordsShown({ on: true })).toBe(true); // no route, so no place to choose: the words sit on the plain path
+  });
+  it("counter-scales the label by 1 / zoom and anchors the badge centre on the arrow for every side and alignment", () => {
+    expect(labelTransform(place, 100, 50, 0.5)).toBe("translate(100px,50px) scale(2) translate(-12px,-50%)");
+    expect(labelTransform({ ...place, side: "l", valign: "u" }, 100, 50, 2)).toBe("translate(100px,50px) scale(0.5) translate(calc(-100% + 12px),calc(-100% + 12px))");
+    expect(labelTransform({ ...place, valign: "d" }, 0, 0, 1)).toBe("translate(0px,0px) scale(1) translate(-12px,-12px)");
+    expect(labelTransform(undefined, 7, 8, 1)).toBe("translate(7px,8px) scale(1) translate(-50%,-50%)");
   });
 });

@@ -31,7 +31,8 @@ vi.mock("@xyflow/react", () => ({
   ReactFlowProvider: ({ children }) => children,
   useReactFlow: () => ({ fitView: rf.fitView }),
   useNodesInitialized: () => true,
-  useStore: (sel) => sel({ nodeLookup: rf.lookup }), // empty in most tests: no measured boxes, so no routes
+  useStore: (sel) => sel({ nodeLookup: rf.lookup, transform: [0, 0, 1] }), // empty in most tests: no measured boxes, so no routes
+  useStoreApi: () => ({ getState: () => ({ transform: [0, 0, 1], width: 1000, height: 700 }), subscribe: () => () => {} }),
   EdgeLabelRenderer: ({ children }) => <div>{children}</div>,
   BaseEdge: ({ className }) => <path className={className} />,
   getSmoothStepPath: () => ["M0,0", 0, 0],
