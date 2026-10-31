@@ -16,8 +16,12 @@
 import crypto from 'node:crypto';
 import express from 'express';
 import { config, secret } from './config.js';
+import { isMock, runtimeEnv } from './mode.js';
+import { setRegistrySource } from './mock/index.js';
+import { mockSigninProblem } from './mockSignin.js';
 import { getIssuerSubjectToken } from './issuerSession.js';
 import { mountInterop } from './interop.js';
+import { outboundFetch } from './outbound.js';
 import * as trustedIdps from './trustedIdps.js';
 import { SPEC, decodeJwt, inspect, scopeList, trimSlash } from './tokenChecks.js';
 import { piFlowHandlers } from './auth/piFlow.js';
@@ -161,7 +165,7 @@ const requireIssuerSignIn = requireRealWhen(() => false); // issuing by refresh 
 const basic = (id, sec) => `Basic ${Buffer.from(`${id}:${sec}`).toString('base64')}`;
 
 async function postForm(url, form, headers = {}) {
-  const r = await fetch(url, {
+  const r = await outboundFetch(url, {
     method: 'POST', body: form.toString(), signal: AbortSignal.timeout(15000),
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json', ...headers },
   });
@@ -285,7 +289,7 @@ export async function probe(url, fresh) {
   if (!fresh && hit && Date.now() - hit.at < PROBE_TTL_MS) return hit.result;
   probes.delete(url);
   try {
-    const r = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(4000) });
+    const r = await outboundFetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(4000) });
     const result = { status: r.status, data: await r.json().catch(() => null) };
     if (r.status >= 200 && r.status < 300) probes.set(url, { at: Date.now(), result });
     return result;
@@ -305,7 +309,7 @@ const PROBE_TIMEOUT_MS = 4000;
  * (over 1.5 s) or down (error, non-2xx, or no answer in 4 s). A resource AS without RFC 8414 metadata
  * (PingFederate as redeemer) falls back to its OpenID configuration.
  */
-export async function probeBackends(s, mcpUrl, fetchImpl = fetch) {
+export async function probeBackends(s, mcpUrl, fetchImpl = outboundFetch) {
   const as = originOf(s.resourceAs.tokenEndpoint);
   const targets = [
     { id: 'idp', label: s.idp.name, urls: s.idp.issuer ? [`${trimSlash(s.idp.issuer)}/.well-known/openid-configuration`] : [] },
@@ -346,7 +350,7 @@ router.get('/as-events', async (req, res) => {
   }
   try {
     // Fixed base: the configured token endpoint's origin, never a caller-supplied URL.
-    const r = await fetch(`${new URL(config().resourceAsTokenEndpoint).origin}/events`, { signal: AbortSignal.timeout(4000) });
+    const r = await outboundFetch(`${new URL(config().resourceAsTokenEndpoint).origin}/events`, { signal: AbortSignal.timeout(4000) });
     if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
     const events = (await r.json()).events;
     const jti = decodeJwt(req.session?.idJagPlayground?.idJag)?.claims?.jti;
@@ -574,7 +578,7 @@ async function preflight(req, step) {
       pfRedeems ? 'Check PF_URL and that PingFederate is up.' : 'Start resource-as (npm start -w resource-as, or docker compose), or fix RESOURCE_AS_TOKEN_ENDPOINT.');
   }
 
-  if (!pfRedeems && at('redeem', 'negative') && !process.env.ID_JAG_REGISTRY_TOKEN) {
+  if (!pfRedeems && at('redeem', 'negative') && !runtimeEnv().ID_JAG_REGISTRY_TOKEN) {
     add('registry', 'resource-as can read this server\'s trust list', 'warn',
       'ID_JAG_REGISTRY_TOKEN is unset, so resource-as cannot read the Trusted IdPs registry (which also lists PF_URL for pf-as). Unless its TRUSTED_IDPS_FILE names the issuer, it answers "ID-JAG issuer is not trusted".',
       'Set ID_JAG_REGISTRY_TOKEN (openssl rand -hex 32) in .env for both this server and resource-as, then restart both.');
@@ -623,6 +627,8 @@ const issuerFlow = piFlowHandlers({
   key: 'idJagIssuerLogin',
   redirectUri: issuerRedirectUri,
   prepare(req) {
+    const blocked = mockSigninProblem(req);
+    if (blocked) return { fail: [blocked.status, { error: blocked.error, message: blocked.message }] };
     const mode = modeOf(req);
     if (mode === 'byo') return { fail: [409, { error: 'byo_mode', message: 'Your IdP issues the ID-JAG: no sign-in here.' }] };
     const keys = missing(mode);
@@ -801,6 +807,7 @@ const xaaEntry = () => trustedIdps.list().find((e) => e.issuer === XAA_ISSUER) |
 
 /** null when this server can run the xaa.dev flow, else why not. */
 function xaaUnavailableReason() {
+  if (isMock()) return 'xaa.dev is a service on the internet and mock mode makes no outside calls. Switch to Live to use it.';
   const issuer = config().resourceAsIssuer;
   if (!/^https:\/\//i.test(issuer)) {
     return `xaa.dev addresses ID-JAGs to a public https issuer registered at xaa.dev, and resource-as's issuer here is ${issuer || '(unset)'}: host this app (Phase 4) and register it.`;
@@ -811,7 +818,7 @@ function xaaUnavailableReason() {
 
 // ponytail: discovery is fetched per call (three per sign-in + exchange); cache it if xaa.dev traffic ever matters.
 async function xaaDiscovery() {
-  const r = await fetch(`${XAA_ISSUER}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(10000) });
+  const r = await outboundFetch(`${XAA_ISSUER}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(10000) });
   const d = await r.json();
   const https = (u) => { try { return new URL(u).protocol === 'https:'; } catch { return false; } };
   if (d?.issuer !== XAA_ISSUER || ![d.authorization_endpoint, d.token_endpoint, d.jwks_uri].every(https)) throw new Error(`discovery is not for ${XAA_ISSUER}`);
@@ -820,7 +827,7 @@ async function xaaDiscovery() {
 
 async function verifyXaaIdToken(idToken, d, nonce) {
   const { jwtVerify, createLocalJWKSet } = await import('jose');
-  const jwks = await (await fetch(d.jwks_uri, { signal: AbortSignal.timeout(10000) })).json();
+  const jwks = await (await outboundFetch(d.jwks_uri, { signal: AbortSignal.timeout(10000) })).json();
   const { payload } = await jwtVerify(idToken, createLocalJWKSet(jwks), {
     issuer: XAA_ISSUER, audience: secret('XAA_DEV_IDP_CLIENT_ID'), algorithms: ['RS256'], clockTolerance: 5,
   });
@@ -925,7 +932,7 @@ router.post('/redeem', requireReal, async (req, res) => {
 
 /** One JSON-RPC request to the MCP server (MCP_URL) with the access token. Server-side only: mcp-sample has no CORS. */
 async function mcpRpc(token, rpc) {
-  const r = await fetch(config().mcpUrl, {
+  const r = await outboundFetch(config().mcpUrl, {
     method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 1, ...rpc }), signal: AbortSignal.timeout(15000),
     headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}` },
   });
@@ -980,7 +987,7 @@ router.post('/resource', async (req, res) => {
   if (v.missing && !token) return res.status(409).json({ error: 'no_token', message: v.missing });
   const request = { method: 'GET', url, authorization: v.shown };
   try {
-    const r = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {}, signal: AbortSignal.timeout(10000) });
+    const r = await outboundFetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {}, signal: AbortSignal.timeout(10000) });
     return res.json({ request, status: r.status, wwwAuthenticate: r.headers?.get?.('www-authenticate') || null, body: await r.json().catch(() => null) });
   } catch (err) {
     return res.status(502).json({ error: 'resource_unreachable', message: `Could not reach ${url} (${err.cause?.code || err.message}).`, request });
@@ -1051,6 +1058,9 @@ export function withPfAsIssuer({ idps }) {
   return { idps: [{ id: 'pf-as', issuer: c.pfUrl, jwksUrl: pfEndpoints(c.pfUrl).jwksUrl,
     clientAliases: { [c.pfExchangeClientId]: c.resourceAsClientId, [c.resourceAsClientId]: c.resourceAsClientId }, scopes: '' }, ...idps] };
 }
+
+// Mock mode: the mock resource AS trusts exactly what the real one would be told to trust.
+setRegistrySource(() => withPfAsIssuer(trustedIdps.resourceAsRegistry()));
 
 // Start over from step 2: forget the ID-JAG and the access token (each ID-JAG is single-use, so a redeemed one is dead).
 // Unlike /reset this keeps the sign-in at the issuer, so the next Request ID-JAG works straight away.

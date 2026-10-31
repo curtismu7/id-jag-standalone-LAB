@@ -2,8 +2,9 @@
 // (PingFederate -> PingOne) is configured the same way: never trust the IdP config alone.
 
 const DEFAULT_DOMAINS = 'pingidentity.com,pingone.com';
+import { runtimeEnv } from '../mode.js';
 
-export const allowedDomains = (env = process.env) =>
+export const allowedDomains = (env = runtimeEnv()) =>
   String(env.ALLOWED_EMAIL_DOMAINS || DEFAULT_DOMAINS).split(',').map((d) => d.trim().toLowerCase()).filter(Boolean);
 
 const refuse = (rule, message) => ({ rule, message });

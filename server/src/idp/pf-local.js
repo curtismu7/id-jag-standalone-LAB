@@ -3,6 +3,7 @@
 import { appHandlers } from '../auth/piFlow.js';
 import { missingConfig, oidcConfig } from '../auth/oidc.js';
 import { demoJson } from '../demoJson.js';
+import { runtimeEnv } from '../mode.js';
 import { addUser, removeUser } from '../pfUsers.js';
 import { pfAdmin } from './pfAdmin.js';
 
@@ -18,7 +19,7 @@ function productionLike(env) {
 }
 
 /** PF admin slice of the doctor: reachable, the kit validator (with its anchor user), the pi.flow client, the account rule. */
-async function doctor({ env = process.env, adminCall, client = pfAdmin() } = {}) {
+async function doctor({ env = runtimeEnv(), adminCall, client = pfAdmin() } = {}) {
   if (!val(env, 'PF_ADMIN_URL')) return [];
   if (!val(env, 'PF_ADMIN_PASSWORD')) {
     return [r('pf-admin', 'fail', 'PF_ADMIN_URL is set but PF_ADMIN_PASSWORD is unset', 'Set PF_ADMIN_PASSWORD (and PF_ADMIN_USER if not administrator).')];
