@@ -7,6 +7,7 @@ import { requireAdmin, sameOrigin } from './auth/oidc.js';
 import { _clearProbeCache } from './idJagPlayground.js';
 import { removeUserForReset as removeUser } from './idp/index.js';
 import { currentMode, isMock } from './mode.js';
+import { resetGatewayRedeem } from './gatewayRedeem.js';
 import { resetMock } from './mock/index.js';
 import { resetRateLimit } from './registrationRoutes.js';
 import { removeClient } from './registry/clients.js';
@@ -21,7 +22,7 @@ router.post('/admin/reset', async (req, res) => {
   if (req.body?.confirm !== 'reset') return res.status(400).json({ error: 'invalid_request', message: 'send {"confirm":"reset"}' });
   const report = await reset({
     dataDir: dataDir(), now: new Date(), actor: req.session.user.email, removeUser, removeClient,
-    clearSessions: (cb) => sessionStore.clearWorkspace(currentWorkspace(), cb), clearMemory: [_clearProbeCache, resetRateLimit, ...(isMock() ? [resetMock] : [])], // mock mode: the mock servers forget their sign-ins, refresh tokens and used ID-JAGs too
+    clearSessions: (cb) => sessionStore.clearWorkspace(currentWorkspace(), cb), clearMemory: [_clearProbeCache, resetRateLimit, ...(isMock() ? [resetMock, () => resetGatewayRedeem(currentWorkspace())] : [])], // mock mode: the mock servers forget their sign-ins, refresh tokens and used ID-JAGs too
   });
   return res.status(report.ok ? 200 : 502).json({ ...report, mode: currentMode() });
 });

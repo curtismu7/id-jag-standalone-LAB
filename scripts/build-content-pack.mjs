@@ -23,12 +23,17 @@ function readGuides() {
   return [...block[1].matchAll(/\[\s*"([^"]+)",\s*"([^"]+)"\s*\]/g)].map(([, id, title]) => [id, title]);
 }
 
+// No "why it matters" card for the gateway redeem feature: section 10 of the feature prompt has no On-Behalf-Of or ID-JAG row, and
+// the slide 48 row there is Intent, Purpose, Behaviour (a different feature). The owner supplies the Challenge, Technical and Business
+// lines for this feature; until then none ships (a test fails if a card carries the slide 48 text).
+
 export async function buildPack({ commit } = {}) {
   const glossary = JSON.parse(read('web/src/data/terms.json')).sort(byId);
   const sources = JSON.parse(read('web/src/data/sources.json')).sort(byId);
   const cards = [
     ...readGuides().map(([id, label]) => ({ id: `guide-${id}`, label, group: 'setup', action: { type: 'route', href: `/guides#${id}` } })),
     { id: 'playground', label: 'ID-JAG Playground', description: 'The flow one step at a time, with every request, response and the code behind it.', group: 'try-it', action: { type: 'route', href: '/' }, terms: ['id-jag', 'jwt-bearer-grant', 'token-exchange'] },
+    { id: 'gateway-redeem', label: 'Gateway redeems the ID-JAG (Ping release claim, mock only)', description: 'The gateway exchanges the caller token (leg 1) and redeems the result at the target app\'s own issuer (leg 2). Ping release claim (2026-11-02), UNVERIFIED on our tenant.', group: 'try-it', action: { type: 'route', href: '/' }, terms: ['id-jag', 'token-exchange', 'jwt-bearer-grant'] },
     { id: 'trusted-idps', label: 'Trusted IdPs', description: 'Register your IdP so our resource authorization server accepts its ID-JAGs.', group: 'try-it', action: { type: 'route', href: '/trusted-idps' }, terms: ['resource-authorization-server'] },
     { id: 'inspector', label: 'Inspector', description: 'Check an ID-JAG against the draft and the trust registry.', group: 'try-it', action: { type: 'route', href: '/inspect' }, terms: ['jti-replay', 'strict-client-binding'] },
   ].sort(byId);

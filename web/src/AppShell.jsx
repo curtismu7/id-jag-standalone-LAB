@@ -4,7 +4,7 @@ import { signIn } from "./utils/signIn";
 import { CustomerProvider, useCustomer } from "./customer/CustomerConfig";
 import SignInModal from "./components/SignInModal";
 import { ModeProvider } from "./mode/ModeContext";
-import { ModeBanner, ModeToggle } from "./mode/ModeToggle";
+import { ClaimBanner, ModeBanner, ModeToggle } from "./mode/ModeToggle";
 import { PresentBar, PresentProvider, PresentToggle } from "./present/PresentMode";
 import "./AppShell.css";
 
@@ -63,6 +63,7 @@ function Shell({ children }) {
         </button>
       </header>
       <ModeBanner />
+      <ClaimBanner />
       <PresentBar />
       {children}
       <SignInModal />

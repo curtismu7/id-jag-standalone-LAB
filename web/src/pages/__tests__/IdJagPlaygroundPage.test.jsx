@@ -713,3 +713,43 @@ describe("ID-JAG playground page", () => {
     expect(within(panel).getByRole("link", { name: "Trusted IdPs page" })).toHaveAttribute("href", "/trusted-idps");
   });
 });
+
+describe("gateway redeem mode", () => {
+  const gwConfig = (over = {}) => config({ mode: "gateway-redeem", signedIn: false,
+    modes: [{ id: "pf-as", label: "PingFederate", available: true }, { id: "gateway-redeem", label: "Gateway redeems the ID-JAG (mock only)", available: true, reason: null }], ...over });
+  const mountGw = (cfg, available = true) => {
+    localStorage.setItem("idjag.playground.mode", "gateway-redeem");
+    get.mockImplementation((url) => {
+      if (url.endsWith("/config")) return Promise.resolve({ data: cfg });
+      if (url.endsWith("/gateway-redeem/state")) return Promise.resolve({ data: { available, reason: available ? null : "Live mode is not available for gateway redeem.", claim: "x", spec: { OBO: { TokenURL: "", ClientID: "", ClientSecret: { set: false }, AuthMethod: "client_secret_basic", Resource: "", Scope: "", PrivateKeyPEM: { set: false }, KeyID: "", SubjectTokenType: "t", RequestedTokenType: "r", Redeem: null } }, authMethods: ["client_secret_basic"], allowList: [], cast: {}, scenarios: [], claims: [] } });
+      return Promise.resolve({ data: url.includes("/preflight?") ? PREFLIGHT_OK : [] });
+    });
+    return render(<IdJagPlaygroundPage />);
+  };
+
+  it("replaces the six sign-in steps with the gateway panel, keeps the talk track, and hides the sign-in controls", async () => {
+    mountGw(gwConfig());
+    expect(await screen.findByTestId("gateway-redeem")).toBeInTheDocument();
+    expect(screen.getByTestId("ijp-story")).toHaveTextContent("Ping release claim (2026-11-02), unverified on our tenant");
+    expect(screen.getByTestId("story-panel")).toHaveTextContent("Story S48");
+    expect(screen.queryByRole("heading", { name: /Sign in at the issuer/ })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Sign-in protocol" })).toBeNull();
+    expect(screen.queryByText("How other implementations do it")).toBeNull();
+    expect(screen.getByRole("group", { name: "Playground mode" })).toHaveTextContent("Gateway redeems the ID-JAG (mock only)");
+    expect(document.querySelectorAll("[id^='ijp-step-']").length).toBe(5);
+  });
+
+  it("links the mode to its own diagram", async () => {
+    mountGw(gwConfig());
+    await screen.findByTestId("gateway-redeem");
+    expect(screen.getByRole("link", { name: /View Gateway redeems the ID-JAG at the target app diagram/ })).toHaveAttribute("href", "/diagram/gateway-redeem");
+  });
+
+  it("in Live mode the panel says it is unavailable and the mode is disabled in the picker with the reason", async () => {
+    const reason = "Live mode is not available for gateway redeem: the 2026-11-02 release is not on our tenant.";
+    mountGw(gwConfig({ modes: [{ id: "pf-as", label: "PingFederate", available: true }, { id: "gateway-redeem", label: "Gateway redeems the ID-JAG (mock only)", available: false, reason }] }), false);
+    expect(await screen.findByTestId("gr-live-unavailable")).toHaveTextContent("Live is unavailable for this mode");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Gateway redeems the ID-JAG (mock only)" })).toBeDisabled());
+    expect(screen.getByRole("button", { name: "Gateway redeems the ID-JAG (mock only)" })).toHaveAttribute("title", reason);
+  });
+});

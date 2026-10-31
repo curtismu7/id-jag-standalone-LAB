@@ -41,6 +41,18 @@ describe("app shell", () => {
     await screen.findByRole("button", { name: "Sign in" }); // /api/me settled (no server here)
   });
 
+  it("shows the release-claim banner on a page and again in presenter mode, and the gateway redeem Live note", async () => {
+    vi.stubGlobal("fetch", respond(401, '{"error":"not_signed_in"}'));
+    render(<AppShell><p>child</p></AppShell>);
+    expect(screen.getByTestId("claim-banner")).toHaveTextContent("Ping release claim (2026-11-02), UNVERIFIED on our tenant");
+    fireEvent.click(screen.getByRole("button", { name: "Present" }));
+    expect(document.documentElement.dataset.present).toBe("1");
+    expect(screen.getByTestId("claim-banner")).toBeVisible();
+    expect(screen.getByTestId("claim-banner")).not.toHaveAttribute("data-admin-only");
+    fireEvent.click(screen.getByRole("button", { name: "Present" }));
+    await screen.findByRole("button", { name: "Sign in" });
+  });
+
   it("shows Sign in when signed out", async () => {
     vi.stubGlobal("fetch", respond(401, '{"error":"not_signed_in"}'));
     render(<AppShell><p>child</p></AppShell>);

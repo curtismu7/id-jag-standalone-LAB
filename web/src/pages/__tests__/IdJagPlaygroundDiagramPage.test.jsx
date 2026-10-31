@@ -11,7 +11,7 @@ afterEach(() => window.history.pushState({}, "", "/"));
 
 describe("ID-JAG playground diagram data", () => {
   it("has one diagram per playground mode", () => {
-    expect(PLAYGROUND_DIAGRAM_MODES).toEqual(["mock", "pf-as", "pf-pf", "byo"]);
+    expect(PLAYGROUND_DIAGRAM_MODES).toEqual(["mock", "pf-as", "pf-pf", "byo", "gateway-redeem"]);
   });
 
   it.each(PLAYGROUND_DIAGRAM_MODES)("%s: every edge joins two actors and every step 1-5 has a call", (mode) => {
@@ -26,13 +26,25 @@ describe("ID-JAG playground diagram data", () => {
     for (const n of [1, 2, 3, 4, 5]) expect(stepParts(d, n).edges.length, `step ${n}`).toBeGreaterThan(0);
   });
 
-  it("uses this repo's actors: no MCP gateway, step 4 goes straight to mcp-sample", () => {
-    for (const mode of PLAYGROUND_DIAGRAM_MODES) {
+  it("uses this repo's actors: no MCP gateway, step 4 goes straight to mcp-sample (the gateway-redeem mode is the gateway and has its own target API)", () => {
+    for (const mode of PLAYGROUND_DIAGRAM_MODES.filter((m) => m !== "gateway-redeem")) {
       const d = PLAYGROUND_DIAGRAMS[mode];
       expect(JSON.stringify(d)).not.toMatch(/[Gg]ateway|oauth-mcp|BFF/); // kind "bff" is only a colour
       expect(d.edges.filter((e) => e.steps.includes(4)).some((e) => e.to === "mcp")).toBe(true);
     }
     expect(PLAYGROUND_DIAGRAMS["pf-as"].nodes.map((n) => n.title)).toContain("resource-as · resource AS");
+  });
+
+  it("gateway-redeem: leg 2 exists only as its own arrow, the refusals are dashed, and the claim is stated", () => {
+    const d = PLAYGROUND_DIAGRAMS["gateway-redeem"];
+    expect(d.overview).toMatch(/Ping release claim \(2026-11-02\), UNVERIFIED on our tenant/);
+    const lit = (n) => d.edges.filter((e) => e.steps.includes(n)).map((e) => `${e.from}>${e.to}`);
+    expect(lit(2)).toEqual(["gateway>exchange", "exchange>gateway"]);
+    expect(lit(3)).toEqual(["gateway>targetidp", "targetidp>gateway"]);
+    expect(lit(4)).toEqual(["gateway>api"]);
+    expect(d.edges.filter((e) => e.dashed).map((e) => e.to)).toEqual(["api", "api"]);
+    expect(d.edges.find((e) => e.from === "gateway" && e.to === "targetidp").label).toMatch(/only if Redeem\.TokenURL is set/);
+    expect(JSON.stringify(d)).not.toMatch(/\bdoor\b/i);
   });
 
   it("shows where trust comes from as dashed reads, and the mode gotchas", () => {

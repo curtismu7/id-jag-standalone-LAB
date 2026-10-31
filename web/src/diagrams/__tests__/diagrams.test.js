@@ -4,6 +4,7 @@ import { validateDiagram } from "../diagramSchema";
 import { diagramNames, loadDiagram } from "../loadDiagram";
 import { assignHandles, toPlaygroundModel } from "../playgroundModel";
 import { PLAYGROUND_DIAGRAMS } from "../../utils/idJagPlaygroundDiagrams";
+import { routeEdges } from "../../utils/idJagPlaygroundRouting";
 
 // vitest runs with the web package as its working directory (npm test -w web, or from web/)
 const dir = `${path.resolve(process.cwd(), "..", "diagrams")}/`;
@@ -11,7 +12,7 @@ const files = fs.readdirSync(dir).filter((f) => f.endsWith(".json")).map((f) => 
 
 describe("diagram-studio/1 data in diagrams/", () => {
   it("has one file per playground mode, and the loader finds them all by name", () => {
-    expect(files).toEqual(["byo", "mock", "pf-as", "pf-pf"]);
+    expect(files).toEqual(["byo", "gateway-redeem", "mock", "pf-as", "pf-pf"]);
     expect(diagramNames().sort()).toEqual(files);
   });
 
@@ -78,5 +79,17 @@ describe("the playground model built from the data", () => {
     expect(two[0].fh[0]).toBe("R");
     const five = assignHandles(nodes, Array.from({ length: 5 }, () => ({ from: "a", to: "b" })));
     expect(new Set(five.map((h) => h.fh)).size).toBe(5);
+  });
+
+  // A box dragged a little must not leave an arrow without a route (an unrouted arrow is drawn straight and its badge lands on a box).
+  it("gateway-redeem: every arrow still routes after any one box is dragged 70 right/left and 50 down/up", () => {
+    const d = PLAYGROUND_DIAGRAMS["gateway-redeem"];
+    const height = { agent: 98, gateway: 185, exchange: 115, targetidp: 132, api: 115 }; // as drawn at the page's width of 300
+    const at = (moved, dx, dy) => Object.fromEntries(d.nodes.map((n) => [n.id, { x: n.x + (n.id === moved ? dx : 0), y: n.y + (n.id === moved ? dy : 0), w: 300, h: height[n.id] }]));
+    expect(routeEdges(at(null, 0, 0), d.edges).fallbacks).toBe(0);
+    for (const n of d.nodes) for (const dx of [-70, 70]) for (const dy of [-50, 50]) {
+      const { fallbacks } = routeEdges(at(n.id, dx, dy), d.edges);
+      expect({ moved: n.id, dx, dy, fallbacks }).toEqual({ moved: n.id, dx, dy, fallbacks: 0 });
+    }
   });
 });
