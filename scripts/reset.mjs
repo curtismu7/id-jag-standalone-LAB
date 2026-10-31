@@ -5,9 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { removeUserForReset as removeUser } from '../server/src/idp/index.js';
 import { removeClient } from '../server/src/registry/clients.js';
 import { reset } from '../server/src/reset.js';
+import { loadSettings } from '../server/src/settings.js';
 import { DEFAULT_WORKSPACE, dataDir } from '../server/src/workspace.js';
 
-try { process.loadEnvFile(fileURLToPath(new URL('../.env', import.meta.url))); } catch { /* no .env */ }
+loadSettings({ repoEnv: fileURLToPath(new URL('../.env', import.meta.url)) });
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');

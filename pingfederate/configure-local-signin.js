@@ -11,6 +11,9 @@
  *   node pingfederate/configure-local-signin.js --ns=<ns> [--port=19999] [--users=a@pingidentity.com,b@pingone.com]
  *   node pingfederate/configure-local-signin.js --ns=<ns> --mode=pingone     # put the PingOne hop back
  *
+ * With no kit policy yet (PF_ADMIN_URL runs by `npm run setup`, after `configure-signin.js --local`), --mode=local creates the
+ * policy itself: the kit client -> the form adapter, everything else CONTINUEs to the policies that were already there.
+ *
  * Creates (ids prefixed idJagKit): a Simple Username Password credential validator holding ONLY the kit's users, an HTML
  * form adapter on it, the policy branch, and lets the kit's client start a pi.flow (allowAuthenticationApiInit). Usernames must be email addresses the kit would accept (allowed domain, no
  * "+"): the ID token's email is the username and email_verified is a constant, because these accounts are created here.
@@ -29,6 +32,7 @@ const PORT = args.port || '19999';
 const MODE = args.mode || 'local';
 const CLIENT = process.env.PF_EXCHANGE_CLIENT_ID || 'id-jag-kit';
 const ID = { pcv: 'idJagKitPcv', adapter: 'idJagKitHtmlForm', apc: 'idJagKitApc', selector: 'idJagKitClientSelector', conn: 'idJagKitP1' };
+const HTML_FORM = 'com.pingidentity.adapters.htmlform.idp.HtmlFormIdpAuthnAdapter';
 const CLAIMS = ['email', 'email_verified', 'name', 'groups'];
 const USERS_FILE = path.join(__dirname, '../deploy/local/kit-users.json');
 const DOMAINS = String(process.env.ALLOWED_EMAIL_DOMAINS || 'pingidentity.com,pingone.com').split(',').map((d) => d.trim().toLowerCase());
@@ -58,8 +62,14 @@ const userRow = (username, password) => ({ defaultRow: false, fields: [
 (async () => {
   const api = adminApi(NS, PORT);
   const policy = await api('GET', '/authenticationPolicies/default');
-  const tree = policy.body?.authnSelectionTrees?.find((t) => t.rootNode.action.authenticationSelectorRef?.id === ID.selector);
-  if (!tree) { console.error('the kit policy tree is missing: run pingfederate/configure-signin.js first'); process.exit(1); }
+  let tree = policy.body?.authnSelectionTrees?.find((t) => t.rootNode.action.authenticationSelectorRef?.id === ID.selector);
+  if (!tree && MODE !== 'local') { console.error('the kit policy tree is missing: run pingfederate/configure-signin.js first'); process.exit(1); }
+  const newTree = !tree;
+  if (newTree) { // first run on a PingFederate with no PingOne hop: the Yes branch is filled in below
+    tree = { name: '', enabled: true, handleFailuresLocally: false, rootNode: { action: { type: 'AUTHN_SELECTOR', authenticationSelectorRef: { id: ID.selector } },
+      children: [{ action: { type: 'AUTHN_SOURCE', context: 'Yes' }, children: [] }, { action: { type: 'CONTINUE', context: 'No' } }] } };
+    policy.body.authnSelectionTrees.unshift(tree);
+  }
 
   if (MODE === 'local') {
     // 1. A credential validator that holds only the kit's users: cloned from the demo's so the descriptor is exact.
@@ -69,8 +79,13 @@ const userRow = (username, password) => ({ defaultRow: false, fields: [
     let pcv = await api('GET', `/passwordCredentialValidators/${ID.pcv}`);
     const noUser = missingFirstUser({ exists: pcv.status === 200, wanted });
     if (noUser) { console.error(noUser); process.exit(2); }
-    const base = (await api('GET', '/passwordCredentialValidators')).body.items.find((p) => p.pluginDescriptorRef.id.endsWith('SimpleUsernamePasswordCredentialValidator'));
-    if (!base) { console.error('no Simple Username Password credential validator exists to clone the descriptor from'); process.exit(1); }
+    // Cloned from the demo's validator so the descriptor is exact; a new PingFederate has none, so use the plugin's own descriptor.
+    let base = pcv.status === 200 ? null : (await api('GET', '/passwordCredentialValidators')).body.items.find((p) => p.pluginDescriptorRef.id.endsWith('SimpleUsernamePasswordCredentialValidator'));
+    if (!base && pcv.status !== 200) {
+      const d = ((await api('GET', '/passwordCredentialValidators/descriptors')).body?.items || []).find((x) => x.id.endsWith('SimpleUsernamePasswordCredentialValidator'));
+      if (!d) { console.error('this PingFederate has no Simple Username Password credential validator plugin'); process.exit(1); }
+      base = { pluginDescriptorRef: { id: d.id }, attributeContract: { coreAttributes: [{ name: 'username' }] } };
+    }
     const body = pcv.status === 200 ? pcv.body : {
       id: ID.pcv, name: 'ID-JAG Kit users', pluginDescriptorRef: base.pluginDescriptorRef, attributeContract: base.attributeContract,
       configuration: { fields: [], tables: [{ name: 'Users', rows: [] }] },
@@ -96,7 +111,18 @@ const userRow = (username, password) => ({ defaultRow: false, fields: [
     if (adapter.status === 200) console.log(`  keep adapter ${ID.adapter}`);
     else {
       const demo = (await api('GET', '/idp/adapters')).body.items.find((a) => a.pluginDescriptorRef.id.endsWith('HtmlFormIdpAuthnAdapter'));
-      const clone = JSON.parse(JSON.stringify(demo));
+      let clone;
+      if (demo) clone = JSON.parse(JSON.stringify(demo));
+      else { // a new PingFederate has no form adapter: build one from the plugin's descriptor defaults
+        const d = (await api('GET', `/idp/adapters/descriptors/${HTML_FORM}`)).body;
+        const fields = (d?.configDescriptor?.fields || []).filter((f) => f.defaultValue !== undefined && f.defaultValue !== null).map((f) => ({ name: f.name, value: String(f.defaultValue) }));
+        clone = {
+          pluginDescriptorRef: { id: HTML_FORM }, configuration: { fields, tables: [] },
+          attributeContract: { coreAttributes: [{ name: 'policy.action', masked: false, pseudonym: false }, { name: 'username', masked: false, pseudonym: true }], extendedAttributes: [], maskOgnlValues: false },
+          attributeMapping: { attributeSources: [], issuanceCriteria: { conditionalCriteria: [] }, attributeContractFulfillment: {
+            'policy.action': { source: { type: 'ADAPTER' }, value: 'policy.action' }, username: { source: { type: 'ADAPTER' }, value: 'username' } } },
+        };
+      }
       clone.id = ID.adapter; clone.name = 'ID-JAG Kit sign-in form';
       clone.configuration.tables = [{ name: 'Credential Validators', rows: [{ defaultRow: false, fields: [{ name: 'Password Credential Validator Instance', value: ID.pcv }] }] }];
       report(`create adapter ${ID.adapter}`, await api('POST', '/idp/adapters', clone));
@@ -109,6 +135,16 @@ const userRow = (username, password) => ({ defaultRow: false, fields: [
     if (client.status !== 200) { console.error(`client ${CLIENT} not found: run pingfederate/configure-signin.js first`); process.exit(1); }
     if (client.body.allowAuthenticationApiInit) console.log(`  keep client ${CLIENT}: pi.flow already allowed`);
     else report(`client ${CLIENT}: allow pi.flow (Authentication API initiation)`, await api('PUT', `/oauth/clients/${encodeURIComponent(CLIENT)}`, { ...client.body, allowAuthenticationApiInit: true }));
+  }
+
+  // A new PingFederate has IdP authentication policies and the Authentication API (pi.flow) off; the policy below needs both.
+  if (MODE === 'local' && newTree) {
+    const polSettings = await api('GET', '/authenticationPolicies/settings');
+    if (polSettings.body?.enableIdpAuthnSelection) console.log('  keep IdP authentication policies enabled');
+    else report('enable IdP authentication policies', await api('PUT', '/authenticationPolicies/settings', { ...polSettings.body, enableIdpAuthnSelection: true }));
+    const authApi = await api('GET', '/authenticationApi/settings');
+    if (authApi.body?.apiEnabled) console.log('  keep Authentication API enabled');
+    else report('enable the Authentication API (pi.flow)', await api('PUT', '/authenticationApi/settings', { ...authApi.body, apiEnabled: true, restrictAccessToRedirectlessMode: true }));
   }
 
   // 3. The policy branch: kit client -> (local adapter | PingOne connection) -> the kit's policy contract.
@@ -125,7 +161,7 @@ const userRow = (username, password) => ({ defaultRow: false, fields: [
       groups: { source: { type: 'TEXT' }, value: 'kit-users' },
     } })
     : acceptAll({ attributeContractFulfillment: from('IDP_CONNECTION', [['subject', 'sub'], ...same(CLAIMS)], { id: ID.conn }) });
-  if (yes.action.authenticationSource?.type === wantSource.type && yes.action.authenticationSource.sourceRef?.id === wantSource.sourceRef.id) {
+  if (!newTree && yes.action.authenticationSource?.type === wantSource.type && yes.action.authenticationSource.sourceRef?.id === wantSource.sourceRef.id) {
     console.log(`  keep policy branch (${MODE})`);
   } else {
     yes.action.authenticationSource = wantSource;
