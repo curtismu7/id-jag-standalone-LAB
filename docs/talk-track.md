@@ -92,9 +92,15 @@ Point at the field names and their tags. Say: "Every field name here is tagged: 
 
 Click **Run all ten**. Walk the refusals: an assertion from an issuer the target does not trust, one addressed to another audience, an expired one, a replayed one, a tampered signature, a token URL on a host that is not allow-listed, a token URL that redirects, and the wrong client authentication method. Say: "Each one stops at a named stage for a named check, and no token is issued."
 
-## Step 13: Why it matters (text pending from the owner)
+## Step 13: Why it matters (DRAFT, not Ping wording)
 
-Say: "Ping's deck has a value panel with a Challenge, a Technical and a Business line for each feature. The copy this lab was given has no panel for the gateway redeeming the ID-JAG: the slide 48 panel in it covers intent, purpose and behaviour, which is a different feature. So I will not read you a business case for this one. What I can show you is what this mock does: the target app sees the user, and nobody shared a credential." Do not quote the slide 48 lines here.
+Say: "Ping's deck has a value panel for each feature, but the copy this lab was given has none for the gateway redeeming the ID-JAG. These three lines are a draft written for this lab from the field names and the feature description. They are not Ping's words, and nothing here is verified on our tenant."
+
+Challenge: "An agent that calls a third-party app for a user either shares one standing credential with that app, so the app cannot tell which user acted, or has no way to present the user's identity to the app's own issuer."
+
+Technical: "The gateway exchanges the caller's token for an ID-JAG and, when a Redeem spec with a TokenURL is set, redeems it at the target app's own issuer as an assertion grant, so the app gets a token for the user and no shared secret sits on the agent side. Without Redeem the exchange result is not redeemed."
+
+Business: "A third-party app can be brought under per-user, attributable access without issuing it a standing service credential, which shrinks the standing-secret inventory and lets an audit show which user an agent acted for."
 
 ## Step 14: Make it the customer's story
 
