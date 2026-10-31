@@ -11,7 +11,7 @@ const files = fs.readdirSync(dir).filter((f) => f.endsWith(".json")).map((f) => 
 
 describe("diagram-studio/1 data in diagrams/", () => {
   it("has one file per playground mode, and the loader finds them all by name", () => {
-    expect(files).toEqual(["byo", "mock", "pf-as", "pf-pf"]);
+    expect(files).toEqual(["byo", "gateway-redeem", "mock", "pf-as", "pf-pf"]);
     expect(diagramNames().sort()).toEqual(files);
   });
 
