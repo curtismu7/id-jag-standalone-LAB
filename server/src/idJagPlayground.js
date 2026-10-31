@@ -1,8 +1,9 @@
 // ID-JAG playground API (/api/id-jag-playground): run the PingFederate ID-JAG flow one step at
 // a time, inspect each artifact, and check it against draft-ietf-oauth-identity-assertion-authz-grant.
 //
-// Custody: raw tokens never leave the server. The ID-JAG and the redeemed access token live in
-// the session; responses carry decoded header/claims and redacted request bodies only.
+// Custody: real tokens never leave the server. The ID-JAG and the redeemed access token live in
+// the session; in Live mode responses carry decoded header/claims and redacted request bodies only.
+// Mock mode (rule 4) shows its mock-issued tokens raw: they are labelled mock (claims mock:true, simulated:true, X-Simulated).
 //
 // Modes:
 //   pf-as  PingFederate (PF_URL) issues, our resource AS (resource-as/) redeems, mcp-sample serves. The ID-JAG can come
@@ -173,6 +174,13 @@ async function postForm(url, form, headers = {}) {
 }
 
 /**
+ * What to show of a token. Mock mode shows the mock-issued token raw, for education (rule 4; every answer in mock mode
+ * carries simulated:true and X-Simulated, and the token's own claims say mock:true). Live mode never sends a token to the
+ * browser: the placeholder is shown.
+ */
+const shownToken = (token, placeholder) => (isMock() && token ? token : placeholder);
+
+/**
  * The RFC 8693 exchange for an ID-JAG: the form to send and the redacted form to show. The subject token is this session's
  * issuer refresh token, or (assertionXml) the signed SAML assertion, sent base64url by the SAML client.
  */
@@ -197,7 +205,7 @@ function exchangeRequest(req, scopeOverride, assertionXml) {
     body: {
       grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
       requested_token_type: ID_JAG_TOKEN_TYPE,
-      subject_token: saml ? '[the signed SAML assertion, base64url, kept server-side]' : '[your session token, never sent to the browser]',
+      subject_token: shownToken(body.get('subject_token'), saml ? '[the signed SAML assertion, base64url, kept server-side]' : '[your session token, never sent to the browser]'),
       subject_token_type: subjectTokenType,
       audience: s.request.audience,
       resource: s.request.resource || undefined,
@@ -229,14 +237,14 @@ async function redeem(assertion, { clientId, clientSecret, scope, s, defaultSecr
   const r = await postForm(s.resourceAs.tokenEndpoint, body, sec ? { Authorization: basic(id, sec) } : {});
   return { ...r, request: {
     endpoint: `POST ${s.resourceAs.tokenEndpoint}`,
-    body: { grant_type: JWT_BEARER, assertion: '[the ID-JAG]', client_id: id, resource: s.request.resource || undefined, scope: scope || undefined },
+    body: { grant_type: JWT_BEARER, assertion: shownToken(assertion, '[the ID-JAG]'), client_id: id, resource: s.request.resource || undefined, scope: scope || undefined },
   } };
 }
 
 function redactedTokenResponse(data) {
   const out = { ...data };
-  if (out.access_token) out.access_token = '[access token, kept server-side]';
-  if (out.refresh_token) out.refresh_token = '[refresh token, kept server-side]';
+  if (out.access_token) out.access_token = shownToken(out.access_token, '[access token, kept server-side]');
+  if (out.refresh_token) out.refresh_token = shownToken(out.refresh_token, '[refresh token, kept server-side]');
   return out;
 }
 
@@ -674,7 +682,7 @@ async function issueIdJag(req, res, assertionXml) {
     req.session.idJagPlayground = { idJag, issuedAt: Date.now(), redeemed: false, ...(assertionXml && { saml: true }) };
     res.json({
       ...(assertionXml && { assertion: describeAssertion(assertionXml) }),
-      request, response: { issued_token_type: ID_JAG_TOKEN_TYPE, token_type: 'N_A', access_token: '[the ID-JAG, kept server-side]' }, token: decoded(idJag),
+      request, response: { issued_token_type: ID_JAG_TOKEN_TYPE, token_type: 'N_A', access_token: shownToken(idJag, '[the ID-JAG, kept server-side]') }, token: decoded(idJag),
     });
   } catch (err) {
     res.status(502).json({ error: 'id_jag_issue_failed', message: err.message, pfError: err.pfError, pfErrorDescription: err.pfErrorDescription });
@@ -731,7 +739,7 @@ router.post('/revoke', requireReal, async (req, res) => {
   if (isSamlSession(req)) return res.status(409).json({ error: 'no_refresh_token', message: 'A SAML sign-in has no refresh token to revoke.' });
   const { s, auth, body, shown } = exchangeRequest(req);
   const url = `${s.idp.issuer}/as/revoke_token.oauth2`;
-  const revokeShown = { endpoint: `POST ${url}`, body: { token: '[your session token, never sent to the browser]', token_type_hint: 'refresh_token', client_id: s.idp.exchangeClientId } };
+  const revokeShown = { endpoint: `POST ${url}`, body: { token: shownToken(getIssuerSubjectToken(req, mode), '[your session token, never sent to the browser]'), token_type_hint: 'refresh_token', client_id: s.idp.exchangeClientId } };
   const outcome = (r) => ({ request: shown, status: r.status, error: r.status === 200 ? null : r.data?.error || `HTTP ${r.status}`, error_description: r.data?.error_description });
   try {
     // Control: the same exchange must work BEFORE revoking, or a later refusal proves nothing about the revocation.
@@ -947,7 +955,7 @@ router.post('/call', requireReal, async (req, res) => {
   const tool = typeof req.body?.tool === 'string' ? req.body.tool : '';
   const args = req.body?.arguments && typeof req.body.arguments === 'object' ? req.body.arguments : {};
   const rpc = tool ? { method: 'tools/call', params: { name: tool, arguments: args } } : { method: 'tools/list' };
-  const request = { endpoint: `POST ${config().mcpUrl}`, authorization: 'Bearer [access token]', body: { jsonrpc: '2.0', id: 1, ...rpc } }; // exactly what mcpRpc sends
+  const request = { endpoint: `POST ${config().mcpUrl}`, authorization: `Bearer ${shownToken(token, '[access token]')}`, body: { jsonrpc: '2.0', id: 1, ...rpc } }; // exactly what mcpRpc sends
   try {
     const r = await mcpRpc(token, rpc);
     const rpcError = r.data?.error && typeof r.data.error === 'object' ? r.data.error : null;
@@ -972,9 +980,9 @@ router.post('/call', requireReal, async (req, res) => {
 });
 
 const RESOURCE_VARIANTS = {
-  token: { token: (pg) => pg?.accessToken, shown: 'Bearer [access token]', missing: 'Redeem the ID-JAG first (step 3).' },
-  'no-token': { token: () => null, shown: 'none' },
-  'id-jag': { token: (pg) => pg?.idJag, shown: 'Bearer [the ID-JAG]', missing: 'Get an ID-JAG first (step 2, or paste one in step 1).' },
+  token: { token: (pg) => pg?.accessToken, shown: (t) => `Bearer ${shownToken(t, '[access token]')}`, missing: 'Redeem the ID-JAG first (step 3).' },
+  'no-token': { token: () => null, shown: () => 'none' },
+  'id-jag': { token: (pg) => pg?.idJag, shown: (t) => `Bearer ${shownToken(t, '[the ID-JAG]')}`, missing: 'Get an ID-JAG first (step 2, or paste one in step 1).' },
 };
 
 /** mcp-sample's /protected/profile with the access token, no token, or the raw ID-JAG. Tokens stay server-side. */
@@ -985,7 +993,7 @@ router.post('/resource', async (req, res) => {
   if (!url) return notConfigured(res, ['MCP_URL']);
   const token = v.token(req.session?.idJagPlayground);
   if (v.missing && !token) return res.status(409).json({ error: 'no_token', message: v.missing });
-  const request = { method: 'GET', url, authorization: v.shown };
+  const request = { method: 'GET', url, authorization: v.shown(token) };
   try {
     const r = await outboundFetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {}, signal: AbortSignal.timeout(10000) });
     return res.json({ request, status: r.status, wwwAuthenticate: r.headers?.get?.('www-authenticate') || null, body: await r.json().catch(() => null) });

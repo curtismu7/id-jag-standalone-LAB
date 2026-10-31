@@ -28,7 +28,12 @@ describe('mock mode, pf-as: PingFederate to resource AS to MCP', () => {
     expect(issued.body.token.header).toMatchObject({ typ: 'oauth-id-jag+jwt', alg: 'ES256' });
     expect(issued.body.token.header.kid).toMatch(/^mock-/);
     expect(issued.body.token.claims).toMatchObject({ mock: true, sub: MOCK_USER.username, client_id: 'id-jag-playground' });
-    expect(JSON.stringify(issued.body)).not.toMatch(/eyJ[\w-]*\.[\w-]+\.[\w-]+/); // raw tokens stay in the session
+    // Rule 4: mock-issued tokens are shown raw (the claims say mock:true, the answer says simulated:true). Real tokens never are (live tests).
+    const jwtClaims = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString('utf8'));
+    expect(issued.body.response.access_token).toMatch(/^eyJ[\w-]*\.[\w-]+\.[\w-]+$/);
+    expect(jwtClaims(issued.body.response.access_token)).toEqual(issued.body.token.claims);
+    expect(jwtClaims(issued.body.response.access_token).mock).toBe(true);
+    expect(issued.body.request.body.subject_token).not.toMatch(/never sent to the browser/); // the mock refresh token, raw
 
     const inspected = (await post(agent, `${API}/inspect`).expect(200)).body;
     const failing = inspected.checks.filter((c) => c.status === 'fail').map((c) => `${c.id}: ${c.actual}`);
@@ -38,13 +43,17 @@ describe('mock mode, pf-as: PingFederate to resource AS to MCP', () => {
     expect(redeemed.body.token.header.typ).toBe('at+jwt');
     expect(redeemed.body.token.claims).toMatchObject({ mock: true, scope: 'read mcp:invoke' });
     expect(redeemed.body.token.claims.iss).toMatch(/resource-as\.mock\.invalid/);
+    expect(redeemed.body.request.body.assertion).toBe(issued.body.response.access_token); // the ID-JAG that was redeemed
+    expect(jwtClaims(redeemed.body.response.access_token)).toEqual(redeemed.body.token.claims);
 
     const tools = (await post(agent, `${API}/call`).expect(200)).body;
     expect(tools.tools.map((t) => t.name).sort()).toEqual(['echo', 'server_time', 'whoami']);
+    expect(tools.request.authorization).toBe(`Bearer ${redeemed.body.response.access_token}`);
     const echo = (await post(agent, `${API}/call`, { tool: 'echo', arguments: { text: 'hi' } }).expect(200)).body;
     expect(echo.result.content[0].text).toBe('hi');
     const profile = (await post(agent, `${API}/resource`, { variant: 'token' }).expect(200)).body;
     expect(profile.status).toBe(200);
+    expect(profile.request.authorization).toBe(`Bearer ${redeemed.body.response.access_token}`);
 
     const record = (await agent.get(`${API}/as-events`).expect(200)).body;
     expect(record.entry).toMatchObject({ decision: 'accepted' });
@@ -58,9 +67,11 @@ describe('mock mode, pf-as: PingFederate to resource AS to MCP', () => {
     await post(agent, `${API}/issue`).expect(200);
     const idJag = (await post(agent, `${API}/resource`, { variant: 'id-jag' }).expect(200)).body;
     expect(idJag.status).toBe(401);
+    expect(idJag.request.authorization).toMatch(/^Bearer eyJ[\w-]*\.[\w-]+\.[\w-]+$/); // the mock ID-JAG, raw
     expect(JSON.stringify(idJag.body)).toMatch(/ID-JAG/);
     const none = (await post(agent, `${API}/resource`, { variant: 'no-token' }).expect(200)).body;
     expect(none.status).toBe(401);
+    expect(none.request.authorization).toBe('none');
   });
 
   it('every negative test is refused by the mock resource AS, and the revocation is proved', async () => {

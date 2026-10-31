@@ -10,7 +10,7 @@ Catalog: C1
 
 ID-JAG is an IETF draft ([draft-ietf-oauth-identity-assertion-authz-grant](https://datatracker.ietf.org/doc/draft-ietf-oauth-identity-assertion-authz-grant/)), so details can still change. Among Ping products, PingFederate is the one that supports ID-JAG, and it is also the only one that supports DPoP; PingOne and PingOne Advanced Identity Cloud do not issue or redeem ID-JAGs. That is why the live modes need PingFederate.
 
-The flow: get an ID-JAG from an IdP (RFC 8693 token exchange), check it against the draft, redeem it at a resource authorization server (RFC 7523 JWT bearer), call an MCP server with the result, and run negative tests. Raw tokens never reach the browser: the server keeps them in the session and returns decoded claims and redacted requests only.
+The flow: get an ID-JAG from an IdP (RFC 8693 token exchange), check it against the draft, redeem it at a resource authorization server (RFC 7523 JWT bearer), call an MCP server with the result, and run negative tests. Real tokens never reach the browser: in Live mode the server keeps them in the session and returns decoded claims and redacted requests only. Mock mode shows its mock tokens raw, labelled mock, for education.
 
 ## What is simulated
 
@@ -402,5 +402,5 @@ See [docs/roadmap.md](docs/roadmap.md).
 
 - Nothing secret is committed: `.env` is ignored, only `.env.example` ships.
 - Three independent checks block a leaked secret: the `.githooks/pre-commit` gitleaks hook (installed by `npm install`), the `secrets` CI job (gitleaks over the full history of every PR), and GitHub secret scanning with push protection on this repository.
-- Raw tokens never reach the browser or the logs (enforced by tests).
+- Real tokens never reach the browser or the logs (enforced by tests). Mock mode shows its own mock tokens raw (they carry `"mock": true`; the answer says it is simulated).
 - Planned: secrets generated inside the cluster, external ones stored as SealedSecrets, `private_key_jwt` client authentication instead of client secrets, and a small encrypted vault for local development.
