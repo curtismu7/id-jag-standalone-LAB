@@ -1,17 +1,17 @@
 {
   "id": "S13",
-  "title": "{{mark}} leaves the company in the middle of a task",
+  "title": "{{cast.mark}} leaves the company in the middle of a task",
   "modes": ["pf-as"],
   "demos": ["C12"],
-  "goal": "{{mark}} has left the company, and IT must stop {{mark}}'s agent, which is signed in and part-way through a task on {{vocab.resourceTool}}.",
-  "obstacle": "The agent holds a refresh token at PingFederate, so on its own it could keep asking for new ID-JAGs, and through them new access tokens, after {{mark}} is gone.",
+  "goal": "{{cast.mark}} has left the company, and IT must stop {{cast.mark}}'s agent, which is signed in and part-way through a task on {{vocab.resourceTool}}.",
+  "obstacle": "The agent holds a refresh token at PingFederate, so on its own it could keep asking for new ID-JAGs, and through them new access tokens, after {{cast.mark}} is gone.",
   "control": "ID-JAG from PingFederate, plus token revocation (RFC 7009): PingFederate decides whether the agent may act, our resource authorization server decides what it may read, and revoking the refresh token makes PingFederate refuse the next ID-JAG request.",
   "say": "The agent works only while PingFederate says it may, and revoking stops it getting anything new.",
   "steps": [
     {
       "n": 1,
       "title": "Sign in once at PingFederate",
-      "tell": "{{mark}} signs in at the issuer PingFederate. This app's server keeps the refresh token from that sign-in, and the ID-JAG is minted from it. Raw tokens never reach the browser. If you already signed in to this app, this step is done.",
+      "tell": "{{cast.mark}} signs in at the issuer PingFederate. This app's server keeps the refresh token from that sign-in, and the ID-JAG is minted from it. Raw tokens never reach the browser. If you already signed in to this app, this step is done.",
       "say": "One sign-in at the company's own identity provider. That session is what the agent borrows.",
       "why": "Everything the agent gets later traces back to this one session."
     },
@@ -33,7 +33,7 @@
       "n": 4,
       "title": "The agent calls {{vocab.resourceTool}}",
       "tell": "The agent calls the sample MCP server with the new access token. The server verifies it against the resource authorization server's keys, so the tools listed are whatever the token's scope allows.",
-      "say": "While {{mark}} is here, the agent does the work.",
+      "say": "While {{cast.mark}} is here, the agent does the work.",
       "why": "This is the working state that the revoke in step 6 will cut off."
     },
     {
@@ -46,7 +46,7 @@
     {
       "n": 6,
       "title": "Revoke and prove it",
-      "tell": "Revoke and retry first asks PingFederate for an ID-JAG, as a control, so a later refusal cannot be a setup problem. That works while {{mark}}'s session is live.",
+      "tell": "Revoke and retry first asks PingFederate for an ID-JAG, as a control, so a later refusal cannot be a setup problem. That works while {{cast.mark}}'s session is live.",
       "say": "First we show the agent could still get a grant.",
       "why": "The control shows the refusal is caused by the revoke and nothing else. With a SAML sign-in there is no refresh token, so this step is hidden.",
       "blocked": {
