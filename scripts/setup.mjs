@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// npm run setup -- [--yes] [--mode=mock|pf-as|pf-pf|byo] [--idp=local] [--pf-url=...] [--pf-client-id=...]
+// npm run setup -- [--yes] [--mode=mock|pf-as|pf-pf|byo|pf-local] [--idp=local] [--users=a@x,b@y] [--pf-url=...] [--pf-client-id=...]
 //   [--pf-admin-url=...] [--acme-client-id=...] [--run=npm|docker] [--force]
 // Secrets are read without echo, or from the environment (PF_EXCHANGE_CLIENT_SECRET, PF_ADMIN_PASSWORD,
 // ACME_EXCHANGE_CLIENT_SECRET), never from flags.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { runSetup } from './setup-lib.mjs';
@@ -25,17 +26,16 @@ const io = {
     try { return (await r.question('')).trim(); } finally { r._writeToOutput = write; process.stdout.write('\n'); }
   },
 };
-const exec = async (cmd, args) => {
-  const r = spawnSync(cmd, args, { cwd: root, encoding: 'utf8' });
+// opts.env is added to the environment (how pf-local hands the admin login to a child: never on a command line).
+// opts.stdio 'inherit' gives the child the terminal (the PingFederate installer asks for YES), so our reader lets go of it.
+const exec = async (cmd, args, opts = {}) => {
+  const inherit = opts.stdio === 'inherit';
+  if (inherit) { rl?.close(); rl = undefined; }
+  const r = spawnSync(cmd, args, { cwd: root, encoding: 'utf8', env: { ...process.env, ...opts.env }, stdio: inherit ? 'inherit' : 'pipe' });
   return { code: r.error ? 127 : r.status ?? 1, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 };
-const fsp = {
-  existsSync: fs.existsSync,
-  readFile: fs.promises.readFile,
-  writeFile: fs.promises.writeFile,
-  copyFile: fs.promises.copyFile,
-};
+const fsp = { existsSync: fs.existsSync, ...fs.promises };
 
-const { code } = await runSetup({ argv: process.argv.slice(2), env: process.env, root, io, fs: fsp, exec });
+const { code } = await runSetup({ argv: process.argv.slice(2), env: process.env, root, home: os.homedir(), io, fs: fsp, exec });
 rl?.close();
 process.exit(code);
