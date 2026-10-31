@@ -14,6 +14,7 @@ import resetRoutes from './resetRoutes.js';
 import { sessionStore } from './sessionStore.js';
 import { DEFAULT_WORKSPACE, requireDefaultWorkspace, workspaceMiddleware } from './workspace.js';
 import doctor from './doctorRoute.js';
+import modeRoutes from './modeRoutes.js';
 import { isMock } from './mode.js';
 import health from './health.js';
 
@@ -45,6 +46,7 @@ export function createApp({ workspaceResolver = () => DEFAULT_WORKSPACE } = {}) 
   app.use('/api', resetRoutes); // /api/admin/reset
   app.use('/api/health', health); // public, coarse (demo-health/1)
   app.use('/api/doctor', doctor); // admin only
+  app.use('/api/mode', modeRoutes); // public GET, same-origin POST
   // Mock mode: say so on every answer that shows tokens or requests (the object gets simulated:true, the response X-Simulated).
   app.use(['/api/id-jag-playground', '/api/inspect'], (_req, res, next) => {
     if (isMock()) {
