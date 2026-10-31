@@ -10,6 +10,10 @@ import https from 'node:https';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { demoJson } from '../demoJson.js';
+import { isMock } from '../mode.js';
+import { mockAdminSend } from '../mock/index.js';
+import { guardSocket } from '../outbound.js';
+import { mockEnv } from '../mock/env.js';
 import { dataDir } from '../workspace.js';
 
 export const LATCH_AFTER = 2;
@@ -20,6 +24,7 @@ const clean = (v) => String(v ?? '').trim();
 
 /** The network hop: resolves { status, body }. Rejects with the raw transport error (the caller scrubs it). */
 export function httpSend(url, { method, headers, body, insecureTls }) {
+  guardSocket(url); // mock mode: refused here (the mock mode client never gets this far)
   const target = new URL(url);
   const lib = target.protocol === 'http:' ? http : https;
   return new Promise((resolve, reject) => {
@@ -133,6 +138,8 @@ export function createPfAdmin({ env = process.env, send = httpSend, now = Date.n
 }
 
 let shared;
-export const pfAdmin = () => (shared ??= createPfAdmin());
+let sharedMock;
+/** The shared client: the live one, or in mock mode one over the mock PingFederate's admin API (its own failure latch). */
+export const pfAdmin = () => (isMock() ? (sharedMock ??= createPfAdmin({ env: mockEnv(), send: mockAdminSend })) : (shared ??= createPfAdmin()));
 /** Tests only: swap the shared client (or pass null to reset it). */
-export const _usePfAdmin = (c) => { shared = c ?? undefined; };
+export const _usePfAdmin = (c) => { shared = c ?? undefined; sharedMock = undefined; };

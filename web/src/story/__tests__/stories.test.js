@@ -35,6 +35,29 @@ describe("shipped data", () => {
     }
   });
 
+  it("stories name people only through {{cast.<id>}} tokens: every cast token is in a vertical's cast, and no cast name is written out", () => {
+    const castIds = new Set(VERTICALS.flatMap((v) => Object.keys(v.cast)));
+    const names = [...new Set(VERTICALS.flatMap((v) => Object.values(v.cast).map((c) => c.name)))];
+    for (const s of STORIES) {
+      const tokens = [...tokensIn(s)];
+      expect(tokens.some((x) => x.startsWith("cast.")), `${s.id} uses a cast token`).toBe(true);
+      for (const tk of tokens) expect(/^(cast|vocab)\.[\w]+$/.test(tk), `${s.id}: ${tk}`).toBe(true);
+      for (const tk of tokens.filter((x) => x.startsWith("cast."))) expect(castIds.has(tk.slice(5)), `${s.id}: ${tk}`).toBe(true);
+      const text = JSON.stringify(s).replace(/\{\{[^}]*\}\}/g, "");
+      for (const n of names) expect(text, `${s.id} writes out the name ${n}`).not.toMatch(new RegExp(`\\b${n}\\b`));
+    }
+  });
+
+  it("a customer's persona (customer.config.json) renames the cast in every story", () => {
+    const v = verticalById("banking");
+    const first = Object.keys(v.cast)[0];
+    for (const s of STORIES) {
+      const out = JSON.stringify(fillAll(s, v, { [first]: "Zed Example" }));
+      expect(out).not.toContain("⟨missing");
+      if (tokensIn(s).has(`cast.${first}`)) expect(out).toContain("Zed Example");
+    }
+  });
+
   it("every story's step numbers exist in each playground mode it names", () => {
     expect(Object.keys(MODE_STEPS).sort()).toEqual([...MODES].sort());
     for (const s of STORIES) {
@@ -97,18 +120,22 @@ describe("validateVertical", () => {
 describe("fill", () => {
   const v = { cast: { lena: { name: "Lena" } }, vocab: { partner: "a partner bank" } };
   it("replaces cast and vocab tokens, tolerating spaces", () => {
-    expect(fill("{{lena}} works at {{ vocab.partner }}.", v)).toBe("Lena works at a partner bank.");
+    expect(fill("{{cast.lena}} works at {{ vocab.partner }}.", v)).toBe("Lena works at a partner bank.");
+  });
+  it("a persona name wins over the vertical's, and the bare {{lena}} still means {{cast.lena}}", () => {
+    expect(fill("{{cast.lena}} / {{lena}}", v, { lena: "Priya" })).toBe("Priya / Priya");
+    expect(fill("{{lena}}", v)).toBe("Lena");
   });
   it("keeps an undefined token visible", () => {
-    expect(fill("{{nobody}} {{vocab.nothing}}", v)).toBe("⟨missing: nobody⟩ ⟨missing: vocab.nothing⟩");
+    expect(fill("{{cast.nobody}} {{vocab.nothing}}", v)).toBe("⟨missing: cast.nobody⟩ ⟨missing: vocab.nothing⟩");
   });
   it("lists tokens across nested values", () => {
     expect([...tokensIn({ a: ["{{x}}", { b: "{{vocab.y}} {{x}}" }] })].sort()).toEqual(["vocab.y", "x"]);
   });
   it("fillAll copies and does not change the source", () => {
-    const src = { t: "{{lena}}", n: 1, arr: ["{{lena}}"] };
+    const src = { t: "{{cast.lena}}", n: 1, arr: ["{{cast.lena}}"] };
     expect(fillAll(src, v)).toEqual({ t: "Lena", n: 1, arr: ["Lena"] });
-    expect(src.t).toBe("{{lena}}");
+    expect(src.t).toBe("{{cast.lena}}");
   });
 });
 

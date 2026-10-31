@@ -8,6 +8,7 @@ import * as trustedIdps from './trustedIdps.js';
 import { describeAssertion } from './saml.js';
 import { SPEC, decodeJwt, inspect, verifySignature } from './tokenChecks.js';
 import { probe } from './idJagPlayground.js';
+import { outboundFetch } from './outbound.js';
 
 const router = express.Router();
 router.use(express.json());
@@ -46,7 +47,7 @@ const checker = () => {
 /** Did the resource AS already accept an ID-JAG with this jti? true / false / null (record unreadable). */
 async function redeemedAtResourceAs(jti) {
   try {
-    const r = await fetch(`${originOf(config().resourceAsTokenEndpoint)}/events`, { signal: AbortSignal.timeout(4000) });
+    const r = await outboundFetch(`${originOf(config().resourceAsTokenEndpoint)}/events`, { signal: AbortSignal.timeout(4000) });
     if (r.status !== 200) return null;
     const prefix = String(jti).slice(0, 8);
     return (await r.json()).events.some((e) => e.decision === 'accepted' && typeof e.jti === 'string' && e.jti.startsWith(prefix));
@@ -152,7 +153,7 @@ router.get('/events', async (_req, res) => {
   try {
     const base = originOf(config().resourceAsTokenEndpoint);
     if (!base) throw new Error('no resource AS configured');
-    const r = await fetch(`${base}/events`, { signal: AbortSignal.timeout(4000) });
+    const r = await outboundFetch(`${base}/events`, { signal: AbortSignal.timeout(4000) });
     if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
     res.json({ available: true, events: (await r.json()).events });
   } catch (err) {

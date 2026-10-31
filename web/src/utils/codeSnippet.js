@@ -1,5 +1,5 @@
 // The Code tab: the Node 18+ fetch call behind a step, rebuilt from the request the page shows.
-// Tokens and secrets are never in that request (the server redacts them) and never in the snippet:
+// Tokens and secrets are never in the snippet (the server redacts real ones, and mock mode's raw ones are replaced here):
 // they become placeholders the reader fills in from their own run.
 
 const PLACEHOLDER = { subject_token: "SUBJECT_TOKEN", token: "SUBJECT_TOKEN", assertion: "ID_JAG", client_secret: "CLIENT_SECRET", client_id: "CLIENT_ID" };
@@ -14,7 +14,15 @@ const q = (v) => JSON.stringify(String(v));
 function bearer(authorization) {
   if (!authorization || authorization === "none") return null;
   if (/^basic/i.test(authorization)) return '"Basic " + btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)';
-  return /id-jag/i.test(authorization) ? "`Bearer ${ID_JAG}`" : "`Bearer ${ACCESS_TOKEN}`";
+  return /id-jag/i.test(authorization) || jwtType(authorization) === "oauth-id-jag+jwt" ? "`Bearer ${ID_JAG}`" : "`Bearer ${ACCESS_TOKEN}`";
+}
+
+// Mock mode shows the mock token itself in the Authorization line (rule 4); its JOSE header says whether it is an ID-JAG.
+function jwtType(authorization) {
+  try {
+    const header = /^Bearer\s+(eyJ[\w-]*)\./i.exec(authorization)?.[1];
+    return header ? JSON.parse(atob(header.replace(/-/g, "+").replace(/_/g, "/"))).typ : null;
+  } catch { return null; }
 }
 
 /** `request` is `{ endpoint: "POST <url>", body, authorization? }` or `{ method, url, authorization }`. */

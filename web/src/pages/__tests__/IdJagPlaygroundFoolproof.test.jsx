@@ -149,7 +149,7 @@ describe("diagram links", () => {
   it("open the mode's diagram, and each step on it, in a new tab", async () => {
     localStorage.setItem("idjag.playground.mode", "mock");
     mount();
-    const view = screen.getByRole("link", { name: "View Mock diagram ↗" });
+    const view = screen.getByRole("link", { name: "View Sample data (browser) diagram ↗" });
     expect(view).toHaveAttribute("href", "/diagram/mock");
     expect(view).toHaveAttribute("target", "_blank");
     expect(view.getAttribute("rel")).toContain("noopener");

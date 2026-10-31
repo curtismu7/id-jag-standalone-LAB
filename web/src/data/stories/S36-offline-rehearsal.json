@@ -1,8 +1,8 @@
 {
   "id": "S36",
-  "title": "{{mary}}'s agent calls {{vocab.resourceTool}}, rehearsed offline",
+  "title": "{{cast.mary}}'s agent calls {{vocab.resourceTool}}, rehearsed offline",
   "modes": ["mock"],
-  "goal": "{{mary}}'s agent needs to call tools on {{vocab.resourceTool}} on {{mary}}'s behalf. You can show the whole flow with no sign-in and no tenant.",
+  "goal": "{{cast.mary}}'s agent needs to call tools on {{vocab.resourceTool}} on {{cast.mary}}'s behalf. You can show the whole flow with no sign-in and no tenant.",
   "obstacle": "The agent starts with a grant, an ID-JAG, and a resource server must not accept that as a key. It has to be traded for an access token first, and the server must refuse anything else.",
   "control": "ID-JAG in mock mode: a sample PingFederate issues the ID-JAG, a sample authorization server redeems it for an access token, and the sample resource server accepts only that token. Everything is sample data in the browser and nothing is sent.",
   "say": "Even with no network and no tenant, we can show every step, and what the server accepts and what it refuses.",

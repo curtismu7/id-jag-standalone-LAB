@@ -1,7 +1,10 @@
 // Every setting comes from the environment (documented in .env.example). Read at call time so
 // tests can change process.env between cases.
 
-const env = (k, fallback = '') => String(process.env[k] ?? '').trim() || fallback;
+import { runtimeEnv } from './mode.js';
+
+// runtimeEnv() is process.env in live mode and the mock's environment in mock mode (mode.js).
+const env = (k, fallback = '') => String(runtimeEnv()[k] ?? '').trim() || fallback;
 const noSlash = (u) => u.replace(/\/$/, '');
 
 // The demo layer (demo/index.js) supplies its own keys; app.js registers it so this file imports no demo code.
@@ -35,7 +38,7 @@ export function config() {
     mcpUrl: env('MCP_URL'),
     resource: env('ID_JAG_RESOURCE'),
     scope: env('ID_JAG_SCOPE'),
-    ...demoConfig(process.env),
+    ...demoConfig(runtimeEnv()),
   };
 }
 

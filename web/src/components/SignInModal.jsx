@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useAppMode } from "../mode/ModeContext";
 import "./SignInModal.css";
 
 const ENDPOINTS = {
@@ -22,6 +23,7 @@ function messageFor(data) {
 
 /** Sign-in dialog for the pi.flow (no-redirect) login. Answers the idjag:signin event; a failure shows the server's message. */
 export default function SignInModal() {
+  const appMode = useAppMode();
   const [flow, setFlow] = useState(null); // { kind, returnTo } once the server opened a flow
   const [error, setError] = useState("");
   const [notice, setNotice] = useState(""); // set instead of flow when the sign-in cannot proceed: the dialog shows only this and Close
@@ -138,6 +140,11 @@ export default function SignInModal() {
           <input id="signin-pass" ref={passRef} type="password" value={password} onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password" maxLength={256} required />
           {error && <p className="signin-error" role="alert">{error}</p>}
+          {appMode?.mode === "mock" && appMode.mockUser && (
+            <p className="signin-hint" data-testid="signin-mock-hint">
+              Mock sign-in, a demo account that exists only inside this app: <code>{appMode.mockUser.username}</code> / <code>{appMode.mockUser.password}</code>
+            </p>
+          )}
           <div className="signin-actions">
             <button type="button" className="signin-cancel" onClick={close}>Cancel</button>
             <button type="submit" className="signin-submit">Sign in</button>

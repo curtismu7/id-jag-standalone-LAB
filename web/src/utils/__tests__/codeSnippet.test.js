@@ -47,6 +47,16 @@ describe("codeSnippet", () => {
     expect(codeSnippet({ method: "GET", url: "https://mcp.test/protected/profile", authorization: "none" })).not.toContain("Authorization");
   });
 
+  it("mock mode shows the mock token raw in the Authorization line; the snippet still uses a placeholder, told apart by the JOSE typ", () => {
+    const jwt = (typ) => `${btoa(JSON.stringify({ alg: "ES256", typ })).replace(/=/g, "")}.eyJtb2NrIjp0cnVlfQ.c2ln`;
+    const access = codeSnippet({ method: "GET", url: "https://mcp.test/protected/profile", authorization: `Bearer ${jwt("at+jwt")}` });
+    expect(access).toContain("`Bearer ${ACCESS_TOKEN}`");
+    const idJag = codeSnippet({ method: "GET", url: "https://mcp.test/protected/profile", authorization: `Bearer ${jwt("oauth-id-jag+jwt")}` });
+    expect(idJag).toContain("`Bearer ${ID_JAG}`");
+    for (const code of [access, idJag]) expect(code).not.toContain("eyJ");
+    expect(codeSnippet({ method: "GET", url: "https://x.test/", authorization: "Bearer eyJ!!!.x.y" })).toContain("`Bearer ${ACCESS_TOKEN}`"); // an undecodable header does not throw
+  });
+
   it("redacts any token, secret, assertion or verifier field by name", () => {
     const code = codeSnippet({ endpoint: "POST https://as.test/token", body: { grant_type: "x", refresh_token: "rt-live", client_assertion: "ca-live", actor_token: "at-live", code_verifier: "cv-live", subject_token_type: "urn:x" } });
     for (const v of ["rt-live", "ca-live", "at-live", "cv-live"]) expect(code).not.toContain(v);
