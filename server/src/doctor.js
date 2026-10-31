@@ -15,7 +15,7 @@ import { mockSigninProblem } from './mockSignin.js';
 import { netguard, outboundFetch } from './outbound.js';
 
 export const MODES = ['mock', 'pf-as', 'pf-pf', 'byo'];
-const MIN_NODE = 22;
+const MIN_NODE = 26;
 
 const REQUIRED = {
   'pf-as': ['PF_EXCHANGE_CLIENT_ID', 'PF_EXCHANGE_CLIENT_SECRET', 'RESOURCE_AS_ISSUER', 'RESOURCE_AS_CLIENT_SECRET', 'ID_JAG_RESOURCE', 'MCP_URL', 'ID_JAG_REGISTRY_TOKEN'],

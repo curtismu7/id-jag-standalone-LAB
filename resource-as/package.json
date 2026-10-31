@@ -4,7 +4,7 @@
   "private": true,
   "description": "Resource authorization server that redeems ID-JAGs (draft-ietf-oauth-identity-assertion-authz-grant) for audience-bound access tokens",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": { "node": ">=26" },
   "scripts": {
     "start": "node src/index.js",
     "test": "vitest run"

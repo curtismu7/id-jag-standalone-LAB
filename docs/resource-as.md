@@ -1,6 +1,6 @@
 # Resource AS and MCP sample
 
-Two small Node 22+ services that let the playground's **redeem** and **call MCP** steps run without anything but your IdP (for example PingFederate):
+Two small Node 26+ services that let the playground's **redeem** and **call MCP** steps run without anything but your IdP (for example PingFederate):
 
 ```
 IdP (PingFederate) --ID-JAG--> resource-as  POST /token  --access token (aud = MCP resource)--> mcp-sample  POST /mcp

@@ -1,4 +1,4 @@
-// The Code tab: the Node 18+ fetch call behind a step, rebuilt from the request the page shows.
+// The Code tab: the Node fetch call behind a step, rebuilt from the request the page shows.
 // Tokens and secrets are never in the snippet (the server redacts real ones, and mock mode's raw ones are replaced here):
 // they become placeholders the reader fills in from their own run.
 
