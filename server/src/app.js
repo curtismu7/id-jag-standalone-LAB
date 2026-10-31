@@ -17,6 +17,7 @@ import doctor from './doctorRoute.js';
 import modeRoutes from './modeRoutes.js';
 import { isMock } from './mode.js';
 import health from './health.js';
+import { hostCheck } from './hostCheck.js';
 
 const DEFAULT_WEB_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
 
@@ -27,6 +28,7 @@ export function createApp({ workspaceResolver = () => DEFAULT_WORKSPACE } = {}) 
   const c = config();
   const app = express();
   app.disable('x-powered-by');
+  app.use(hostCheck()); // first: a request for any other Host name is refused before it reaches a route (DNS rebinding)
   app.use(workspaceMiddleware(workspaceResolver));
   if (process.env.TRUST_PROXY) app.set('trust proxy', process.env.TRUST_PROXY);
   let secret = process.env.SESSION_SECRET;
