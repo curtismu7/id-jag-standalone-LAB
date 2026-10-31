@@ -1,0 +1,122 @@
+// `npm run setup -- --mode=pf-local`: set up the app against a PingFederate on this machine (admin 4731, engine 4732).
+// Installs or finds it (scripts/pingfederate-setup.sh), runs the configure scripts against it, and writes the app's
+// runtime settings to the ONE shared settings file. The admin login lives only in ~/.config/demo-kit/provisioning.json:
+// it is read here, handed to the configure scripts through their environment, and never printed, put on a command
+// line, or written anywhere else. Prompting, the filesystem and process spawning are injected, as in setup-lib.mjs.
+import path from 'node:path';
+import { sharedEnvPath } from '../server/src/settings.js';
+
+export const PF_ADMIN_ORIGIN = 'https://127.0.0.1:4731'; // the only admin API this mode ever contacts
+export const PF_RUNTIME_URL = 'https://127.0.0.1:4732';
+const PROVISIONING = ['.config', 'demo-kit', 'provisioning.json'];
+
+// Keys setup generates for the shared file, written only when the file has no value for them.
+const GENERATED = ['SESSION_SECRET', 'REGISTRATION_KEY', 'ID_JAG_REGISTRY_TOKEN', 'RESOURCE_AS_CLIENT_SECRET'];
+const LOCAL_BACKENDS = {
+  RESOURCE_AS_ISSUER: 'http://localhost:9080',
+  MCP_URL: 'http://localhost:9090/mcp',
+  ID_JAG_RESOURCE: 'http://localhost:9090/mcp',
+};
+const ADMIN_KEY = /^PF_ADMIN_(USER|PASSWORD)$/;
+
+const valueOf = (text, key) => (new RegExp(`^${key}=(.*)$`, 'm').exec(text)?.[1] ?? '').trim();
+
+/**
+ * Add settings to .env text. A key is written only when the file has no value for it, unless it is in `overwrite`.
+ * Every other line (comments, other apps' keys) is kept as it is. PF_ADMIN_USER / PF_ADMIN_PASSWORD are refused.
+ */
+export function mergeShared(text, entries, overwrite = []) {
+  let out = text;
+  for (const [k, v] of Object.entries(entries)) {
+    if (ADMIN_KEY.test(k)) throw new Error(`${k} must not be written to the shared settings file`);
+    if (/[\r\n]/.test(v)) throw new Error(`${k}: value contains a line break`);
+    if (valueOf(out, k) && !overwrite.includes(k)) continue;
+    const line = `${k}=${v}`;
+    const re = new RegExp(`^${k}=.*$`, 'm');
+    out = re.test(out) ? out.replace(re, () => line) : `${out.replace(/\n*$/, '\n')}${line}\n`;
+  }
+  return out;
+}
+
+/** The pingfederate entry of provisioning.json, checked to be the local admin. Errors never contain a value. */
+export async function readPfAdmin({ fs, home }) {
+  const file = path.join(home, ...PROVISIONING);
+  let entry;
+  try { entry = JSON.parse(await fs.readFile(file, 'utf8')).pingfederate; } catch { entry = null; }
+  if (!entry || typeof entry.adminUrl !== 'string' || typeof entry.username !== 'string' || typeof entry.password !== 'string' || !entry.password) {
+    throw new Error(`no usable "pingfederate" admin login in ${file}: rerun npm run setup -- --mode=pf-local, or scripts/pingfederate-setup.sh`);
+  }
+  if (entry.adminUrl.replace(/\/$/, '') !== PF_ADMIN_ORIGIN) {
+    throw new Error(`the saved PingFederate admin URL is not ${PF_ADMIN_ORIGIN}; pf-local only ever configures the local install on 4731`);
+  }
+  return { adminUrl: PF_ADMIN_ORIGIN, username: entry.username, password: entry.password };
+}
+
+export async function runPfLocal({ flags, yes, env, root, home, io, fs, exec, rand }) {
+  const log = io.log;
+  const shared = sharedEnvPath({ env, home });
+  const sh = (p) => path.join(root, p);
+
+  if (!home) { io.err('cannot find your home folder (HOME is not set)'); return { code: 1 }; }
+
+  log('PingFederate: find or install it on 127.0.0.1 (admin 4731, engine 4732).');
+  // The installer asks for YES itself, so it gets the terminal. PF_ACCEPT_EULA comes from the caller's environment only.
+  const install = await exec('bash', [sh('scripts/pingfederate-setup.sh')], {
+    stdio: 'inherit',
+    env: { PF_ADMIN_PORT: '4731', PF_ENGINE_PORT: '4732' },
+  });
+  if (install.code !== 0) {
+    io.err(`PingFederate setup did not finish (exit ${install.code}). Nothing else was changed. Read the message above, fix it, and rerun.`);
+    return { code: 1 };
+  }
+
+  let admin;
+  try { admin = await readPfAdmin({ fs, home }); } catch (e) { io.err(e.message); return { code: 1 }; }
+  const scrub = (s) => String(s ?? '').split(admin.password).join('***'); // belt and braces: no child output can echo it
+  const show = (r) => {
+    const out = scrub(r.stdout).trimEnd(); if (out) log(out);
+    const err = scrub(r.stderr).trimEnd(); if (err) io.err(err);
+  };
+
+  // The shared settings file: created if missing, mode 600, other apps' keys untouched, existing values of ours kept.
+  let text = '';
+  if (fs.existsSync(shared)) text = await fs.readFile(shared, 'utf8');
+  else { await fs.mkdir(path.dirname(shared), { recursive: true }); text = '# Settings shared by the standalone apps. Mode 600. Admin logins do NOT go here.\n'; }
+  const entries = { PF_URL: PF_RUNTIME_URL, ...LOCAL_BACKENDS };
+  for (const k of GENERATED) entries[k] = rand(32);
+  const before = text;
+  text = mergeShared(text, entries, ['PF_URL']);
+  await fs.writeFile(shared, text, { mode: 0o600 });
+  await fs.chmod(shared, 0o600); // writeFile's mode only applies to a new file
+  log(before === text ? `${shared}: nothing to add (mode 600).` : `${shared}: settings added (mode 600). Generated secrets are not shown; PF_URL=${PF_RUNTIME_URL}.`);
+
+  let users = typeof flags.users === 'string' ? flags.users : '';
+  if (!users && !yes) users = await io.ask('Kit sign-in users, comma-separated emails (blank keeps the existing ones)', '');
+
+  const child = {
+    PF_ADMIN_URL: admin.adminUrl, PF_ADMIN_USER: admin.username, PF_ADMIN_PASSWORD: admin.password,
+    PF_ADMIN_INSECURE_TLS: 'true', // PingFederate's own self-signed certificate on 127.0.0.1
+    PF_SETTINGS_FILE: shared,
+  };
+  const steps = [
+    ['pingfederate/configure-signin.js', ['--local']],
+    ['pingfederate/configure-local-signin.js', users ? [`--users=${users}`] : []],
+  ];
+  for (const [script, args] of steps) {
+    log('', `Running ${script}`);
+    const r = await exec('node', [sh(script), ...args], { env: child });
+    show(r);
+    if (r.code !== 0) { io.err(`${script} failed (exit ${r.code}). The scripts are safe to rerun.`); return { code: 1 }; }
+  }
+
+  log('', 'Running doctor (pf-as)', '');
+  const doc = await exec('node', [sh('scripts/doctor.mjs'), '--mode=pf-as']);
+  show(doc);
+
+  log('', 'PingFederate is configured. Doctor FAIL lines for resource-as and mcp are expected until you start them:',
+    '  npm start -w resource-as     (separate terminal, :9080)',
+    '  npm start -w mcp-sample      (separate terminal, :9090)',
+    '  npm run build && npm start    # http://localhost:4720',
+    `A pf-discovery FAIL naming a certificate means Node does not trust the certificate on ${PF_RUNTIME_URL} (the image's own self-signed one): install a valid one in PingFederate's admin console.`);
+  return { code: doc.code === 0 ? 0 : 1, mode: 'pf-local' };
+}

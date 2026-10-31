@@ -18,3 +18,9 @@ AI-DEMO2 names (its default registry URL and token manager), so treat it as refe
   subject at PingFederate, an SP connection for this kit's resource AS, the confidential clients `id-jag-mcpc` /
   `id-jag-vscode` (signing in through the kit's PingOne), and the resource AS files under `deploy/local/` used by
   `deploy/docker-compose.desktop-clients.yml`. `pf-admin.js` holds the helpers these scripts share.
+
+`npm run setup -- --mode=pf-local` runs `configure-signin.js --local` and `configure-local-signin.js` against a
+PingFederate on 127.0.0.1:4731. Their admin API is then reached directly through `PF_ADMIN_URL`, `PF_ADMIN_USER`,
+`PF_ADMIN_PASSWORD` and `PF_ADMIN_INSECURE_TLS=true` in the environment (no kubectl, no `--ns`), and `PF_SETTINGS_FILE`
+names the file that receives the client id and secret (the shared `~/Development/.env`). The other scripts still use a
+cluster port-forward.

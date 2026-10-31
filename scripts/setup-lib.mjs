@@ -3,6 +3,10 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { MODES } from '../server/src/doctor.js';
+import { runPfLocal } from './setup-pf-local.mjs';
+
+// pf-local is the pf-as flow against a PingFederate this script installs or finds on 127.0.0.1 (setup-pf-local.mjs).
+export const SETUP_MODES = [...MODES, 'pf-local'];
 
 export const IDPS = [
   { id: 'local', label: 'Local PingFederate users (pi.flow)', available: true },
@@ -54,19 +58,20 @@ export async function checkDockerContext(exec) {
   return `Docker context is "${ctx}", not "orbstack". This kit runs on OrbStack, not Docker Desktop. Switch with: docker context use orbstack`;
 }
 
-export async function runSetup({ argv = [], env = {}, root, io, fs, exec, rand = (n) => crypto.randomBytes(n).toString('hex') }) {
+export async function runSetup({ argv = [], env = {}, root, home = env.HOME, io, fs, exec, rand = (n) => crypto.randomBytes(n).toString('hex') }) {
   const flags = parseArgs(argv);
   const yes = flags.yes === true;
   const envFile = path.join(root, '.env');
   const log = io.log;
 
+  const mode = flags.mode ?? (yes ? 'mock' : await io.ask(`Mode to configure (${SETUP_MODES.join(', ')})`, 'mock'));
+  if (!SETUP_MODES.includes(mode)) { io.err(`unknown mode ${mode}; use one of ${SETUP_MODES.join(', ')}`); return { code: 2 }; }
+  if (mode === 'pf-local') return runPfLocal({ flags, yes, env, root, home, io, fs, exec, rand });
+
   if (fs.existsSync(envFile) && flags.force !== true) {
     io.err('.env already exists; not touching it. Rerun with --force to replace it (the old one is saved as .env.bak.<n>).');
     return { code: 1 };
   }
-
-  const mode = flags.mode ?? (yes ? 'mock' : await io.ask(`Mode to configure (${MODES.join(', ')})`, 'mock'));
-  if (!MODES.includes(mode)) { io.err(`unknown mode ${mode}; use one of ${MODES.join(', ')}`); return { code: 2 }; }
 
   if (mode !== 'mock') {
     log('How PingFederate signs users in:');

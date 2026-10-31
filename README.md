@@ -36,13 +36,35 @@ environment: `npm run setup -- --yes --mode=pf-as --pf-url=https://pf.example.co
 (secrets are read without echo, or from `PF_EXCHANGE_CLIENT_SECRET`, `PF_ADMIN_PASSWORD`, `ACME_EXCHANGE_CLIENT_SECRET`).
 `--run=docker` checks the Docker context is `orbstack` and prints the compose command instead. `--force` replaces an
 existing `.env` after saving it as `.env.bak.<n>`. Setup generates `SESSION_SECRET`, `REGISTRATION_KEY` and
-`ID_JAG_REGISTRY_TOKEN` and never prints them. PingFederate signs users in itself ("local PingFederate users", pi.flow);
+`ID_JAG_REGISTRY_TOKEN` and never prints them. The extra mode `--mode=pf-local` is described in [PingFederate for ID-JAG](#pingfederate-for-id-jag); it writes the shared settings file instead of the repo `.env`. PingFederate signs users in itself ("local PingFederate users", pi.flow);
 PingOne behind PingFederate and AIC are listed as unavailable, with the reason.
 
 Every real-mode button runs a **pre-flight check** first (`GET /api/id-jag-playground/preflight?step=`): pass,
 warn or fail with the fix, and nothing is sent while a check fails. Each mode has a **ReactFlow diagram** at
 `/diagram/<mode>` (`?step=N` lights one step; it opens in a new tab), and **Download report** saves the run
 as Markdown or JSON, built in the browser with no raw token in it.
+
+## PingFederate for ID-JAG
+
+One command sets this app up against a PingFederate on your own machine, installing it if you do not have one:
+
+```sh
+npm run setup -- --mode=pf-local --users=you@pingone.com
+```
+
+- **You need** Docker (OrbStack) running, and your `pingfederate.lic` at `~/Documents/pingfederate.lic` (or set `PF_LICENSE_FILE`). The license file comes from the owner; it is never committed.
+- **YES.** If nothing answers on port 4731 the script installs the official PingFederate image in Docker, bound to `127.0.0.1` only, and asks you to type `YES`. Typing YES accepts Ping's terms for the image and PingFederate's in-product license agreement. Nothing is accepted for you; `PF_ACCEPT_EULA=YES` in your own environment is the only way to skip the question.
+- **Login.** The local install uses the official image default: `administrator` / `2FederateM0re`. It is for `127.0.0.1` only; change it for anything else. The login is saved to `~/.config/demo-kit/provisioning.json` (mode 600) and nowhere else. It is never written to the settings file, printed, or put on a command line: setup hands it to the configure scripts through their environment.
+- **Ports.** PingFederate admin `4731`, engine (runtime) `4732`. `PF_URL` is set to `https://127.0.0.1:4732`. If PingFederate is already running on 4731 setup uses it and checks the saved login (it asks for the admin login if the default does not work).
+- **What it does after that.** `pingfederate/configure-signin.js --local` and `pingfederate/configure-local-signin.js` create the app's OAuth client, token manager, OIDC policy and a sign-in form holding only the users you name (`--users`, plain addresses on `ALLOWED_EMAIL_DOMAINS`; their generated passwords go to `deploy/local/kit-users.json`, not the screen). Then it writes the app's settings to the shared file, `~/Development/.env` (mode 600, or the file named by `STANDALONE_ENV`), adding keys and never replacing ones that are already there, and runs `npm run doctor -- --mode=pf-as`. It only ever contacts `https://127.0.0.1:4731`.
+- **Rerun it any time.** A second run finds the install, keeps every object and setting, and changes nothing (`--users` is needed only the first time).
+- **Not done for you:** the ID-JAG issuing policy at PingFederate (see [setup guide](docs/setup-guides.md#pingfederate-as-the-id-jag-issuer)), the Acme PingFederate for `pf-pf`, and a certificate Node trusts for `https://127.0.0.1:4732`. The image ships its own self-signed one; on 2026-10-31 it had expired, so `npm run doctor` fails `pf-discovery` with `CERT_HAS_EXPIRED` until you install a valid certificate in PingFederate's admin console.
+
+If port 4731 or 4732 is taken by something that is not PingFederate:
+1. Find what is using it: `lsof -iTCP:4731 -sTCP:LISTEN -n -P`
+2. If it is an old copy of this install, stop that process: `kill <PID>` (or `docker stop pingfederate-lab`).
+3. If it is something else, stop it. The local PingFederate ports are fixed at 4731 and 4732 for the standalone apps.
+4. Do not use 8080, 5173, 3000, 4000, 4400, 4510, 4600-4601, 18080, 19080 or 19090.
 
 ## Modes
 
@@ -146,6 +168,13 @@ deploy/         docker-compose.yml (all three services), overlays (desktop clien
 ## Configuration
 
 Every variable is in [`.env.example`](.env.example). None are needed for Mock mode.
+
+**Where settings are read from**, first one wins per variable: real environment variables, then the shared file
+`~/Development/.env` (mode 600, shared by every standalone app; `STANDALONE_ENV=/path/to/file` names another), then this
+repo's own `.env` (still read, so existing setups keep working). Admin logins (`PF_ADMIN_USER`, `PF_ADMIN_PASSWORD`) never
+go in the shared file: `npm run setup -- --mode=pf-local` keeps the local PingFederate admin login only in
+`~/.config/demo-kit/provisioning.json`. To let a running app use the admin API (approving account requests), export
+them in the shell that starts it.
 
 | Variable | Default | Used for |
 | --- | --- | --- |
@@ -325,7 +354,7 @@ See [docs/roadmap.md](docs/roadmap.md).
 All rights reserved. Private repository; not licensed for redistribution.
 
 ## Keeping secrets out
-- Nothing secret is committed: `.env` is ignored, only `.env.example` ships.
+- Nothing secret is committed: `.env` is ignored, only `.env.example` ships. The shared `~/Development/.env` and `provisioning.json` live outside the repo.
 - Three independent checks block a leaked secret: the `.githooks/pre-commit` gitleaks hook (installed by `npm install`), the `secrets` CI job (gitleaks over the full history of every PR), and GitHub secret scanning with push protection on this repository.
 - Raw tokens never reach the browser or the logs (enforced by tests).
 - Planned: secrets generated inside the cluster, external ones stored as SealedSecrets, `private_key_jwt` client authentication instead of client secrets, and a small encrypted vault for local development.
@@ -337,5 +366,5 @@ This app listens on **4720** (set with `PORT`). The Vite dev server uses **4723*
 If the port is taken:
 1. Find what is using it: `lsof -iTCP:<port> -sTCP:LISTEN -n -P`
 2. If it is an old copy of this app, stop that process: `kill <PID>`
-3. If it is something else, stop it, or start this app on another port: `PORT=4730 npm run dev` (and set `APP_ORIGIN` to match), or `HOST_PORT=4731 docker compose -f deploy/docker-compose.yml up -d`
+3. If it is something else, stop it, or start this app on another port: `PORT=4725 npm run dev` (and set `APP_ORIGIN` to match), or `HOST_PORT=4726 docker compose -f deploy/docker-compose.yml up -d`
 4. Do not use 8080, 5173, 3000, 4000, 4400, 4510, 4600-4601, 18080, 19080 or 19090. Other demos and tools use them.

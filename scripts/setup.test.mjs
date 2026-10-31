@@ -103,7 +103,7 @@ test('generated and supplied secrets are never printed', async () => {
 test('pf-as asks for PF settings (secret via askSecret); admin password only when an admin URL is given', async () => {
   const t = fixture({ answers: ['pf-as', 'local', 'https://pf.test', 'cid', 'https://pf.test:9999'], secrets: ['xsecret', 'adminpw'] });
   assert.equal((await t.run([])).code, 0);
-  assert.deepEqual(t.asked, ['Mode to configure (mock, pf-as, pf-pf, byo)', 'Sign-in', 'PingFederate base URL', 'PingFederate exchange client id', 'PingFederate exchange client secret', 'PingFederate admin URL (blank to skip the admin checks)', 'PingFederate admin password']);
+  assert.deepEqual(t.asked, ['Mode to configure (mock, pf-as, pf-pf, byo, pf-local)', 'Sign-in', 'PingFederate base URL', 'PingFederate exchange client id', 'PingFederate exchange client secret', 'PingFederate admin URL (blank to skip the admin checks)', 'PingFederate admin password']);
   assert.match(t.env(), /^PF_ADMIN_PASSWORD=adminpw$/m);
   const none = fixture({ answers: ['pf-as', 'local', 'https://pf.test', 'cid', ''], secrets: ['xsecret'] });
   await none.run([]);
