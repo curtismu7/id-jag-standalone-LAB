@@ -1,0 +1,12 @@
+{
+  "id": "id-jag-standalone",
+  "name": "ID-JAG Standalone LAB",
+  "catalogId": "C1",
+  "kind": "Demo",
+  "description": "Token exchange with ID-JAG, using a mock authorization server and a sample MCP server.",
+  "url": "http://127.0.0.1:4720",
+  "healthPath": "/api/health",
+  "composeFile": "deploy/docker-compose.yml",
+  "composeOverlays": [],
+  "notes": "Host-run: npm run build && npm start (port 4720). Or: docker compose -f deploy/docker-compose.yml up --build -d (publishes 127.0.0.1 only: 4720 playground, 4721 resource-as, 4722 mcp-sample)."
+}

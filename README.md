@@ -1,6 +1,8 @@
-# ID-JAG Standalone
+# ID-JAG Standalone LAB
 
 Repo: https://github.com/ping-sandbox/id-jag-standalone-LAB
+Tier: Demo
+Catalog: C1
 
 A shareable playground, resource authorization server and PingFederate setup kit for
 **ID-JAG** (Identity Assertion JWT Authorization Grant,
