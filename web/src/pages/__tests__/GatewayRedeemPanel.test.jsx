@@ -197,10 +197,12 @@ describe("a run shows what the server returned, not a constant", () => {
   });
 
   it("says plainly when there is no second leg", async () => {
-    mount({ runs: { happy: run({ leg2: null, redeemed: false, hops: run().hops.slice(0, 2), target: { status: 401, body: { error: "invalid_token" } } }) } });
+    mount({ runs: { happy: run({ leg2: null, redeemed: false, hops: run().hops.slice(0, 2), target: { status: 401, body: { error: "invalid_token" } },
+      refusal: { stage: "target", kind: "oauth", status: 401, error: "invalid_token", check: "token type", description: "This is an ID-JAG" } }) } });
     await ready();
     fireEvent.click(screen.getByTestId("gr-run-happy"));
     expect(await screen.findByTestId("gr-no-leg2")).toHaveTextContent("Redeem.TokenURL is not set");
+    expect(screen.getByTestId("gr-refusal")).toHaveTextContent("Refused at target");
   });
 
   it("every scenario has a Run button, and Run all ten runs them in order and marks each pass or fail from its verdict", async () => {

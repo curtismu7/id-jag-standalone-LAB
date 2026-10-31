@@ -7,6 +7,7 @@
 .gateway-redeem__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.6rem 1rem; }
 .gateway-redeem__field { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; font-size: var(--font-size-xs); }
 .gateway-redeem__field input, .gateway-redeem__field select, .gateway-redeem__field textarea { min-width: 0; width: 100%; box-sizing: border-box; }
+.gateway-redeem__field .ijp-check input { width: auto; flex: none; }
 .gateway-redeem__name { font-weight: 700; overflow-wrap: anywhere; }
 .gateway-redeem__masked { -webkit-text-security: disc; font-family: var(--font-mono); }
 .gateway-redeem__verdict { margin: 0.6rem 0; padding: 0.6rem 0.9rem; border: 1px solid var(--border); border-left-width: 5px; border-radius: 8px; background: var(--surface-2); }

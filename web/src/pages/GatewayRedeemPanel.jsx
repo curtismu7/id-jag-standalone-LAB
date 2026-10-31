@@ -301,7 +301,7 @@ export default function GatewayRedeemPanel() {
             <ul>{saveErrors.map((e) => <li key={`${e.field}-${e.message}`}><code>{e.field}</code> {e.message}</li>)}</ul>
           </div>
         )}
-        {run && !legs.two && !run.refusal && (
+        {run && run.leg1 && !legs.two && (
           <p className="ijp-status" data-testid="gr-no-leg2">No second leg: Redeem.TokenURL is not set, so the exchange result was not redeemed.</p>
         )}
         {run && legs.two && (
