@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 // npm run doctor -- [--json] [--mode=mock|pf-as|pf-pf|byo]   Exit 1 if any check fails. Never prints secret values.
+// Works in both app modes (MODE=mock|live, or the choice saved by the toggle): in mock mode it also proves the netguard and the mock servers.
 import { fileURLToPath } from 'node:url';
+import { loadSharedMode } from '../server/src/mode.js';
 import { formatReport, MODES, runDoctor } from '../server/src/doctor.js';
 
 const envFile = fileURLToPath(new URL('../.env', import.meta.url));
 try { process.loadEnvFile(envFile); } catch { /* no .env */ }
+loadSharedMode(); // MODE from the shared settings file, like the server
 
 const args = process.argv.slice(2);
 const mode = args.find((a) => a.startsWith('--mode='))?.slice(7) || 'mock';
