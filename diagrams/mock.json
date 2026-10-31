@@ -1,0 +1,181 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "mock",
+  "title": "Sample data (browser)",
+  "lede": "Mock mode needs no sign-in and makes no network call: idJagPlaygroundMock.js stands in for the server and returns the same response shapes, so the page renders exactly as in a real run. Hosts below are sample values. Mock: every arrow is simulated by idJagPlaygroundMock.js inside the page. No sign-in, no network, no real token.",
+  "groups": {
+    "user": {
+      "label": "Person or app",
+      "color": "dark"
+    },
+    "bff": {
+      "label": "This app",
+      "color": "red"
+    },
+    "pf": {
+      "label": "PingFederate or outside IdP",
+      "color": "red"
+    },
+    "as": {
+      "label": "Authorization server",
+      "color": "red"
+    },
+    "rs": {
+      "label": "Resource server",
+      "color": "grey"
+    }
+  },
+  "nodes": [
+    {
+      "id": "browser",
+      "group": "user",
+      "label": "Browser",
+      "sub": [
+        "the playground page, in Mock mode",
+        "Every button calls the mock API, not the network"
+      ],
+      "x": 0,
+      "y": 300
+    },
+    {
+      "id": "mockapi",
+      "group": "bff",
+      "label": "Mock API",
+      "sub": [
+        "idJagPlaygroundMock.js · in the page",
+        "Fixtures for issue, inspect, redeem, call, the protected page and negative tests",
+        "Sample trusted IdP: Partner Okta (sample)"
+      ],
+      "x": 520,
+      "y": 300
+    },
+    {
+      "id": "pf",
+      "group": "pf",
+      "label": "PingFederate (sample)",
+      "sub": [
+        "pingfederate.example.com",
+        "Sample ID-JAG typed oauth-id-jag+jwt",
+        "Exchange client agent-exchange-client"
+      ],
+      "x": 1040,
+      "y": 0
+    },
+    {
+      "id": "as",
+      "group": "as",
+      "label": "MCP authorization server (sample)",
+      "sub": [
+        "mcp-as.example.com/token",
+        "Sample redemption for client agent-mcp-client"
+      ],
+      "x": 1040,
+      "y": 600
+    },
+    {
+      "id": "mcp",
+      "group": "rs",
+      "label": "MCP server (sample)",
+      "sub": [
+        "mcp.example.com/mcp",
+        "Sample tools: search_records, get_record, create_note"
+      ],
+      "x": 1560,
+      "y": 300
+    },
+    {
+      "id": "profile",
+      "group": "rs",
+      "label": "Protected resource (sample)",
+      "sub": [
+        "sample /protected/profile page",
+        "Same bearer validation as the MCP tools",
+        "Says which check failed when it refuses"
+      ],
+      "x": 520,
+      "y": 640
+    }
+  ],
+  "edges": [
+    {
+      "source": "browser",
+      "target": "mockapi",
+      "label": "mockApi.post(…) · no network"
+    },
+    {
+      "source": "mockapi",
+      "target": "pf",
+      "label": "simulated RFC 8693 token exchange · requested_token_type=id-jag"
+    },
+    {
+      "source": "mockapi",
+      "target": "as",
+      "label": "simulated RFC 7523 jwt-bearer · client_id agent-mcp-client"
+    },
+    {
+      "source": "as",
+      "target": "pf",
+      "label": "sample JWKS check",
+      "dashed": true
+    },
+    {
+      "source": "mockapi",
+      "target": "mcp",
+      "label": "simulated tools/list · tools/call (Bearer)"
+    },
+    {
+      "source": "mockapi",
+      "target": "profile",
+      "label": "sample protected page"
+    },
+    {
+      "source": "mockapi",
+      "target": "as",
+      "label": "sample refusals: replay · tampered signature · other client · extra scope"
+    }
+  ],
+  "steps": [
+    {
+      "title": "No sign-in",
+      "what": "No sign-in: the mock config says you are signed in, so steps 2 to 5 are ready at once.",
+      "edges": [
+        0
+      ]
+    },
+    {
+      "title": "Get an ID-JAG",
+      "what": "A sample ID-JAG comes back with the same request, response and spec-check table a real exchange produces.",
+      "edges": [
+        0,
+        1
+      ]
+    },
+    {
+      "title": "Redeem it",
+      "what": "A sample redemption returns a decoded access token. The scope dropdown lists the sample ID-JAG's scopes.",
+      "edges": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "title": "Call the MCP server",
+      "what": "tools/list returns three sample tools; tools/call returns a sample result. The protected page renders a sample profile.",
+      "edges": [
+        0,
+        4,
+        5
+      ]
+    },
+    {
+      "title": "Negative tests",
+      "what": "Each negative test returns a sample refusal so you can see what a pass looks like.",
+      "edges": [
+        0,
+        1,
+        6
+      ]
+    }
+  ]
+}

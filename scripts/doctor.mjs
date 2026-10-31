@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // npm run doctor -- [--json] [--mode=mock|pf-as|pf-pf|byo]   Exit 1 if any check fails. Never prints secret values.
+// Works in both app modes (MODE=mock|live, or the choice saved by the toggle): in mock mode it also proves the netguard and the mock servers.
 import { fileURLToPath } from 'node:url';
 import { formatReport, MODES, runDoctor } from '../server/src/doctor.js';
 import { loadSettings } from '../server/src/settings.js';

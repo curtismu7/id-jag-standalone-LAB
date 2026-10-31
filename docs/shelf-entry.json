@@ -4,7 +4,7 @@
   "catalogId": "C1",
   "kind": "Demo",
   "description": "Token exchange with ID-JAG, using a mock authorization server and a sample MCP server.",
-  "url": "http://127.0.0.1:4720",
+  "url": "http://localhost:4720",
   "healthPath": "/api/health",
   "composeFile": "deploy/docker-compose.yml",
   "composeOverlays": [],

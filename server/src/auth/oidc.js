@@ -9,11 +9,13 @@ import fs from 'node:fs';
 import express from 'express';
 import * as jose from 'jose';
 import { config } from '../config.js';
+import { isMock, runtimeEnv } from '../mode.js';
+import { outboundFetch } from '../outbound.js';
 import { allowedDomains, checkEmail } from './emailRules.js';
 
 const BASE_SCOPES = ['openid', 'profile', 'email', 'offline_access'];
 const LOGIN_TTL_MS = 10 * 60 * 1000;
-const env = (k) => String(process.env[k] ?? '').trim();
+const env = (k) => String(runtimeEnv()[k] ?? '').trim();
 const rand = (n = 24) => crypto.randomBytes(n).toString('base64url');
 
 // Defaults to the pf-as issuer settings: one PingFederate client signs users in and runs the exchange.
@@ -39,16 +41,19 @@ export const missingConfig = (c) => [
   !c.clientSecret && !c.privateKey && 'OIDC_CLIENT_SECRET (or OIDC_PRIVATE_KEY_JWT, or PF_EXCHANGE_CLIENT_SECRET)',
 ].filter(Boolean);
 
+// Mock mode: the keys are read through the netguard (jose's own remote JWKS would open a socket), fresh on every check.
+const mockJwks = (url) => async (header, token) => jose.createLocalJWKSet(await (await outboundFetch(url)).json())(header, token);
+
 // Provider metadata + its JWKS, per issuer. A failed discovery is retried on the next login.
 const discovered = new Map();
 export function discover(issuer) {
   if (!discovered.has(issuer)) {
     const p = (async () => {
-      const r = await fetch(`${issuer.replace(/\/$/, '')}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(5000) });
+      const r = await outboundFetch(`${issuer.replace(/\/$/, '')}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(5000) });
       if (!r.ok) throw new Error(`discovery answered HTTP ${r.status}`);
       const meta = await r.json();
       if (meta.issuer !== issuer) throw new Error(`discovery names issuer ${meta.issuer}, not ${issuer}`);
-      return { ...meta, jwks: jose.createRemoteJWKSet(new URL(meta.jwks_uri)) };
+      return { ...meta, jwks: isMock() ? mockJwks(meta.jwks_uri) : jose.createRemoteJWKSet(new URL(meta.jwks_uri)) };
     })();
     p.catch(() => discovered.delete(issuer));
     discovered.set(issuer, p);
@@ -76,7 +81,7 @@ async function redeemCode(c, meta, code, verifier) {
   } else {
     headers.Authorization = `Basic ${Buffer.from(`${c.clientId}:${c.clientSecret}`).toString('base64')}`;
   }
-  const r = await fetch(meta.token_endpoint, { method: 'POST', headers, body: form.toString(), signal: AbortSignal.timeout(10000) });
+  const r = await outboundFetch(meta.token_endpoint, { method: 'POST', headers, body: form.toString(), signal: AbortSignal.timeout(10000) });
   const data = await r.json().catch(() => ({}));
   if (r.status !== 200 || typeof data.id_token !== 'string') throw new Error(`token endpoint answered HTTP ${r.status} ${data.error || ''}`.trim());
   return data;

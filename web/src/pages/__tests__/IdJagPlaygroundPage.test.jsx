@@ -400,7 +400,7 @@ describe("ID-JAG playground page", () => {
     localStorage.clear();
     mount(config());
     expect(screen.getByTestId("ijp-mock-badge")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Mock (no sign-in)" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Sample data (browser)" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("explains what to set when the picked mode is not configured", async () => {
@@ -453,8 +453,8 @@ describe("ID-JAG playground page", () => {
   it("mock mode runs steps 2-5 from fixtures with no network calls", async () => {
     localStorage.setItem("idjag.playground.mode", "mock");
     mount(config());
-    expect(screen.getByTestId("ijp-mock-badge")).toHaveTextContent("Mock: sample data, nothing is sent");
-    expect(screen.getByTestId("ijp-signin-status")).toHaveTextContent("Mock: no sign-in needed");
+    expect(screen.getByTestId("ijp-mock-badge")).toHaveTextContent("Sample data: nothing is sent");
+    expect(screen.getByTestId("ijp-signin-status")).toHaveTextContent("Sample data: no sign-in needed");
 
     fireEvent.click(screen.getByRole("button", { name: "Request ID-JAG" }));
     expect(await screen.findByTestId("ijp-checks", {}, slow)).toHaveTextContent("Spec check: 17 of 17 pass");

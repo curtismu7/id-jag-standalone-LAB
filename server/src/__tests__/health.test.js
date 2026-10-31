@@ -23,8 +23,8 @@ describe('GET /api/health', () => {
   it('cold start answers unknown, with the full contract shape', async () => {
     const res = await request(app()).get('/api/health');
     expect(res.status).toBe(200);
-    expect(Object.keys(res.body).sort()).toEqual(['at', 'demo', 'runtime', 'schema', 'state']);
-    expect(res.body).toMatchObject({ schema: 'demo-health/1', state: 'unknown', runtime: 'offline', demo: { id: 'id-jag', name: 'ID-JAG Standalone', version: '0.1.0' } });
+    expect(Object.keys(res.body).sort()).toEqual(['at', 'demo', 'mode', 'runtime', 'schema', 'state']);
+    expect(res.body).toMatchObject({ schema: 'demo-health/1', state: 'unknown', runtime: 'offline', mode: 'live', demo: { id: 'id-jag', name: 'ID-JAG Standalone', version: '0.1.0' } });
     expect(Object.keys(res.body.demo).sort()).toEqual(['id', 'name', 'version']);
     expect(new Date(res.body.at).toISOString()).toBe(res.body.at);
     expect(res.headers['cache-control']).toBe('no-store');

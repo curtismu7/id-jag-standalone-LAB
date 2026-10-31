@@ -1,6 +1,6 @@
 # resource-as or mcp-sample, from the repo root (the workspaces share one lockfile):
 #   docker build -f deploy/service.Dockerfile --build-arg SERVICE=resource-as .
-FROM node:22-alpine
+FROM node:26-alpine
 ARG SERVICE
 WORKDIR /app
 ENV NODE_ENV=production

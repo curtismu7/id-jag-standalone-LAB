@@ -47,7 +47,7 @@ describe("the four diagrams route", () => {
   it.each(PLAYGROUND_DIAGRAM_MODES)("%s: every edge is routed from its declared handle sides with no fallback", (mode) => {
     const d = PLAYGROUND_DIAGRAMS[mode];
     const rects = {};
-    for (const n of [...d.nodes, ...d.notes]) rects[n.id] = { x: n.x, y: n.y, w: 300, h: n.text ? 70 : 150 };
+    for (const n of d.nodes) rects[n.id] = { x: n.x, y: n.y, w: 300, h: 150 };
     const { routes, fallbacks } = routeEdges(rects, d.edges);
     expect(fallbacks).toBe(0);
     for (const e of d.edges) {
@@ -59,7 +59,7 @@ describe("the four diagrams route", () => {
 });
 
 const P = (x, y) => ({ x, y });
-const rectsOf = (d) => Object.fromEntries([...d.nodes, ...d.notes].map((n) => [n.id, { x: n.x, y: n.y, w: 300, h: n.text ? 70 : 150 }]));
+const rectsOf = (d) => Object.fromEntries(d.nodes.map((n) => [n.id, { x: n.x, y: n.y, w: 300, h: 150 }]));
 
 describe("separateRoutes", () => {
   // two arrows share the vertical run at x = 500; the second is moved GAP clear, its ends stay on the handles

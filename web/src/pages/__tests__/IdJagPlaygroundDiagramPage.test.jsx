@@ -41,10 +41,10 @@ describe("ID-JAG playground diagram data", () => {
     expect(dashed("pf-as")).toMatch(/resource-as \/jwks/);
     expect(dashed("pf-pf")).toMatch(/single key/);
     expect(dashed("byo")).toMatch(/trusted-idps\/registry/);
-    const notes = (mode) => PLAYGROUND_DIAGRAMS[mode].notes.map((n) => n.text).join(" ");
-    expect(notes("pf-pf")).toMatch(/single-key JWKS/);
-    expect(notes("pf-pf")).toMatch(/mcp-sample trusts resource-as only/);
-    expect(notes("byo")).toMatch(/Trusted IdPs registry/);
+    const why = (mode) => PLAYGROUND_DIAGRAMS[mode].steps.map((s) => s.why).join(" ");
+    expect(why("pf-pf")).toMatch(/single-key JWKS/);
+    expect(why("pf-pf")).toMatch(/mcp-sample trusts resource-as only/);
+    expect(why("byo")).toMatch(/Trusted IdPs registry/);
   });
 
   it("byo: step 1 shows the xaa.dev hop (IdenX sign-in, callback, exchange); step 3 names its JWKS", () => {
@@ -55,11 +55,12 @@ describe("ID-JAG playground diagram data", () => {
     expect(d.steps[2].text).toMatch(/idp\.xaa\.dev\/jwks/);
   });
 
-  it("lights the browser's button press but zooms to the real hop", () => {
+  it("lights the actors a step's calls touch, and zooms to them", () => {
     const parts = stepParts(PLAYGROUND_DIAGRAMS["pf-as"], 3);
-    expect(parts.nodes).toContain("browser");
-    expect(parts.focus).toEqual(["server", "ras", "registry", "pf", "n-trust"]);
-    expect(stepParts(PLAYGROUND_DIAGRAMS.mock, 1).focus).toEqual(["browser", "mockapi", "n-mock"]);
+    expect(parts.nodes).toEqual(["browser", "server", "ras", "registry", "pf"]);
+    expect(parts.focus).toEqual(parts.nodes);
+    expect(stepParts(PLAYGROUND_DIAGRAMS.mock, 1).focus).toEqual(["browser", "mockapi"]);
+    expect(stepParts(PLAYGROUND_DIAGRAMS.mock, 0).nodes).toHaveLength(6);
   });
 
   it("builds /diagram/:mode paths with ?step=N", () => {
@@ -144,6 +145,7 @@ describe("label words and scale", () => {
     expect(wordsShown({ place, on: true, dragging: true })).toBe(false);
     expect(wordsShown({ place: { ...place, ok: false }, on: true, hover: true })).toBe(false);
     expect(wordsShown({ on: true })).toBe(true); // no route, so no place to choose: the words sit on the plain path
+    expect(wordsShown({ on: true, fallback: true })).toBe(false); // the router found no way round: drawn plain, not placed, so no words that could cover a box
   });
   it("counter-scales the label by 1 / zoom and anchors the badge centre on the arrow for every side and alignment", () => {
     expect(labelTransform(place, 100, 50, 0.5)).toBe("translate(100px,50px) scale(2) translate(-12px,-50%)");

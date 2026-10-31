@@ -4,7 +4,7 @@ import { BADGE, badgeSpots, labelRect, pillSizes, placeLabels, stripLabel } from
 
 const P = (x, y) => ({ x, y });
 const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-const rectsOf = (d) => Object.fromEntries([...d.nodes, ...d.notes].map((n) => [n.id, { x: n.x, y: n.y, w: 300, h: n.text ? 70 : 150 }]));
+const rectsOf = (d) => Object.fromEntries(d.nodes.map((n) => [n.id, { x: n.x, y: n.y, w: 300, h: 150 }]));
 
 describe("pillSizes and stripLabel", () => {
   it("strips the step circle", () => {

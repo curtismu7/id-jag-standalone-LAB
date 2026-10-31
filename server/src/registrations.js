@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { allowedDomains, checkEmail } from './auth/emailRules.js';
 import { config } from './config.js';
+import { runtimeEnv } from './mode.js';
 import { dataDir } from './workspace.js';
 import { activeAdapter } from './idp/index.js';
 import * as audit from './registry/audit.js';
@@ -20,7 +21,7 @@ const MAX_PASSWORD = 128;
 const file = () => path.resolve(dataDir(), 'registrations.json');
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const key = () => {
-  const k = String(process.env.REGISTRATION_KEY ?? '').trim();
+  const k = String(runtimeEnv().REGISTRATION_KEY ?? '').trim();
   if (k.length < 16) throw fail(503, 'Registration is not set up: REGISTRATION_KEY (16+ characters) is missing');
   return crypto.createHash('sha256').update(k).digest();
 };

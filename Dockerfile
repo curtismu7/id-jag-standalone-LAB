@@ -1,14 +1,16 @@
 # Build the web app, then run the API server, which also serves web/dist.
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY web/package.json web/
 COPY server/package.json server/
 RUN npm ci
 COPY web web
+# The diagram data (diagram-studio/1 files) is bundled into the web build.
+COPY diagrams diagrams
 RUN npm run build -w web
 
-FROM node:22-alpine
+FROM node:26-alpine
 WORKDIR /app
 ENV NODE_ENV=production PORT=4720 DATA_DIR=/data
 COPY package.json package-lock.json ./

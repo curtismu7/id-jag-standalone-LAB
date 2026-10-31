@@ -45,11 +45,12 @@ const get = (rep, id) => rep.checks.find((c) => c.id === id);
 const checkPfAdmin = (env, adminCall) => pfLocal.doctor({ env, adminCall });
 
 describe('individual checks', () => {
-  it('node: passes on 20+, fails below with a fix', () => {
-    expect(doctor.checkNode('22.1.0').status).toBe('pass');
-    const f = doctor.checkNode('18.19.0');
+  it('node: passes on 26+, fails below with a fix', () => {
+    expect(doctor.checkNode('26.1.0').status).toBe('pass');
+    expect(doctor.checkNode('22.19.0').status).toBe('fail');
+    const f = doctor.checkNode('20.19.0');
     expect(f.status).toBe('fail');
-    expect(f.fix).toMatch(/Node 20/);
+    expect(f.fix).toMatch(/Node 26/);
   });
   it('env file: mock does not need it, a real mode warns', () => {
     const none = { existsSync: () => false };
@@ -182,7 +183,7 @@ describe('runDoctor', () => {
     await expect(doctor.runDoctor({ mode: 'nope' })).rejects.toThrow(/unknown mode/);
   });
   it('formatReport prints each non-pass check with its fix', () => {
-    const text = doctor.formatReport({ mode: 'pf-as', ok: false, checks: [{ id: 'port', status: 'fail', message: 'in use', fix: 'free it' }, { id: 'node', status: 'pass', message: 'Node 22', fix: '' }] });
+    const text = doctor.formatReport({ mode: 'pf-as', ok: false, checks: [{ id: 'port', status: 'fail', message: 'in use', fix: 'free it' }, { id: 'node', status: 'pass', message: 'Node 26', fix: '' }] });
     expect(text).toContain('FAIL  port');
     expect(text).toContain('fix: free it');
     expect(text).toContain('1 passed, 0 warnings, 1 failed');

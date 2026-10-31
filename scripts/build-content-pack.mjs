@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Generates content-pack.json (repo root) from web/src/data/terms.json and sources.json, plus the guide list
- * in GuidesPage.jsx and the diagram modes in idJagPlaygroundDiagrams.js. Format: docs/content-pack.schema.json.
+ * in GuidesPage.jsx and the diagram files in diagrams/. Format: docs/content-pack.schema.json.
  * Output is deterministic: lists sorted by id, 2-space JSON, no timestamps. The git commit is recorded only when
  * passed (--commit=<sha>), so a plain run is reproducible.
  *
@@ -24,8 +24,6 @@ function readGuides() {
 }
 
 export async function buildPack({ commit } = {}) {
-  const { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES, playgroundDiagramPath } =
-    await import(pathToFileURL(path.join(ROOT, 'web/src/utils/idJagPlaygroundDiagrams.js')));
   const glossary = JSON.parse(read('web/src/data/terms.json')).sort(byId);
   const sources = JSON.parse(read('web/src/data/sources.json')).sort(byId);
   const cards = [
@@ -36,7 +34,9 @@ export async function buildPack({ commit } = {}) {
   ].sort(byId);
   const termIds = new Set(glossary.map((t) => t.id));
   for (const c of cards) for (const t of c.terms || []) if (!termIds.has(t)) throw new Error(`card ${c.id}: unknown term ${t}`);
-  const diagrams = [...PLAYGROUND_DIAGRAM_MODES].sort().map((m) => ({ id: `flow-${m}`, label: `${PLAYGROUND_DIAGRAMS[m].label} diagram`, href: playgroundDiagramPath(m), mode: m }));
+  // One diagram per file in diagrams/ (diagram-studio/1 data); the title is the label the app shows for the mode.
+  const diagrams = fs.readdirSync(path.join(ROOT, 'diagrams')).filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, '')).sort()
+    .map((m) => ({ id: `flow-${m}`, label: `${JSON.parse(read(`diagrams/${m}.json`)).title} diagram`, href: `/diagram/${m}`, mode: m }));
   return {
     schema: 'demo-content-pack/1',
     id: 'id-jag',
