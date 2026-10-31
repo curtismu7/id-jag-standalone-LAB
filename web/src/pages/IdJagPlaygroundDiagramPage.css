@@ -71,7 +71,7 @@
 .ijx .detail figcaption{font-size:.72rem;font-weight:700;margin-bottom:2px}
 .ijx .detail pre{margin:0;padding:8px 10px;overflow:auto;max-height:260px;background:var(--th-bg);border:1px solid var(--th-border);border-radius:6px;font-size:.68rem;line-height:1.4;color:var(--th-text)}
 .ijx .detail .token pre{border-style:dashed}
-.ijx .chip{display:inline-block;padding:0 7px;border-radius:999px;font-size:.62rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border:1px solid var(--th-border);color:var(--th-text-muted);vertical-align:middle}
+.ijx .chip{display:inline-block;padding:0 7px;border-radius:999px;font-size:.625rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border:1px solid var(--th-border);color:var(--th-text-muted);vertical-align:middle}
 .ijx .chip.rfc{color:var(--th-info);border-color:var(--th-info)}
 .ijx .chip.spec{color:var(--th-ok);border-color:var(--th-ok)}
 .ijx .chip.emerging{color:var(--text);background:var(--th-bg-page);border:1px dashed var(--border)}

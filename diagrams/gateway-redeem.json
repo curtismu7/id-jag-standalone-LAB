@@ -1,0 +1,180 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "gateway-redeem",
+  "title": "Gateway redeems the ID-JAG at the target app",
+  "lede": "Ping release claim (2026-11-02), UNVERIFIED on our tenant, shown here with in-process mocks. The Privilege MCP gateway, configured with an On-Behalf-Of spec, exchanges the caller's token at the exchange issuer (leg 1, RFC 8693) and gets an ID-JAG. When a Redeem spec with a TokenURL is set, it redeems that ID-JAG at the target app's own issuer (leg 2, RFC 7523), so the target app sees the user with no shared credential. Without Redeem the exchange result is not redeemed.",
+  "groups": {
+    "user": {
+      "label": "Person or app",
+      "color": "dark"
+    },
+    "gw": {
+      "label": "Privilege MCP gateway",
+      "color": "blue"
+    },
+    "pf": {
+      "label": "Exchange issuer",
+      "color": "red"
+    },
+    "as": {
+      "label": "Target app issuer",
+      "color": "red"
+    },
+    "rs": {
+      "label": "Target app API",
+      "color": "grey"
+    }
+  },
+  "nodes": [
+    {
+      "id": "agent",
+      "group": "user",
+      "label": "Agent app",
+      "sub": [
+        "acts for the signed-in user",
+        "Holds the caller token",
+        "exchange-idp.mock.invalid signed it in"
+      ],
+      "x": 0,
+      "y": 340
+    },
+    {
+      "id": "gateway",
+      "group": "gw",
+      "label": "Privilege MCP gateway \u00b7 mock",
+      "sub": [
+        "Holds the On-Behalf-Of spec (OBO) and its Redeem spec",
+        "Leg 1 at OBO.TokenURL, leg 2 at Redeem.TokenURL",
+        "Calls only allow-listed https hosts, follows no redirect",
+        "ClientSecret and PrivateKeyPEM are write-only"
+      ],
+      "x": 420,
+      "y": 340
+    },
+    {
+      "id": "exchange",
+      "group": "pf",
+      "label": "Exchange issuer \u00b7 company IdP",
+      "sub": [
+        "exchange-idp.mock.invalid",
+        "RFC 8693: caller token in, ID-JAG out",
+        "ID-JAG: aud = Resource, sub = the user, act = the caller"
+      ],
+      "x": 420,
+      "y": 0
+    },
+    {
+      "id": "targetidp",
+      "group": "as",
+      "label": "Target app's own issuer",
+      "sub": [
+        "target-idp.mock.invalid",
+        "RFC 7523 jwt-bearer: trusts the exchange issuer only",
+        "Checks signature, aud, expiry, client, single-use jti"
+      ],
+      "x": 420,
+      "y": 680
+    },
+    {
+      "id": "api",
+      "group": "rs",
+      "label": "Target app API",
+      "sub": [
+        "target-api.mock.invalid \u00b7 GET /ledger/entries",
+        "Accepts only access tokens its own issuer minted",
+        "Says which check failed when it refuses"
+      ],
+      "x": 840,
+      "y": 340
+    }
+  ],
+  "edges": [
+    {
+      "source": "agent",
+      "target": "gateway",
+      "label": "caller token: Authorization: Bearer (aud = the gateway)"
+    },
+    {
+      "source": "gateway",
+      "target": "exchange",
+      "label": "leg 1: RFC 8693 exchange \u00b7 requested_token_type=id-jag \u00b7 resource=Resource"
+    },
+    {
+      "source": "exchange",
+      "target": "gateway",
+      "label": "ID-JAG \u00b7 aud = Resource \u00b7 sub = user \u00b7 act = caller"
+    },
+    {
+      "source": "gateway",
+      "target": "targetidp",
+      "label": "leg 2: RFC 7523 jwt-bearer \u00b7 assertion = the ID-JAG \u00b7 only if Redeem.TokenURL is set"
+    },
+    {
+      "source": "targetidp",
+      "target": "gateway",
+      "label": "access token \u00b7 sub = user \u00b7 aud = the target API"
+    },
+    {
+      "source": "gateway",
+      "target": "api",
+      "label": "Bearer access token from the target issuer"
+    },
+    {
+      "source": "agent",
+      "target": "api",
+      "label": "the caller's original token: refused (signature)",
+      "dashed": true
+    },
+    {
+      "source": "gateway",
+      "target": "api",
+      "label": "no Redeem: the unredeemed ID-JAG goes on: refused (token type)",
+      "dashed": true
+    }
+  ],
+  "steps": [
+    {
+      "title": "The agent calls the gateway with the caller token",
+      "what": "The company IdP signed the user in and issued the caller token. The agent presents it to the gateway. The gateway checks signature, expiry, issuer and that it is the audience.",
+      "why": "The caller token is for the gateway only. The target app never sees it.",
+      "edges": [
+        0
+      ]
+    },
+    {
+      "title": "Leg 1: exchange the caller token for an ID-JAG",
+      "what": "The gateway posts an RFC 8693 token exchange to OBO.TokenURL with its client credentials (OBO.AuthMethod). OBO.Resource becomes the aud of the ID-JAG, so it is addressed to the target app's issuer. The ID-JAG names the user as sub and the calling client in act.",
+      "why": "Console swagger names: modelMcpOBOSpec. Resource (RFC 8707) becomes the exchanged aud.",
+      "edges": [
+        1,
+        2
+      ]
+    },
+    {
+      "title": "Leg 2: redeem it at the target app's own issuer",
+      "what": "Only when Redeem.TokenURL is set, the gateway posts the ID-JAG as a jwt-bearer assertion to the target app's issuer, authenticating with the Redeem client. The target issuer checks signature, trusted issuer, aud, expiry, client binding and that the jti is new, then mints its own access token for the same user.",
+      "why": "Console swagger names: modelMcpOBORedeemSpec. Without a Redeem TokenURL there is no leg 2 and the exchange result is not redeemed.",
+      "edges": [
+        3,
+        4
+      ]
+    },
+    {
+      "title": "The target API accepts the redeemed token",
+      "what": "The gateway calls the target API with the access token the target issuer minted. The API verifies it against its own issuer's keys and sees the user as sub, with no shared credential and no secret from the gateway.",
+      "why": "The target app logs the user, not a service account.",
+      "edges": [
+        5
+      ]
+    },
+    {
+      "title": "What the target API refuses",
+      "what": "The caller's original token is refused: it was not minted by the target issuer. The unredeemed ID-JAG is refused too: it is a grant for an issuer to redeem, never an access token. The refusal names the check that failed.",
+      "why": "Both refusals come from the target API's own answer to a real request, not from a fixed message.",
+      "edges": [
+        6,
+        7
+      ]
+    }
+  ]
+}

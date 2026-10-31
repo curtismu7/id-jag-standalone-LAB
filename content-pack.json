@@ -442,6 +442,21 @@
   ],
   "cards": [
     {
+      "id": "gateway-redeem",
+      "label": "Gateway redeems the ID-JAG (Ping release claim, mock only)",
+      "description": "The gateway exchanges the caller token (leg 1) and redeems the result at the target app's own issuer (leg 2). Ping release claim (2026-11-02), UNVERIFIED on our tenant.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/"
+      },
+      "terms": [
+        "id-jag",
+        "token-exchange",
+        "jwt-bearer-grant"
+      ]
+    },
+    {
       "id": "guide-desktop",
       "label": "Use mcpc or VS Code as the client",
       "group": "setup",
@@ -544,6 +559,12 @@
       "label": "Your IdP → our resource AS diagram",
       "href": "/diagram/byo",
       "mode": "byo"
+    },
+    {
+      "id": "flow-gateway-redeem",
+      "label": "Gateway redeems the ID-JAG at the target app diagram",
+      "href": "/diagram/gateway-redeem",
+      "mode": "gateway-redeem"
     },
     {
       "id": "flow-mock",

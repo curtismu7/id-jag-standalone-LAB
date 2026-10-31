@@ -11,3 +11,8 @@
 .mode-banner__hint { flex-basis: 100%; min-width: 0; color: var(--text); font-weight: 600; }
 .mode-banner[data-state="mock"] .mode-banner__badge { color: var(--danger-text); }
 .mode-banner[data-state="live"] .mode-banner__badge { color: var(--status-info); }
+
+/* The release-claim banner: same layout as the mode banner. */
+.claim-banner { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; }
+.claim-banner__badge { font-weight: 800; letter-spacing: 0.06em; color: var(--danger-text); }
+.claim-banner__text { min-width: 0; }

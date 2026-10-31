@@ -12,6 +12,13 @@ export const ORIGINS = {
   acme: 'https://acme-pf.mock.invalid',
   as: 'https://resource-as.mock.invalid',
   mcp: 'https://mcp.mock.invalid',
+  // Gateway redeem mode (mock/gatewayWorld.js): the exchange issuer, a partner issuer the target does not trust, the target
+  // app's own issuer, the target app's API, and the gateway the caller's token is presented to.
+  gwIdp: 'https://exchange-idp.mock.invalid',
+  gwPartner: 'https://partner-idp.mock.invalid',
+  gwTarget: 'https://target-idp.mock.invalid',
+  gwApi: 'https://target-api.mock.invalid',
+  gwGateway: 'https://gateway.mock.invalid',
 };
 export const MOCK_ORIGINS = new Set(Object.values(ORIGINS));
 export const MCP_RESOURCE = `${ORIGINS.mcp}/mcp`;

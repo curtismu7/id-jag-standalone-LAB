@@ -9,7 +9,7 @@ import { toPlaygroundModel } from "../diagrams/playgroundModel";
 export const playgroundDiagramPath = (mode, step) => `/diagram/${mode}${step ? `?step=${step}` : ""}`;
 
 // Order of the mode picker; the names are the diagram files.
-const MODES = ["mock", "pf-as", "pf-pf", "byo"];
+const MODES = ["mock", "pf-as", "pf-pf", "byo", "gateway-redeem"];
 export const PLAYGROUND_DIAGRAMS = Object.fromEntries(MODES.map((m) => [m, toPlaygroundModel(loadDiagram(m))]));
 
 export const PLAYGROUND_DIAGRAM_MODES = Object.keys(PLAYGROUND_DIAGRAMS);

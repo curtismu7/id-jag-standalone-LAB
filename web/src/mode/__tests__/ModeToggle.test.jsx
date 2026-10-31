@@ -57,6 +57,14 @@ describe("mock mode", () => {
     expect(posts(f)).toHaveLength(0);
   });
 
+  it("explains that gateway redeem has no Live mode, in the banner and on the Live button", async () => {
+    stub();
+    wrap();
+    await waitFor(() => expect(button("Mock")).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByTestId("gateway-live-note")).toHaveTextContent("Gateway redeem has no Live mode: the 2026-11-02 release is not on our tenant");
+    expect(button("Live")).toHaveAttribute("title", expect.stringContaining("not on our tenant"));
+  });
+
   it("says why mock sign-in is off", async () => {
     stub({ mode: { ...MOCK, signin: { allowed: false, message: "Mock sign-in is off. Start the server with ALLOW_MOCK_SIGNIN=1 to use the built-in demo account." } } });
     wrap();
