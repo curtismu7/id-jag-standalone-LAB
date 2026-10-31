@@ -330,7 +330,7 @@ function createTargetApi({ origin, issuer, issuerKey }) {
 
 /** Builds the whole world. The test hooks (underscore names) are for tests and never reach an HTTP route. */
 export function createGatewayWorld() {
-  const secrets = { obo: rand(24), redeem: rand(24) };
+  const secrets = { obo: rand(24), redeem: rand(24), peer: rand(24) };
   const oboKey = createEcKey('obo-key-1');
   const redeemKey = createEcKey('gw-redeem-1');
   const exchangeClients = {
@@ -338,6 +338,8 @@ export function createGatewayWorld() {
   };
   const targetClients = {
     'gateway-redeem': { secret: secrets.redeem, methods: ['client_secret_post', 'private_key_jwt'], jwk: redeemKey.jwk, scopes: SCOPES },
+    // Another registered app of the target issuer. A test authenticates as it to prove an ID-JAG is bound to the client it names.
+    'peer-app': { secret: secrets.peer, methods: ['client_secret_post'], jwk: redeemKey.jwk, scopes: SCOPES },
   };
   // The company IdP signs the caller's token with its own key and trusts it; the partner issuer trusts the same key, so it can
   // exchange the same token, but the target app does not trust the partner.
@@ -367,6 +369,8 @@ export function createGatewayWorld() {
       };
     },
     reset() { target.reset(); company.events.clear(); partner.events.clear(); },
+    /** Test hook: another client registered at the target issuer (its secret is random for each run and never shown). */
+    _peerClient: () => ({ id: 'peer-app', secret: secrets.peer }),
     /** Test hook: another valid EC key (a wrong key must be refused). */
     _otherKey: () => { const k = createEcKey('other-key-1'); return { pem: pem(k), kid: k.kid }; },
   };

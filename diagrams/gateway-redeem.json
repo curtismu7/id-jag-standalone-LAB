@@ -48,7 +48,7 @@
         "Calls only allow-listed https hosts, follows no redirect",
         "ClientSecret and PrivateKeyPEM are write-only"
       ],
-      "x": 520,
+      "x": 383,
       "y": 340
     },
     {
@@ -60,7 +60,7 @@
         "RFC 8693: caller token in, ID-JAG out",
         "ID-JAG: aud = Resource, sub = the user, act = the caller"
       ],
-      "x": 520,
+      "x": 383,
       "y": 0
     },
     {
@@ -72,7 +72,7 @@
         "RFC 7523 jwt-bearer: trusts the exchange issuer only",
         "Checks signature, aud, expiry, client, single-use jti"
       ],
-      "x": 520,
+      "x": 383,
       "y": 680
     },
     {
@@ -84,7 +84,7 @@
         "Accepts only access tokens its own issuer minted",
         "Says which check failed when it refuses"
       ],
-      "x": 1040,
+      "x": 766,
       "y": 340
     }
   ],

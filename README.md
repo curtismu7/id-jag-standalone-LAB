@@ -16,6 +16,8 @@ The flow: get an ID-JAG from an IdP (RFC 8693 token exchange), check it against 
 
 **Mock mode (the default)** runs fully offline, with no tenant and no setup. A PingFederate, a second ("Acme") PingFederate, a resource authorization server and an MCP server run inside this app and answer like the real ones: pi.flow sign-in with PKCE, the RFC 8693 exchange, the RFC 7523 redemption, a single-use `jti`, and scope-gated MCP tools. The cryptography is real (ES256 signatures, real JWT checks), but the keys belong to the simulation. Every mock token carries `"mock": true` and a `kid` that starts with `mock-`, every playground answer says it is simulated, and a netguard refuses every outbound call except to the in-process mock and to loopback. A mock token proves how the flow works; it proves nothing about a customer's PingFederate. xaa.dev sign-in, SAML and the interop panel need real servers and are Live only. The playground also keeps a separate **Sample data (browser)** mode, which answers from fixtures in the page and sends nothing at all.
 
+**Gateway redeem (Ping release claim, mock only).** The playground mode **Gateway redeems the ID-JAG (mock only)** shows a feature of Ping's 2026-11-02 Privilege release: the MCP gateway, configured with an On-Behalf-Of spec, exchanges the caller's token at the exchange issuer (leg 1, RFC 8693) and, when a Redeem spec with a TokenURL is set, redeems the resulting ID-JAG at the target app's own issuer (leg 2, RFC 7523), so the target app sees the user with no shared credential. **Ping release claim (2026-11-02), UNVERIFIED on our tenant**: the release is not on our tenant, so everything runs against in-process mocks (a company IdP, a partner issuer the target does not trust, the target app's issuer and API, and the gateway). A banner on every page and in presenter mode says so. There is no Live form of this mode, and the Mock / Live toggle's note says why.
+
 **Live mode (owner-run)** is the same app against the real PingFederate servers named in your settings, plus the kit's own `resource-as` and `mcp-sample`. It needs the settings in [Settings file](#settings-file) and is not used for a standard demo. The simulation banner on every page says which mode you are in.
 
 ## Run from a clone
@@ -74,6 +76,7 @@ In Live mode on the host, the helper services `resource-as` and `mcp-sample` def
 `MODE=mock|live` decides (unset: mock, or live when `PF_URL`, `PF_EXCHANGE_CLIENT_ID` and `PF_EXCHANGE_CLIENT_SECRET` are already set) what the app talks to. The **Mock / Live** switch in the header of every page shows the mode and changes it, the banner on every page repeats it (presenter mode included), and `GET /api/health` reports it as `mode`. The choice is saved in `DATA_DIR/mode.json`, so it survives a restart. Switching ends every session. Mock data lives in `DATA_DIR/mock` and never mixes with live data.
 
 - **Mock**: the in-app simulation described under [What is simulated](#what-is-simulated). Demo account `alice@mock.example` / `mock-password`, shown in the sign-in dialog (public, mock only). Mock sign-in needs `ALLOW_MOCK_SIGNIN=1`, a loopback bind (`HOST=127.0.0.1`, the default in Mock mode, or `LAB_PUBLISH=loopback` in Docker) and no proxy.
+- **Gateway redeem has no Live form.** Live answers 409 `live_unavailable` for its routes and the mode is disabled in the picker with the reason; the header toggle and the banner say so on every page.
 - **Live**: the servers named in your settings. It can be chosen only when `PF_URL`, `PF_EXCHANGE_CLIENT_ID` and `PF_EXCHANGE_CLIENT_SECRET` (or the Acme set) are present; otherwise the Live button is disabled and the banner names what is missing.
 
 ## Health, doctor and reset
@@ -177,6 +180,8 @@ If port 4731 or 4732 is taken by something that is not PingFederate:
 | **Acme PingFederate → PingFederate** (`pf-pf`) | The outside "Acme" PingFederate (`ACME_PF_URL`) | PingFederate (`PF_URL`) via an IdP connection | Works once `pingfederate/configure-acme-signin.js` has run on Acme and the redeemer client is in `.env` (see [setup guide](docs/setup-guides.md#acme-pingfederate--pingfederate)); `mcp-sample` refuses PingFederate's token (it trusts `resource-as` only) |
 | **Your IdP → our resource AS** (`byo`) | Any IdP on the Trusted IdPs list; you paste the ID-JAG, or get one from xaa.dev's IdenX | `resource-as`, or PingFederate | Inspect works; redeem needs the target's secret |
 
+| **Gateway redeems the ID-JAG (mock only)** (`gateway-redeem`) | The company IdP (mock), by exchanging the caller's token for the gateway (leg 1) | The target app's own issuer (mock), by the gateway (leg 2); the target API (mock) accepts the result | Mock only. Ping release claim (2026-11-02), UNVERIFIED on our tenant |
+
 Two PingFederates in `pf-pf` because an IdP must not redeem its own ID-JAG (draft §9.3).
 
 The resource AS shows its own work: `GET /` on it is a live page of its last 50 redemptions (accepted or refused, with
@@ -221,6 +226,18 @@ The **Trusted IdPs** page (`/trusted-idps`) lists outside IdPs whose ID-JAGs we 
 register an IdP. It stays `pending`, and is not trusted, until an admin approves it. Every change is audited.
 The resource AS and the PingFederate sync script read the approved entries server to server with a Bearer
 `ID_JAG_REGISTRY_TOKEN`. See [Sign-in and the Trusted IdPs registry](#sign-in-and-the-trusted-idps-registry).
+
+### Gateway redeem
+
+Ping release claim (2026-11-02), **UNVERIFIED on our tenant**. A mock of the gateway side of the claim; nothing here proves anything about the real release.
+
+- **Spec.** The form edits the console swagger fields (2026-10-31, schema only; nothing was called): `OBO` `{TokenURL, ClientID, ClientSecret, AuthMethod, Resource, Scope, PrivateKeyPEM, KeyID, SubjectTokenType, RequestedTokenType, Redeem}` and `Redeem` `{TokenURL, ClientID, ClientSecret, AuthMethod, Scope, PrivateKeyPEM, KeyID}`. Leg 2 runs only when `Redeem.TokenURL` is set; without it the exchange result is not redeemed and the target API refuses it.
+- **Write-only.** `ClientSecret` and `PrivateKeyPEM` are never returned: every answer reports `{ set }` and every response is scrubbed of stored and just-typed values. Write `null` to clear one; leave it out (or empty) to keep it.
+- **Ten scenarios (lab-invented).** Both legs as configured; no Redeem; an issuer the target does not trust; the wrong audience; an expired assertion; a replayed one (the target issuer accepts each `jti` once); a tampered signature; a `Redeem.TokenURL` on a host that is not allow-listed (SSRF); one that redirects (`redirect: error`); the wrong client authentication method. Each verdict is computed from the run (stage, check, error), and the target API's refusal of the caller's original token and of the raw assertion comes from real requests to the mock.
+- **Where every name comes from.** Each name is tagged *console swagger name, 2026-10-31, schema only*, *lab reading* or *lab-invented* (the panel's last section lists them; `CLAIMS` in `server/src/gatewayRedeem.js` is the one list). `AuthMethod` values, the token type URNs, the `act` claim shape and the single-use `jti` are the lab's reading. The cast, the scenarios, the allow-list and the mock hosts (all `.invalid`) are made up.
+- **Routes.** `/api/id-jag-playground/gateway-redeem/` `state`, `spec` (PUT), `spec/reset`, `run`, `reset`. Writes are same-origin only. The mock servers live in `server/src/mock/gatewayWorld.js`, the gateway in `server/src/gatewayRedeem.js`.
+- **Diagram.** `diagrams/gateway-redeem.json` (diagram-studio/1). Its boxes sit close together and the view never zooms out below 0.9, so no on-screen text is under 10px; the view refits when the window is resized.
+- **Why it matters (Ping's claims).** The talk track and `content-pack.json` carry the deck's Challenge, Technical and Business lines for slide 48 as Ping claims, unverified.
 
 ### Layout
 
