@@ -34,23 +34,28 @@
 .ijx .sim button{border:1px solid var(--th-border);background:var(--th-bg);color:var(--th-text);border-radius:8px;padding:5px 10px;font:inherit;font-size:.75rem;cursor:pointer}
 .ijx .sim button.pri{background:var(--red);border-color:var(--red);color:var(--on-accent);font-weight:600}
 .ijx .sim button:disabled{opacity:.4;cursor:default}.ijx .hint{font-size:.75rem;color:var(--th-text-muted)}
-.ijx .elabel{position:absolute;pointer-events:none;background:var(--th-bg-card);color:var(--th-text);border:1px solid var(--th-border);border-radius:5px;padding:1px 6px;font-size:.7rem;white-space:nowrap}
 .ijx .pkt{fill:var(--red);stroke:var(--surface);stroke-width:2}
-@media (max-width:900px){.ijx{height:auto}.ijx-app{grid-template-columns:1fr;grid-template-rows:auto 6px 60vh;height:auto}.ijx .split{display:none}}
+/* Phone and tablet: the diagram sits on top and stays in view (sticky) while the panel scrolls under it. */
+@media (max-width:900px){.ijx{height:auto}.ijx-app{grid-template-columns:minmax(0,1fr);grid-template-rows:60vh auto;height:auto}.ijx .split{display:none}
+.ijx main{order:-1;position:sticky;top:0;z-index:40;height:60vh;border-bottom:1px solid var(--th-border)}}
 
 /* Match the AI-DEMO2 Ping-style diagrams: light grey canvas, thick black arrows, dark labels above the lines. */
 .ijx .react-flow{background:var(--th-bg-page)}
 .ijx .react-flow__edge-path{stroke:var(--text);stroke-width:3.2}
 .ijx .react-flow__edge:hover .react-flow__edge-path{stroke:var(--text);stroke-width:4.2}
-.ijx .elabel{z-index:20;background:var(--surface);color:var(--text);border:1px solid var(--border);font-weight:700}
 
 /* Numbered arrows: a step badge always shows; the words appear when the step lights the edge, or on hover. */
-.ijx .elabel{display:flex;align-items:center;gap:6px;pointer-events:all;padding:2px 8px 2px 2px;border-radius:14px;max-width:420px;white-space:normal;line-height:1.25}
-.ijx .elabel:not(.words){padding:0;background:transparent;border-color:transparent}
+/* The label (badge + words) is counter-scaled by the page so it keeps one size on screen; transform-origin 0 0 makes that scale pivot on the anchor. */
+.ijx .elabel{position:absolute;z-index:20;display:flex;align-items:center;gap:4px;transform-origin:0 0;pointer-events:all;max-width:420px;white-space:normal;line-height:1.25}
 .ijx .elabel.words{z-index:30}
+.ijx .elabel[data-valign="d"]{align-items:flex-start}
+.ijx .elabel[data-valign="u"]{align-items:flex-end}
+.ijx .elabel.side-l{flex-direction:row-reverse}
 .ijx .enum{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:24px;height:24px;border-radius:999px;background:var(--ping-red);color:var(--on-accent);font-weight:800;font-size:.8rem;border:2px solid var(--surface);box-shadow:0 1px 3px var(--th-shadow);opacity:.7}
 .ijx .elabel.on .enum,.ijx .elabel:hover .enum{opacity:1}
-.ijx .ewords{font-size:.72rem;font-weight:700;color:var(--text)}
+/* The arrow under the pointer (or its entry in the step list) is marked, even when its words have no clear place on the diagram. */
+.ijx .elabel[data-hot] .enum{opacity:1;outline:3px solid var(--th-info);outline-offset:1px}
+.ijx .ewords{flex:1 1 auto;min-width:0;padding:3px 8px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);font-size:.72rem;font-weight:700;overflow-wrap:anywhere}
 .ijx .legend .enum{min-width:18px;height:18px;font-size:.68rem;opacity:1;vertical-align:middle}
 .ijx .legend .blue{color:var(--th-info);font-weight:700}
 /* Trust-source and alternate paths: blue dashed. */
@@ -76,7 +81,3 @@
 .ijx .refs{list-style:none;padding-left:0;margin:0 0 6px}
 .ijx .refs li{margin:0 0 5px;color:var(--th-text);font-size:.75rem}
 .ijx .refs li.emerging{border-left:3px solid var(--ping-red);padding-left:6px}
-
-/* Routed badge: the badge stays on the line, the words pill grows to its right or left (side-r / side-l). */
-.ijx .elabel.side-r{--bx-x:-12px}.ijx .elabel.side-r.words{--bx-x:-14px}
-.ijx .elabel.side-l{--bx-x:calc(-100% + 12px);flex-direction:row-reverse}.ijx .elabel.side-l.words{--bx-x:calc(-100% + 14px);padding:2px 2px 2px 8px}
