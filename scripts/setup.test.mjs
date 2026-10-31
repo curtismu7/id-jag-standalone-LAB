@@ -81,6 +81,23 @@ test('--force leaves .env and its backup readable only by the owner, even if the
   assert.equal(fs.statSync(path.join(t.root, '.env.bak.1')).mode & 0o777, 0o600);
 });
 
+test('the real setup.mjs wiring gives runSetup every fs call it makes (mock setup with --yes exits 0 and writes a private .env)', { skip: process.platform === 'win32' }, () => {
+  const here = path.dirname(new URL(import.meta.url).pathname);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'idjag-setup-real-'));
+  fs.mkdirSync(path.join(root, 'scripts'));
+  fs.symlinkSync(path.join(here, '..', 'server'), path.join(root, 'server'), 'dir'); // setup-lib imports server/src/doctor.js
+  for (const f of fs.readdirSync(here).filter((n) => /^setup.*\.mjs$/.test(n) && !n.endsWith('.test.mjs'))) fs.copyFileSync(path.join(here, f), path.join(root, 'scripts', f));
+  fs.writeFileSync(path.join(root, 'scripts', 'doctor.mjs'), "console.log('Doctor (stub)');\n");
+  fs.writeFileSync(path.join(root, '.env.example'), EXAMPLE);
+  const r = spawnSync(process.execPath, [path.join(root, 'scripts', 'setup.mjs'), '--yes', '--mode=mock'], { cwd: root, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(fs.statSync(path.join(root, '.env')).mode & 0o777, 0o600);
+  // a second run with --force goes through copyFile and chmod on the backup too
+  const f = spawnSync(process.execPath, [path.join(root, 'scripts', 'setup.mjs'), '--yes', '--mode=mock', '--force'], { cwd: root, encoding: 'utf8' });
+  assert.equal(f.status, 0, f.stderr);
+  assert.equal(fs.statSync(path.join(root, '.env.bak.1')).mode & 0o777, 0o600);
+});
+
 test('.env backups are ignored by git and docker, so --force cannot stage or bake in real secrets', () => {
   const repo = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
   assert.equal(spawnSync('git', ['check-ignore', '-q', '.env.bak.1'], { cwd: repo }).status, 0);
