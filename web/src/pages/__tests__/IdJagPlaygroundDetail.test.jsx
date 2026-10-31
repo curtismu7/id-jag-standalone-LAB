@@ -101,7 +101,7 @@ describe("numbered arrows", () => {
   it("dashed edges carry the dashed class and the legend explains the notation", () => {
     open("/diagram/pf-as");
     expect(rf.props.edges.find((e) => e.id === "a3k").markerEnd.color).toBe("#1f5fbf");
-    expect(screen.getByTestId("pgd-legend")).toHaveTextContent(/orange number = step.*solid line = request\/response.*blue dashed = trust source \(JWKS or registry read\) or alternate path/);
+    expect(screen.getByTestId("pgd-legend")).toHaveTextContent(/red number = step.*solid line = request\/response.*blue dashed = trust source \(JWKS or registry read\) or alternate path/);
   });
 });
 

@@ -1,67 +1,56 @@
-/* Ping brand tokens. The page CSS reads the --th-* and --font-size-* names. */
+/* App token aliases over the shared stylesheet (standalone-ui.css). Colours come from shared tokens only.
+   --ping-red and --ping-red-deep stay as names because a customer brand replaces them on :root (see customer/brand.js). */
 :root {
-  --ping-red: #d20e0f;
-  --ping-red-deep: #aa0005;
-  --ping-core-dark: #051727;
+  --ping-red: var(--accent);
+  --ping-red-deep: var(--accent-deep);
   --ping-grad: linear-gradient(90deg, var(--ping-red) 55%, var(--ping-red-deep));
 
-  --th-bg: #ffffff;
-  --th-bg-page: #f4f5f7;
-  --th-bg-card: #ffffff;
-  --th-text: #051727;
-  --th-text-muted: #4a5868;
-  --th-border: #d9dde3;
+  --th-bg: var(--surface);
+  --th-bg-page: var(--surface-2);
+  --th-bg-card: var(--surface);
+  --th-text: var(--text);
+  --th-text-muted: var(--muted);
+  --th-border: var(--border);
+
+  /* Semantic colours the shared file does not have yet: aliases of shared tokens (see the PR notes). */
+  --th-ok: var(--status-ok);
+  --th-info: var(--focus);
+  --th-warn: var(--text);
+  --th-shadow: color-mix(in srgb, var(--text) 16%, transparent);
+  --th-veil: color-mix(in srgb, var(--surface-2) 88%, transparent);
+
+  /* Accent used as text. A customer brand colour wins when it reads on the theme. */
+  --th-accent-text: var(--brand-text-light, var(--danger-text));
 
   --font-size-3xs: 0.68rem;
   --font-size-2xs: 0.75rem;
   --font-size-xs: 0.85rem;
-
-  color-scheme: light;
 }
-:root[data-theme="dark"] {
-  --th-bg: #0b2033;
-  --th-bg-page: #051727;
-  --th-bg-card: #0e263b;
-  --th-text: #e8edf2;
-  --th-text-muted: #9fb0c2;
-  --th-border: #22405c;
-  color-scheme: dark;
-}
-
-* { box-sizing: border-box; }
-html, body { margin: 0; }
-body {
-  font-family: "Montserrat", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  background: var(--th-bg-page);
-  color: var(--th-text);
-  line-height: 1.5;
-}
-button, input, select, textarea { font-family: inherit; }
+:root[data-theme="dark"] { --th-accent-text: var(--brand-text-dark, var(--danger-text)); }
 
 .shell-bar {
   display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
   padding: 0.65rem 1.25rem;
-  background: var(--brand-header, var(--ping-core-dark)); color: var(--brand-header-on, #fff);
+  background: var(--brand-header, var(--surface-2)); color: var(--brand-header-on, var(--text));
   border-bottom: 3px solid transparent;
   border-image: var(--ping-grad) 1;
 }
 .shell-brand { display: inline-flex; align-items: center; gap: 0.6rem; color: inherit; text-decoration: none; font-weight: 700; letter-spacing: 0.02em; }
 .shell-brand img { width: 1.9rem; height: 1.9rem; object-fit: contain; }
-.shell-nav { display: flex; gap: 0.25rem; flex: 1; }
-.shell-nav a { padding: 0.3rem 0.75rem; border-radius: 999px; color: var(--brand-header-soft, rgba(255, 255, 255, 0.78)); text-decoration: none; font-size: var(--font-size-xs); font-weight: 500; }
-.shell-nav a:hover { color: var(--brand-header-on, #fff); background: rgba(255, 255, 255, 0.08); }
-.shell-nav a[aria-current="page"] { color: var(--brand-on, #fff); background: var(--ping-grad); font-weight: 600; }
+.shell-nav { display: flex; flex-wrap: wrap; gap: 0.25rem; flex: 1; }
+.shell-nav a { padding: 0.3rem 0.75rem; border-radius: 999px; color: var(--brand-header-soft, var(--muted)); text-decoration: none; font-size: var(--font-size-xs); font-weight: 500; }
+.shell-nav a:hover { color: var(--brand-header-on, var(--text)); text-decoration: underline; }
+.shell-nav a[aria-current="page"] { color: var(--brand-on, var(--on-accent)); background: var(--ping-grad); font-weight: 600; }
 .shell-theme {
-  padding: 0.3rem 0.8rem; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 6px;
-  background: transparent; color: var(--brand-header-on, #fff); font-size: var(--font-size-2xs); font-weight: 600; cursor: pointer;
+  padding: 0.3rem 0.8rem; border-radius: 6px;
+  background: transparent; color: var(--brand-header-on, var(--text)); font-size: var(--font-size-2xs); font-weight: 600; cursor: pointer;
 }
-.shell-theme:hover { border-color: var(--brand-header-on, #fff); }
+.shell-theme:hover { border-color: var(--brand-header-on, var(--text)); }
 .shell-user { display: inline-flex; align-items: center; gap: 0.5rem; margin: 0; font-size: var(--font-size-xs); }
 .shell-user > span:first-child { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.shell-badge { padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--ping-grad); color: var(--brand-on, #fff); font-size: var(--font-size-3xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
-.shell a:focus-visible, .shell button:focus-visible { outline: 2px solid var(--ping-red); outline-offset: 2px; }
+.shell-badge { padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--ping-grad); color: var(--brand-on, var(--on-accent)); font-size: var(--font-size-3xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 
-@media (max-width: 560px) {
+@media (max-width: 600px) {
   .shell-bar { gap: 0.75rem; padding: 0.6rem 1rem; }
   .shell-nav { order: 3; flex-basis: 100%; }
 }
