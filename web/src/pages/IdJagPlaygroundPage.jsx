@@ -313,7 +313,7 @@ function Lifetime({ id, label, exp, used, now, again }) {
   const left = exp - Math.floor(now / 1000);
   const stale = used || left <= 0;
   const text = used ? `redeemed (single-use). ${again}` : left <= 0 ? `expired. ${again}` : `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
-  // Not an error: a used or expired token is the expected end of its life. Redeemed is info (blue), expired is a caution (amber).
+  // Not an error: a used or expired token is the expected end of its life. Redeemed uses the info status colour and expired the warn status colour (--status-info, --status-warn); the words say which, so colour is not the only cue.
   return <p className={`ijp-life${used ? " is-stale is-used" : stale ? " is-stale is-expired" : ""}`} data-testid={`ijp-life-${id}`}><strong>{label}:</strong> {text}</p>;
 }
 

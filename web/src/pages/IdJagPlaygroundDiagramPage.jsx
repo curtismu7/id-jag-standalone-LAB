@@ -51,7 +51,14 @@ function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targ
   return (
     <>
       <g onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-        <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} className={data.dashed ? "dashed" : undefined} interactionWidth={24} />
+        {data.dashed ? (
+          <defs>
+            <marker id={`ijx-head-${id}`} className="ijx-head ijx-head--dashed" data-edge-head={id} markerWidth="12.5" markerHeight="12.5" viewBox="-10 -10 20 20" markerUnits="strokeWidth" orient="auto-start-reverse" refX="0" refY="0">
+              <polyline className="arrowclosed" strokeLinecap="round" strokeLinejoin="round" points="-5,-4 0,0 -5,4 -5,-4" />
+            </marker>
+          </defs>
+        ) : null}
+        <BaseEdge id={id} path={path} markerEnd={data.dashed ? `url(#ijx-head-${id})` : markerEnd} style={style} className={data.dashed ? "dashed" : undefined} interactionWidth={24} />
       </g>
       {data.pulse ? (
         <circle r="7" className="pkt" key={data.pulse}>
@@ -191,7 +198,7 @@ function PlaygroundFlow({ mode, d }) {
     return {
       id: e.id, source: e.from, target: e.to, sourceHandle: e.fh, targetHandle: e.th, label: e.label, type: "flow",
       data: { on: !!step && on, num: edgeStepNumber(e), dashed: !!e.dashed, route: routing.routes[e.id], place: routing.places?.[e.id], pulse: step && on ? step : 0, dur: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: e.dashed ? "#1f5fbf" : undefined },
+      markerEnd: { type: MarkerType.ArrowClosed },
       style: { strokeWidth: on ? 2.4 : 1.2, opacity: on ? 1 : 0.15, strokeDasharray: e.dashed ? "6 4" : undefined },
     };
   });

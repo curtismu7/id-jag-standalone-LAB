@@ -19,9 +19,9 @@
 .ijx:fullscreen{height:100vh}
 .ijx .react-flow{background:var(--th-bg)}
 .ijx .card{width:100%;height:100%;overflow:auto;background:var(--th-bg-card);color:var(--th-text);border:1.5px solid var(--th-border);border-radius:10px;padding:10px 12px;transition:opacity .2s,box-shadow .2s}
-/* Ping slide look: key services are Ping-red boxes, the rest are dark cards; the active step glows blue. */
+/* Ping slide look: key services are deep-red boxes, the rest are theme cards; the active step gets an info-colour ring. */
 .ijx .card.k-bff,.ijx .card.k-pf,.ijx .card.k-as{background:var(--ping-red-deep);color:var(--on-accent);border-color:var(--ping-red-deep)}
-.ijx .card.k-bff .cs,.ijx .card.k-pf .cs,.ijx .card.k-as .cs,.ijx .card.k-bff ul,.ijx .card.k-pf ul,.ijx .card.k-as ul{color:var(--on-accent)}
+.ijx .card.k-bff .cs,.ijx .card.k-pf .cs,.ijx .card.k-as .cs,.ijx .card.k-bff ul,.ijx .card.k-pf ul,.ijx .card.k-as ul{color:var(--on-accent);opacity:.85}
 .ijx .card.dim{opacity:.28}.ijx .card.on{border-color:var(--th-info);box-shadow:0 0 0 3px var(--th-info),0 6px 18px var(--th-shadow)}
 .ijx .ct{font-weight:700;font-size:.85rem}.ijx .cs{color:var(--th-text-muted);font-size:.72rem;margin-bottom:4px}
 .ijx .card ul{margin:0;padding-left:16px;font-size:.72rem}
@@ -55,7 +55,7 @@
 .ijx .legend .blue{color:var(--th-info);font-weight:700}
 /* Trust-source and alternate paths: blue dashed. */
 .ijx .react-flow__edge-path.dashed{stroke:var(--th-info)}
-.ijx marker[id*="1f5fbf"] polyline{stroke:var(--th-info);fill:var(--th-info)}
+.ijx .ijx-head--dashed polyline{stroke:var(--th-info);fill:var(--th-info)}
 
 /* Selected actor ring. */
 .ijx .card.sel,.ijx .note.sel{outline:3px solid var(--ping-red);outline-offset:3px}
