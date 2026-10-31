@@ -42,7 +42,7 @@ function readChosen() {
 }
 
 export function currentMode() {
-  const fromEnv = val(process.env, 'MODE').toLowerCase();
+  const fromEnv = String(process.env.MODE ?? '').trim().toLowerCase();
   return readChosen() ?? (MODES.includes(fromEnv) ? fromEnv : 'mock');
 }
 export const isMock = () => currentMode() === 'mock';
