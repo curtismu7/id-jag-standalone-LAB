@@ -35,7 +35,7 @@ function Note({ data, selected }) {
     </div>
   );
 }
-// Edge with a token dot travelling along the path while the simulation runs it. The orange badge always
+// Edge with a token dot travelling along the path while the simulation runs it. The numbered badge always
 // shows the step number; the words show only while the step lights the edge, or on hover.
 const stripCircled = (label) => label.replace(/^[\u2460-\u2468\u2013]+\s*/, "");
 // data.route is the routed path around the boxes; without it (while a box is dragged, or when no route was found) the plain smooth-step path is drawn.
@@ -246,7 +246,7 @@ function PlaygroundFlow({ mode, d }) {
   };
 
   return (
-    <div className="ijx-app" style={{ gridTemplateColumns: panel ? `${side}px 6px 1fr` : "0 0 1fr" }}>
+    <div className="ijx-app" style={{ "--ijx-cols": panel ? `${side}px 6px 1fr` : "0 0 1fr" }}>
       <aside ref={asideRef} style={panel ? undefined : { padding: 0, border: 0, overflow: "hidden", visibility: "hidden" }}>
         <h1>ID-JAG Playground: {d.label}</h1>
         <p className="lede">{d.lede}</p>
@@ -276,7 +276,7 @@ function PlaygroundFlow({ mode, d }) {
           <ul data-testid="pgd-calls">{d.edges.filter((e) => lit.edges.includes(e.id)).map((e) => <li key={e.id}>{e.label}</li>)}</ul>
           {detail ? <div ref={detailRef}><StepDetail detail={detail} /></div> : null}
         </section>
-        <p className="legend" data-testid="pgd-legend"><span className="enum">1</span> orange number = step · solid line = request/response · <span className="blue">blue dashed</span> = trust source (JWKS or registry read) or alternate path</p>
+        <p className="legend" data-testid="pgd-legend"><span className="enum">1</span> red number = step · solid line = request/response · <span className="blue">blue dashed</span> = trust source (JWKS or registry read) or alternate path</p>
         <p className="legend"><a href="/">Open the playground</a> to run this mode for real.</p>
       </aside>
       <div className="split" style={panel ? undefined : { visibility: "hidden" }} onPointerDown={startSplit} title="Drag to resize panel" />
