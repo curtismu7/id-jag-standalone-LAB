@@ -92,15 +92,9 @@ Point at the field names and their tags. Say: "Every field name here is tagged: 
 
 Click **Run all ten**. Walk the refusals: an assertion from an issuer the target does not trust, one addressed to another audience, an expired one, a replayed one, a tampered signature, a token URL on a host that is not allow-listed, a token URL that redirects, and the wrong client authentication method. Say: "Each one stops at a named stage for a named check, and no token is issued."
 
-## Step 13: Why it matters (Ping's claims, unverified)
+## Step 13: Why it matters (text pending from the owner)
 
-Say: "These three lines are from Ping's deck, slide 48. They are Ping claims, and we have not verified them on our tenant. The deck puts On-Behalf-Of and ID-JAG on the same slide as intent, purpose and behaviour."
-
-Challenge: "A tool name and arguments cannot say what was asked for, whether the agent was meant to do it, or whether it normally does."
-
-Technical: "Three separable signals: deterministic intent patterns and purpose declarations refuse hard; learned behaviour baselines drive alerts and approval."
-
-Business: "The enforceable declaration 'this agent exists to reconcile invoices' unblocks unattended agents in processes that could not otherwise approve them."
+Say: "Ping's deck has a value panel with a Challenge, a Technical and a Business line for each feature. The copy this lab was given has no panel for the gateway redeeming the ID-JAG: the slide 48 panel in it covers intent, purpose and behaviour, which is a different feature. So I will not read you a business case for this one. What I can show you is what this mock does: the target app sees the user, and nobody shared a credential." Do not quote the slide 48 lines here.
 
 ## Step 14: Make it the customer's story
 

@@ -132,14 +132,14 @@ export function buildPatch(spec, draft) {
       if (f.secret) {
         if (draft.clear[path]) out[f.key] = null;
         else if (draft.secrets[path]) out[f.key] = draft.secrets[path];
-      } else if (draft[name === "OBO" ? "OBO" : "Redeem"][f.key] !== (current?.[f.key] ?? "")) out[f.key] = draft[name === "OBO" ? "OBO" : "Redeem"][f.key];
+      } else if (draft[name][f.key] !== (current?.[f.key] ?? "")) out[f.key] = draft[name][f.key];
     }
     return out;
   };
   const obo = leg("OBO", LEG1, spec.OBO);
   if (!draft.redeemOn) { if (spec.OBO.Redeem) obo.Redeem = null; }
   else {
-    const r = leg("OBO.Redeem", LEG2, spec.OBO.Redeem);
+    const r = leg("Redeem", LEG2, spec.OBO.Redeem);
     if (!spec.OBO.Redeem || Object.keys(r).length) obo.Redeem = r;
   }
   return Object.keys(obo).length ? { OBO: obo } : null;
