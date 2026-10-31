@@ -1,0 +1,5 @@
+# Test-only false positives (gitleaks 8.18.4 private-key rule). Each line wraps a made-up
+# variable (${typed} / ${TYPED_PEM_LINE}) in a PEM header and footer to prove that the
+# write-only PrivateKeyPEM field is never echoed. No real key material is involved.
+e8747325724537148ac29fa37401b138d87d5eae:server/src/__tests__/gatewayRedeemRoutes.test.js:private-key:182
+e8747325724537148ac29fa37401b138d87d5eae:server/src/__tests__/gatewayRedeem.test.js:private-key:298
