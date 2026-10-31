@@ -1,28 +1,130 @@
 # ID-JAG Standalone LAB
 
-Repo: https://github.com/ping-sandbox/id-jag-standalone-LAB
+A playground, a resource authorization server and a PingFederate setup kit for **ID-JAG** (Identity Assertion JWT Authorization Grant): it runs the flow one step at a time and shows every request, token and check.
+
 Tier: Demo
+
+Repo: https://github.com/ping-sandbox/id-jag-standalone-LAB
+
 Catalog: C1
 
-A shareable playground, resource authorization server and PingFederate setup kit for
-**ID-JAG** (Identity Assertion JWT Authorization Grant,
-[draft-ietf-oauth-identity-assertion-authz-grant](https://datatracker.ietf.org/doc/draft-ietf-oauth-identity-assertion-authz-grant/)).
+ID-JAG is an IETF draft ([draft-ietf-oauth-identity-assertion-authz-grant](https://datatracker.ietf.org/doc/draft-ietf-oauth-identity-assertion-authz-grant/)), so details can still change. Among Ping products, PingFederate is the one that supports ID-JAG, and it is also the only one that supports DPoP; PingOne and PingOne Advanced Identity Cloud do not issue or redeem ID-JAGs. That is why the live modes need PingFederate.
 
-It runs the ID-JAG flow one step at a time: get an ID-JAG from an IdP (RFC 8693 token exchange), check it
-against the draft, redeem it at a resource authorization server (RFC 7523 JWT bearer), call an MCP server
-with the result, and run live negative tests. Raw tokens never reach the browser: the server keeps them in
-the session and returns decoded claims and redacted requests only.
+The flow: get an ID-JAG from an IdP (RFC 8693 token exchange), check it against the draft, redeem it at a resource authorization server (RFC 7523 JWT bearer), call an MCP server with the result, and run negative tests. Raw tokens never reach the browser: the server keeps them in the session and returns decoded claims and redacted requests only.
 
-At runtime it depends on nothing but PingFederate servers (defaults below, configurable through env).
+## What is simulated
 
-Mock mode works end to end with no network. The real modes run against our own resource AS (`resource-as/`)
-and sample MCP server (`mcp-sample/`) once their settings exist; until then they answer `409 not_configured`,
-and the pre-flight check names what to set.
+**Mock mode (the default)** runs fully offline, with no tenant and no setup. A PingFederate, a second ("Acme") PingFederate, a resource authorization server and an MCP server run inside this app and answer like the real ones: pi.flow sign-in with PKCE, the RFC 8693 exchange, the RFC 7523 redemption, a single-use `jti`, and scope-gated MCP tools. The cryptography is real (ES256 signatures, real JWT checks), but the keys belong to the simulation. Every mock token carries `"mock": true` and a `kid` that starts with `mock-`, every playground answer says it is simulated, and a netguard refuses every outbound call except to the in-process mock and to loopback. A mock token proves how the flow works; it proves nothing about a customer's PingFederate. xaa.dev sign-in, SAML and the interop panel need real servers and are Live only. The playground also keeps a separate **Sample data (browser)** mode, which answers from fixtures in the page and sends nothing at all.
 
-## Quickstart
+**Live mode (owner-run)** is the same app against the real PingFederate servers named in your settings, plus the kit's own `resource-as` and `mcp-sample`. It needs the settings in [Settings file](#settings-file) and is not used for a standard demo. The simulation banner on every page says which mode you are in.
+
+## Run from a clone
+
+Prerequisites: Node 22 or newer (Node 22 is what the tests and CI run on). Docker is needed only for the Docker form.
 
 ```sh
-git clone <this repo> && cd id-jag-standalone
+git clone https://github.com/ping-sandbox/id-jag-standalone-LAB.git
+cd id-jag-standalone-LAB
+npm ci
+npm run build
+ALLOW_MOCK_SIGNIN=1 npm start
+```
+
+Then open **http://127.0.0.1:4720**. It starts in Mock mode, which needs no `.env`, no network and no PingFederate.
+
+What works with no setup at all: every page; the playground in **Sample data (browser)** mode with no sign-in; the **PingFederate → resource AS**, **Acme PingFederate → PingFederate** and **Your IdP → our resource AS** modes against the in-app simulation (sign in with the demo account shown in the sign-in dialog, which needs `ALLOW_MOCK_SIGNIN=1` as above, and without it the dialog says so); the inspector, the Trusted IdPs page, the diagrams at `/diagram/<mode>`, the stories, and `npm run doctor`. Mock sign-in is refused behind a proxy and on any non-loopback bind.
+
+For development, `npm run dev` starts the API on :4720 and Vite on :4723. The presenter script is [docs/talk-track.md](docs/talk-track.md) (press **Present** in the header).
+
+## Settings file
+
+All standalone apps read one settings file, `~/Development/.env` (mode 600). Set `STANDALONE_ENV=/path/to/file` to use another. The repo-root `.env` (copy `.env.example`; git-ignored) is also read, and real environment variables win. **None are needed for Mock mode.** Admin and worker credentials never go in the shared file; they belong in `~/.config/demo-kit/provisioning.json`, which only owner-run provisioning scripts read.
+
+Keys this app uses (the full list, with defaults, is in [Configuration](#configuration)):
+
+| Key | Optional? | What it is |
+| --- | --- | --- |
+| `MODE` | optional | `mock` (default) or `live`. The header switch saves its choice in `DATA_DIR/mode.json`, which wins |
+| `ALLOW_MOCK_SIGNIN` | optional | `1` turns on the built-in demo account in Mock mode (Docker sets it) |
+| `PORT`, `HOST`, `APP_ORIGIN`, `DATA_DIR` | optional | Where the server listens, its browser origin, where it keeps data |
+| `SESSION_SECRET` | optional | Signs the session cookie; random per start if unset |
+| `PF_URL` | live only | The issuer and redeeming PingFederate |
+| `PF_EXCHANGE_CLIENT_ID`, `PF_EXCHANGE_CLIENT_SECRET` | live only | The sign-in and token-exchange client at `PF_URL` |
+| `ACME_PF_URL`, `ACME_EXCHANGE_CLIENT_ID`, `ACME_EXCHANGE_CLIENT_SECRET` | live only | The outside "Acme" PingFederate (`pf-pf` mode) |
+| `RESOURCE_AS_ISSUER`, `MCP_URL`, `ID_JAG_RESOURCE`, `ID_JAG_REGISTRY_TOKEN` | live only | Where the resource AS and MCP server are, and the registry token |
+| `CUSTOMER_CONFIG` | optional | Path to a `customer.config.json` (branding, vertical, cast names) |
+
+## Ports, and what to do if the port is taken
+
+Ports: id-jag-standalone listens on 4720 (set with `PORT`, default 4720). The Vite dev server uses 4723. The Docker host ports are `HOST_PORT` 4720 (playground), `AS_HOST_PORT` 4721 (resource-as) and `MCP_HOST_PORT` 4722 (mcp-sample).
+Port range for this app: 4720-4729.
+
+If the port is taken:
+1. Find what is using it:
+   lsof -iTCP:4720 -sTCP:LISTEN -n -P
+2. If it is an old copy of this app, stop that process: kill <PID>.
+3. If it is something else, stop it, or start this app on another port:
+   `PORT=4724 npm start` (set `APP_ORIGIN` to match, for example `APP_ORIGIN=http://localhost:4724`), or `HOST_PORT=4724 docker compose -f deploy/docker-compose.yml up -d`
+4. Do not use 8080, 5173, 3000, 4000, 4400, 4510, 4600-4601, 18080, 19080 or 19090.
+
+In Live mode on the host, the helper services `resource-as` and `mcp-sample` default to 9080 and 9090 in code. They are not started in Mock mode. Set `PORT=4721` and `PORT=4722` for them if you want them inside this app's block.
+
+## Mock and live modes
+
+`MODE=mock|live` (default mock) decides what the app talks to. The **Mock / Live** switch in the header of every page shows the mode and changes it, the banner on every page repeats it (presenter mode included), and `GET /api/health` reports it as `mode`. The choice is saved in `DATA_DIR/mode.json`, so it survives a restart. Switching ends every session. Mock data lives in `DATA_DIR/mock` and never mixes with live data.
+
+- **Mock**: the in-app simulation described under [What is simulated](#what-is-simulated). Demo account `alice@mock.example` / `mock-password`, shown in the sign-in dialog (public, mock only). Mock sign-in needs `ALLOW_MOCK_SIGNIN=1`, a loopback bind (`HOST=127.0.0.1`, the default in Mock mode, or `LAB_PUBLISH=loopback` in Docker) and no proxy.
+- **Live**: the servers named in your settings. It can be chosen only when `PF_URL`, `PF_EXCHANGE_CLIENT_ID` and `PF_EXCHANGE_CLIENT_SECRET` (or the Acme set) are present; otherwise the Live button is disabled and the banner names what is missing.
+
+## Health, doctor and reset
+
+```sh
+npm run doctor   # checks Node, settings, the port and, in Live mode, PingFederate; exit 1 on any failure
+npm run reset    # clears run state; saved settings and the saved mode are kept
+```
+
+`GET /api/health` is public and answers `demo-health/1`. `POST /api/admin/reset` (admin, same-origin) resets a running server. Details: [Run doctor before a demo](#run-doctor-before-a-demo), [Health for the demo shelf](#health-for-the-demo-shelf) and [Reset between demos](#reset-between-demos).
+
+## Docker (optional)
+
+```sh
+docker compose -f deploy/docker-compose.yml up --build -d
+```
+
+It publishes to 127.0.0.1 only: 4720 (playground), 4721 (resource-as) and 4722 (mcp-sample). Mock mode works with no configuration, and the compose file turns on the mock demo account. Stop it with `docker compose -f deploy/docker-compose.yml down`. On a Mac use OrbStack.
+
+## Tests
+
+```sh
+npm test
+```
+
+On Node 22 a good run is 1218 tests: web 391, server 696, resource-as 69, mcp-sample 22 and scripts 40. `check-css.sh` (in the AI-DEMO-Standalone repo) and `npm run check:forbidden` should also pass. Under heavy machine load a timing-based test can time out; rerun that file alone to confirm.
+
+## Troubleshooting
+
+- **The sign-in dialog says mock sign-in is off.** Start with `ALLOW_MOCK_SIGNIN=1 npm start`, and do not open the app through a proxy or on a non-loopback address.
+- **The Live button is greyed out.** Live needs `PF_URL` and the exchange client in your settings. The banner names what is missing. Mock mode needs none of it.
+- **A step says `409 not_configured`.** That mode needs the settings it names. The pre-flight check on the step says which, and `npm run doctor -- --mode=pf-as` lists them.
+- **The page loads but is empty.** Run `npm run build` first: `npm start` serves `web/dist`.
+- **The port is taken.** See [Ports, and what to do if the port is taken](#ports-and-what-to-do-if-the-port-is-taken).
+
+## Ownership
+
+- Owner: the Ping standalone demo kit owner.
+- License: all rights reserved. This is an internal Ping repository, not licensed for redistribution.
+- Found a problem? Open an issue on the repo.
+
+---
+
+## Reference
+
+The sections below are the detail behind the ones above.
+
+### Setup script (optional, for a live mode)
+
+```sh
+git clone https://github.com/ping-sandbox/id-jag-standalone-LAB.git && cd id-jag-standalone-LAB
 npm ci
 npm run setup           # picks a mode, writes .env (never overwrites one), runs doctor, prints what to run next
 npm run build && npm start
@@ -44,7 +146,7 @@ warn or fail with the fix, and nothing is sent while a check fails. Each mode ha
 `/diagram/<mode>` (`?step=N` lights one step; it opens in a new tab), and **Download report** saves the run
 as Markdown or JSON, built in the browser with no raw token in it.
 
-## Modes
+### Modes
 
 | Mode | Issues the ID-JAG | Redeems it | Status |
 | --- | --- | --- | --- |
@@ -98,54 +200,7 @@ register an IdP. It stays `pending`, and is not trusted, until an admin approves
 The resource AS and the PingFederate sync script read the approved entries server to server with a Bearer
 `ID_JAG_REGISTRY_TOKEN`. See [Sign-in and the Trusted IdPs registry](#sign-in-and-the-trusted-idps-registry).
 
-## Running it
-
-### Docker (OrbStack or any Docker engine)
-
-```sh
-docker compose -f deploy/docker-compose.yml up --build -d
-open http://localhost:4720     # Mock mode works with no configuration
-docker compose -f deploy/docker-compose.yml down
-```
-
-Three services: the playground (`HOST_PORT`, default 4720), `resource-as` (`AS_HOST_PORT`, 4721, issuer
-`http://localhost:4721`) and `mcp-sample` (`MCP_HOST_PORT`, 4722, resource `http://localhost:4722/mcp`).
-Secrets and PingFederate settings come from an optional `.env` at the repo root (copy `.env.example`), read
-by every service. Compose sets the addresses the services use to find each other (`APP_ORIGIN`,
-`RESOURCE_AS_ISSUER`, `RESOURCE_AS_TOKEN_ENDPOINT`, `ID_JAG_RESOURCE`, `MCP_URL`) from the host ports, so
-they always agree; export one in the shell to override it.
-
-### Local development (Node 22+)
-
-```sh
-npm ci
-cp .env.example .env            # set APP_ORIGIN=http://localhost:4723 for the Vite dev server
-npm run dev                     # API on :4720, Vite on :4723 (proxies /api and /auth)
-npm start -w resource-as        # :9080 (see docs/resource-as.md); npm start -w mcp-sample  # :9090
-npm test                        # vitest, all four workspaces
-npm run build                   # web/dist, served by the server in production
-```
-
-`npm start` serves `web/dist` and the API on `PORT`.
-
-## Mock and live
-
-`MODE=mock|live` (default mock) decides what the app talks to; the **Mock / Live** switch in the header of every page shows it
-and changes it, and `GET /api/health` reports it as `mode`. The choice is saved in `DATA_DIR/mode.json`, so it survives a restart; without
-a saved choice `MODE` is read from the environment, `.env`, or the shared settings file (`STANDALONE_ENV`, else `~/Development/.env`).
-
-- **Mock**: a PingFederate, an outside "Acme" PingFederate, a resource authorization server and an MCP server run inside the app and
-  answer like the real ones (pi.flow with PKCE, RFC 8693 exchange, RFC 7523 redemption, single-use `jti`, scope-gated tools). Every token
-  carries `"mock": true`, every playground answer says `simulated`, and a netguard refuses every outbound call except to the mock and to
-  loopback, counting what it refuses (`npm run doctor` runs its self-test). Mock data lives in `DATA_DIR/mock`. xaa.dev, SAML and the
-  interop panel need a real server and are Live only. The demo account is `alice@mock.example` / `mock-password`; mock sign-in needs
-  `ALLOW_MOCK_SIGNIN=1`, a loopback bind (`HOST=127.0.0.1`, the default in mock mode, or `LAB_PUBLISH=loopback` in Docker) and no proxy.
-- **Live**: today's behaviour, against the servers named in `.env`. It can be chosen only when `PF_URL`, `PF_EXCHANGE_CLIENT_ID` and
-  `PF_EXCHANGE_CLIENT_SECRET` (or the Acme set) are present; otherwise the switch says what is missing.
-
-`npm run reset` and `POST /api/admin/reset` clear the current mode's data and keep the saved choice.
-
-## Layout
+### Layout
 
 ```text
 web/            Vite + React playground (Mock mode, Form|JSON view, mode picker, pre-flight, diagrams, report, Trusted IdPs)
@@ -160,7 +215,7 @@ tools/          outside-agent.js test harness (adapted)
 deploy/         docker-compose.yml (all three services), overlays (desktop clients, SAML), service.Dockerfile
 ```
 
-## Configuration
+### Configuration
 
 Every variable is in [`.env.example`](.env.example). None are needed for Mock mode.
 
@@ -205,7 +260,7 @@ Every variable is in [`.env.example`](.env.example). None are needed for Mock mo
 Sessions use express-session's in-memory store: one process only, everyone is signed out on restart.
 A shared store is needed before running more than one replica.
 
-## Make it the customer's
+### Make it the customer's
 
 Copy `customer.config.example.json` to `customer.config.json` (git-ignored), edit, and reload the page. No rebuild or restart.
 
@@ -225,7 +280,13 @@ Copy `customer.config.example.json` to `customer.config.json` (git-ignored), edi
 
 The file is meant to be shared with customers, so any key containing `secret`, `password`, `token` or `key` is rejected. An invalid file is ignored as a whole (the server logs one line naming the bad field) and the kit shows its defaults. `CUSTOMER_CONFIG=/path/to/file.json` points elsewhere; in Docker, mount the file and set that variable. The sanitized result is public at `GET /api/customer-config`.
 
-## Run doctor before a demo
+Stories name people as `{{cast.<id>}}` tokens and nouns as `{{vocab.<key>}}`, so a name written in one place is replaced everywhere; a test fails on an undefined token or a cast name written out.
+
+### Diagrams
+
+Each playground mode has a ReactFlow diagram at `/diagram/<mode>` (`?step=N` lights step N; it opens in a new tab). The diagrams are diagram-studio/1 data files in [`diagrams/`](diagrams/), loaded by name; nothing is hand-built in code. Boxes are movable, **Simulate** walks the steps (the **Speed** control sets the pause), and **Reset** stops the walk, shows the overview and puts every box back. A step's callout is its `why` in the data file. After a change, evaluate the AI-DEMO-Standalone `scripts/diagram-overlap.js` on each diagram in a browser and expect `pass: true`.
+
+### Run doctor before a demo
 
 ```sh
 npm run doctor                          # mock mode: needs no .env and no network
@@ -238,7 +299,7 @@ admin API, the `idJagKitPcv` validator and that the sign-in client allows pi.flo
 exact fix. Exit code 1 on any FAIL. Secrets show only as set/unset and length. Signed-in admins get the same report
 from `GET /api/doctor?mode=pf-as`.
 
-## Health for the demo shelf
+### Health for the demo shelf
 
 `GET /api/health` is public and answers the `demo-health/1` contract: `state` (`ready`, `needs-setup`, `broken`,
 `unknown`), `runtime` (`offline` or `live`) and the demo's id, name and version. Nothing else: no counts, messages or
@@ -247,7 +308,7 @@ background every 60 s, never per request, through the IdP adapter's doctor (so t
 health makes no PF admin call of its own). It describes the process and is answered from the default workspace in every
 workspace. GET only: HEAD answers 405, so the shelf must poll with GET. Code: `server/src/health.js`. Full contract: [docs/health-contract.md](docs/health-contract.md).
 
-## Sign-in and the Trusted IdPs registry
+### Sign-in and the Trusted IdPs registry
 
 Sign-in is OIDC (authorization code + PKCE, state, nonce) at PingFederate, which federates to PingOne. The ID
 token is validated (signature, `iss`, `aud`, `exp`, `nonce`) and then the app applies its own rules, whatever the
@@ -271,7 +332,7 @@ Credentials and codes are never logged or stored; at most 8 password attempts pe
 
 Go-live setup (a new dedicated PingOne environment, the PingFederate client, the admin group): [docs/setup-guides.md](docs/setup-guides.md#sign-in-for-this-app-go-live).
 
-### Sign-in limits
+#### Sign-in limits
 
 The kit signs in by pi.flow only. These limits are documented, not fixed; the modal shows a message for each.
 
@@ -301,7 +362,7 @@ The kit signs in by pi.flow only. These limits are documented, not fixed; the mo
   connect time), with a 4 s timeout and no redirects.
 - The audit log is `DATA_DIR/audit.jsonl`, append-only, with before/after snapshots (entries hold no secrets).
 
-## Reset between demos
+### Reset between demos
 
 Return the demo to a fresh state before the next customer:
 
@@ -322,7 +383,7 @@ server or use the route for that.
 If PingFederate is unreachable, local state is still reset; the users it could not remove are listed and the
 command exits 1 (the route answers 502). `.env`, secrets and all other PingFederate configuration are left alone.
 
-## PingFederate ID-JAG gotchas
+### PingFederate ID-JAG gotchas
 
 1. The ID-JAG signing key is not in `/pf/JWKS` unless a JWT access token manager publishes it
    ("Publish Keys to the PingFederate JWKS Endpoint").
@@ -333,26 +394,13 @@ command exits 1 (the route answers 502). `.env`, secrets and all other PingFeder
    resource in its selection settings.
 5. `x5t` lookups must count distinct keys: a static JWKS lists one certificate under several `kid`s.
 
-## Roadmap
+### Roadmap
 
 See [docs/roadmap.md](docs/roadmap.md).
 
-## License
+### Keeping secrets out
 
-All rights reserved. Private repository; not licensed for redistribution.
-
-## Keeping secrets out
 - Nothing secret is committed: `.env` is ignored, only `.env.example` ships.
 - Three independent checks block a leaked secret: the `.githooks/pre-commit` gitleaks hook (installed by `npm install`), the `secrets` CI job (gitleaks over the full history of every PR), and GitHub secret scanning with push protection on this repository.
 - Raw tokens never reach the browser or the logs (enforced by tests).
 - Planned: secrets generated inside the cluster, external ones stored as SealedSecrets, `private_key_jwt` client authentication instead of client secrets, and a small encrypted vault for local development.
-
-## Ports, and what to do if the port is taken
-
-This app listens on **4720** (set with `PORT`). The Vite dev server uses **4723**. Docker host ports: `HOST_PORT` 4720 (playground), `AS_HOST_PORT` 4721 (resource-as), `MCP_HOST_PORT` 4722 (mcp-sample). Port range for this app: 4720-4729.
-
-If the port is taken:
-1. Find what is using it: `lsof -iTCP:<port> -sTCP:LISTEN -n -P`
-2. If it is an old copy of this app, stop that process: `kill <PID>`
-3. If it is something else, stop it, or start this app on another port: `PORT=4730 npm run dev` (and set `APP_ORIGIN` to match), or `HOST_PORT=4731 docker compose -f deploy/docker-compose.yml up -d`
-4. Do not use 8080, 5173, 3000, 4000, 4400, 4510, 4600-4601, 18080, 19080 or 19090. Other demos and tools use them.

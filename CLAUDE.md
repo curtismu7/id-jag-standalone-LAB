@@ -28,6 +28,18 @@ module may call `fetch`; use `outboundFetch`). Settings are read through `runtim
 settings. Mock tokens carry `mock: true`; EC keys use `createECDH` + `createPrivateKey`. Mock sign-in is guarded (`mockSignin.js`).
 The server suite runs with `MODE=live` (vitest config); `mock*.test.js` choose mock themselves.
 
+## Diagrams, stories, talk track
+
+- Diagrams are diagram-studio/1 data files in `diagrams/` (one per playground mode: `mock`, `pf-as`, `pf-pf`, `byo`), loaded by name
+  (`web/src/diagrams/loadDiagram.js`) and turned into the page's model by `playgroundModel.js`. Do not hand-build nodes or edges. Edit the
+  JSON (box positions, arrows, steps; a step's `why` is its gotcha callout). Arrow handles are chosen from box positions, and a test fails
+  when two arrows share a slot or run. The Dockerfile copies `diagrams/` into the web build.
+- After any diagram change, run the overlap check in a real browser: evaluate `AI-DEMO-Standalone/scripts/diagram-overlap.js` on `/diagram/<mode>`
+  (and `?step=1` to `5`) and expect `pass: true` with no lit label clipped.
+- Stories (`web/src/data/stories`) name people only as `{{cast.<id>}}` and nouns as `{{vocab.<key>}}`. Names come from the vertical pack and
+  from `customer.config.json` `persona`. A test fails on an undefined token or a written-out cast name.
+- `docs/talk-track.md` is the presenter script. A test checks that every bold button name in it still exists in `web/src`.
+
 ## Rules that bite
 
 - Mock mode works with no configuration. Live PingFederate use is owner-run.
