@@ -11,7 +11,7 @@
     {
       "n": 1,
       "title": "Sign in once at PingFederate",
-      "tell": "{{cast.mark}} signs in at the issuer PingFederate. This app's server keeps the refresh token from that sign-in, and the ID-JAG is minted from it. Raw tokens never reach the browser. If you already signed in to this app, this step is done.",
+      "tell": "{{cast.mark}} signs in at the issuer PingFederate. This app's server keeps the refresh token from that sign-in, and the ID-JAG is minted from it. Real tokens never reach the browser (Mock mode shows its mock tokens raw, labelled mock). If you already signed in to this app, this step is done.",
       "say": "One sign-in at the company's own identity provider. That session is what the agent borrows.",
       "why": "Everything the agent gets later traces back to this one session."
     },

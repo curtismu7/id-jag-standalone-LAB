@@ -842,7 +842,7 @@ export default function IdJagPlaygroundPage() {
             <h1>ID-JAG Playground</h1>
             <p className="ijp-lede">
               Run the real flow one step at a time against your PingFederate, our resource authorization server and
-              the sample MCP server. Every request and response is shown (tokens decoded, never raw), each button runs a
+              the sample MCP server. Every request and response is shown (in Mock mode the mock tokens are shown raw and labelled mock; real tokens stay on the server and are shown decoded), each button runs a
               pre-flight check first, the ID-JAG is checked against the IETF draft, and live negative tests confirm the
               authorization server refuses what it should.
             </p>
