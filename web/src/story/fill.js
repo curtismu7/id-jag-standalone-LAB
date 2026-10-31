@@ -1,7 +1,8 @@
 // Story text is written once with tokens; a vertical pack supplies the names and nouns.
-//   {{lena}}          a cast id, replaced by that person's name
+//   {{cast.lena}}     a cast member of the vertical pack, replaced by that person's name
 //   {{vocab.partner}} a vocabulary entry of the vertical
-// A customer persona ({ lena: "Priya" }) overrides a cast name.
+// The name comes from the customer's own config first (customer.config.json: persona { "lena": "Priya" }), then the
+// vertical pack. Stories never hold a literal name. The bare form {{lena}} still works and means {{cast.lena}}.
 // A token nothing defines stays visible as ⟨missing: token⟩ so a gap is seen, not hidden.
 
 const TOKEN = /\{\{\s*([\w.]+)\s*\}\}/g;
@@ -10,11 +11,12 @@ export function fill(text, vertical, persona) {
   if (typeof text !== "string") return text;
   return text.replace(TOKEN, (_m, key) => {
     if (key.startsWith("vocab.")) return vertical?.vocab?.[key.slice(6)] ?? `⟨missing: ${key}⟩`;
-    return persona?.[key] ?? vertical?.cast?.[key]?.name ?? `⟨missing: ${key}⟩`;
+    const id = key.startsWith("cast.") ? key.slice(5) : key;
+    return persona?.[id] ?? vertical?.cast?.[id]?.name ?? `⟨missing: ${key}⟩`;
   });
 }
 
-/** Every token used anywhere in a value (string, array or object), as "lena" / "vocab.partner". */
+/** Every token used anywhere in a value (string, array or object), as "cast.lena" / "vocab.partner". */
 export function tokensIn(value, found = new Set()) {
   if (typeof value === "string") for (const m of value.matchAll(TOKEN)) found.add(m[1]);
   else if (Array.isArray(value)) value.forEach((v) => tokensIn(v, found));

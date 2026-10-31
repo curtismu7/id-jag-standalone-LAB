@@ -1,18 +1,18 @@
 {
   "id": "S11b",
-  "title": "{{lena}}'s company runs its own PingFederate",
+  "title": "{{cast.lena}}'s company runs its own PingFederate",
   "modes": ["pf-pf"],
   "demos": ["C1"],
-  "goal": "{{lena}} works at {{vocab.partner}}, which runs its own PingFederate. {{lena}}'s agent needs to reach {{vocab.resource}} that we host, on the strength of that company's sign-in.",
+  "goal": "{{cast.lena}} works at {{vocab.partner}}, which runs its own PingFederate. {{cast.lena}}'s agent needs to reach {{vocab.resource}} that we host, on the strength of that company's sign-in.",
   "obstacle": "Two companies, each with a PingFederate, and an IdP must not redeem its own ID-JAG (draft section 9.3). So the partner's PingFederate issues the grant and ours redeems it, and the resource still decides which tokens it trusts.",
   "control": "ID-JAG across two PingFederates: the partner's PingFederate issues an ID-JAG addressed to ours, which redeems it through an IdP connection (a JWT bearer grant) and mints the access token. The resource server separately trusts only the tokens of its own authorization server.",
-  "say": "The partner vouches for {{lena}}, we redeem the grant, and we still decide which tokens count at the resource.",
+  "say": "The partner vouches for {{cast.lena}}, we redeem the grant, and we still decide which tokens count at the resource.",
   "steps": [
     {
       "n": 1,
       "title": "Sign in at the partner's PingFederate",
-      "tell": "{{lena}} signs in at the partner company's PingFederate (shown as Acme). This sign-in is separate from the app's own sign-in, and it happens at the company that knows {{lena}}.",
-      "say": "Identity starts at {{lena}}'s own company, not with us.",
+      "tell": "{{cast.lena}} signs in at the partner company's PingFederate (shown as Acme). This sign-in is separate from the app's own sign-in, and it happens at the company that knows {{cast.lena}}.",
+      "say": "Identity starts at {{cast.lena}}'s own company, not with us.",
       "why": "The company that knows the person is the one that signs the person in."
     },
     {
