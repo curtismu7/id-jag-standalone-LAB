@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { _resetMode, currentMode, liveReadiness, loadSharedMode, runtimeEnv, setMode } from '../mode.js';
+import { _resetMode, currentMode, liveReadiness, runtimeEnv, setMode } from '../mode.js';
+import { loadSettings } from '../settings.js';
 
 let dir;
 beforeEach(() => {
@@ -22,6 +23,25 @@ const configureLive = () => {
 
 describe('which mode runs', () => {
   it('is mock when nothing says otherwise', () => {
+    expect(currentMode()).toBe('mock');
+  });
+
+  it('is live when nothing says otherwise but the live PingFederate settings are present (an existing install stays live)', () => {
+    configureLive();
+    expect(currentMode()).toBe('live');
+  });
+
+  it('is mock when the live settings are only partly there', () => {
+    vi.stubEnv('PF_URL', 'https://pf.example.invalid');
+    expect(currentMode()).toBe('mock');
+  });
+
+  it('MODE=mock and the toggle both beat the live settings being present', () => {
+    configureLive();
+    vi.stubEnv('MODE', 'mock');
+    expect(currentMode()).toBe('mock');
+    vi.stubEnv('MODE', '');
+    setMode('mock');
     expect(currentMode()).toBe('mock');
   });
 
@@ -86,32 +106,21 @@ describe('live needs the live settings', () => {
   });
 });
 
-describe('the shared settings file (STANDALONE_ENV, else ~/Development/.env)', () => {
+describe('the shared settings file (STANDALONE_ENV, else ~/Development/.env), read by settings.js', () => {
   const write = (text) => { const f = path.join(dir, 'shared.env'); fs.writeFileSync(f, text); return f; };
 
-  it('supplies MODE, and only MODE', () => {
-    const env = {};
-    loadSharedMode({ env, file: write('MODE=live\nPF_URL=https://elsewhere.invalid\nPF_ADMIN_PASSWORD=x\n') });
-    expect(env).toEqual({ MODE: 'live' });
+  it('a MODE in it reaches currentMode()', () => {
+    delete process.env.MODE; // unset, as in a real start (afterEach restores it)
+    loadSettings({ env: { STANDALONE_ENV: write('MODE=live\n') } });
+    _resetMode();
+    expect(currentMode()).toBe('live');
   });
 
-  it('never overrides a MODE that is already set', () => {
-    const env = { MODE: 'mock' };
-    loadSharedMode({ env, file: write('MODE=live\n') });
-    expect(env.MODE).toBe('mock');
-  });
-
-  it('reads the file named by STANDALONE_ENV', () => {
-    const env = { STANDALONE_ENV: write('MODE=live\n') };
-    loadSharedMode({ env });
-    expect(env.MODE).toBe('live');
-  });
-
-  it('ignores a missing file and a MODE that is not mock or live', () => {
-    const env = {};
-    loadSharedMode({ env, file: path.join(dir, 'absent.env') });
-    loadSharedMode({ env, file: write('MODE=sideways\n') });
-    expect(env).toEqual({});
+  it('a MODE already in the environment wins over the file', () => {
+    vi.stubEnv('MODE', 'mock');
+    loadSettings({ env: { STANDALONE_ENV: write('MODE=live\n') } });
+    _resetMode();
+    expect(currentMode()).toBe('mock');
   });
 });
 

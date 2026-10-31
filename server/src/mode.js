@@ -2,31 +2,17 @@
 //   mock  every outside call is answered by the in-process mock (mock/index.js); the netguard refuses everything else.
 //   live  today's behaviour: the real PingFederate servers, resource AS and MCP server named in the environment.
 // Which one runs, first match wins: the choice made with the toggle (DATA_DIR/mode.json, so it survives a restart),
-// then MODE in the environment (the shell, the repo .env, or the family's shared settings file), then mock.
+// then MODE in the environment (the shell, the repo .env, or the family's shared settings file, all loaded by settings.js),
+// then mock (or live, when the live PingFederate settings are already present: see defaultMode).
 // This file imports nothing from the app, so config.js can import it.
 
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { parseEnv } from 'node:util';
 import { mockEnv } from './mock/env.js';
 
 export const MODES = ['mock', 'live'];
-export const DEFAULT_SHARED_FILE = path.join(os.homedir(), 'Development', '.env');
 
 const val = (env, k) => String(env[k] ?? '').trim();
-
-/**
- * The family's one settings file: STANDALONE_ENV, else ~/Development/.env. Only MODE is taken from it (this app's other
- * settings stay in its own .env and the environment), and a MODE already in the environment wins. Never throws.
- */
-export function loadSharedMode({ env = process.env, file = val(env, 'STANDALONE_ENV') || DEFAULT_SHARED_FILE } = {}) {
-  if (val(env, 'MODE')) return;
-  try {
-    const mode = String(parseEnv(fs.readFileSync(file, 'utf8')).MODE ?? '').trim().toLowerCase();
-    if (MODES.includes(mode)) env.MODE = mode;
-  } catch { /* no shared file */ }
-}
 
 // What the toggle chose, read once per process (undefined = not read yet, null = nothing chosen).
 let chosen;
@@ -43,8 +29,10 @@ function readChosen() {
 
 export function currentMode() {
   const fromEnv = String(process.env.MODE ?? '').trim().toLowerCase();
-  return readChosen() ?? (MODES.includes(fromEnv) ? fromEnv : 'mock');
+  return readChosen() ?? (MODES.includes(fromEnv) ? fromEnv : defaultMode());
 }
+/** Nothing chose a mode: an install that already has its live PingFederate settings stays live; any other starts on the mock. */
+const defaultMode = () => (liveReadiness().ready ? 'live' : 'mock');
 export const isMock = () => currentMode() === 'mock';
 
 /** The environment the app reads its settings from: the real one in live mode, the mock's in mock mode. */
