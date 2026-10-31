@@ -31,6 +31,8 @@ services:
       # Listens wide inside the container; the port above is published on 127.0.0.1 only. Mock sign-in checks this (rule 11).
       HOST: "0.0.0.0"
       LAB_PUBLISH: loopback
+      # The resource AS reads the Trusted IdPs registry at http://id-jag:4720, so that name is allowed as a Host.
+      ALLOWED_HOSTS: id-jag
       ALLOW_MOCK_SIGNIN: ${ALLOW_MOCK_SIGNIN:-1}
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:${HOST_PORT:-4720}}
       RESOURCE_AS_ISSUER: *as-issuer

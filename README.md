@@ -30,7 +30,7 @@ npm run build
 ALLOW_MOCK_SIGNIN=1 npm start
 ```
 
-Then open **http://127.0.0.1:4720**. It starts in Mock mode, which needs no `.env`, no network and no PingFederate.
+Then open **http://localhost:4720**. Use `localhost`, not `127.0.0.1`: the server accepts sign-in and the Mock/Live switch only from its own `APP_ORIGIN`, which defaults to `http://localhost:4720`, and a page opened on `127.0.0.1` gets `invalid_origin`. It starts in Mock mode, which needs no `.env`, no network and no PingFederate (Mock mode is the start-up default only when the live `PF_*` settings are not set).
 
 What works with no setup at all: every page; the playground in **Sample data (browser)** mode with no sign-in; the **PingFederate → resource AS**, **Acme PingFederate → PingFederate** and **Your IdP → our resource AS** modes against the in-app simulation (sign in with the demo account shown in the sign-in dialog, which needs `ALLOW_MOCK_SIGNIN=1` as above, and without it the dialog says so); the inspector, the Trusted IdPs page, the diagrams at `/diagram/<mode>`, the stories, and `npm run doctor`. Mock sign-in is refused behind a proxy and on any non-loopback bind.
 
@@ -44,7 +44,7 @@ Keys this app uses (the full list, with defaults, is in [Configuration](#configu
 
 | Key | Optional? | What it is |
 | --- | --- | --- |
-| `MODE` | optional | `mock` (default) or `live`. The header switch saves its choice in `DATA_DIR/mode.json`, which wins |
+| `MODE` | optional | `mock` or `live`. Unset: `live` when `PF_URL`, `PF_EXCHANGE_CLIENT_ID` and `PF_EXCHANGE_CLIENT_SECRET` are set (an existing install stays live), otherwise `mock`. The header switch saves its choice in `DATA_DIR/mode.json`, which wins |
 | `ALLOW_MOCK_SIGNIN` | optional | `1` turns on the built-in demo account in Mock mode (Docker sets it) |
 | `PORT`, `HOST`, `APP_ORIGIN`, `DATA_DIR` | optional | Where the server listens, its browser origin, where it keeps data |
 | `SESSION_SECRET` | optional | Signs the session cookie; random per start if unset |
@@ -71,7 +71,7 @@ In Live mode on the host, the helper services `resource-as` and `mcp-sample` def
 
 ## Mock and live modes
 
-`MODE=mock|live` (default mock) decides what the app talks to. The **Mock / Live** switch in the header of every page shows the mode and changes it, the banner on every page repeats it (presenter mode included), and `GET /api/health` reports it as `mode`. The choice is saved in `DATA_DIR/mode.json`, so it survives a restart. Switching ends every session. Mock data lives in `DATA_DIR/mock` and never mixes with live data.
+`MODE=mock|live` decides (unset: mock, or live when `PF_URL`, `PF_EXCHANGE_CLIENT_ID` and `PF_EXCHANGE_CLIENT_SECRET` are already set) what the app talks to. The **Mock / Live** switch in the header of every page shows the mode and changes it, the banner on every page repeats it (presenter mode included), and `GET /api/health` reports it as `mode`. The choice is saved in `DATA_DIR/mode.json`, so it survives a restart. Switching ends every session. Mock data lives in `DATA_DIR/mock` and never mixes with live data.
 
 - **Mock**: the in-app simulation described under [What is simulated](#what-is-simulated). Demo account `alice@mock.example` / `mock-password`, shown in the sign-in dialog (public, mock only). Mock sign-in needs `ALLOW_MOCK_SIGNIN=1`, a loopback bind (`HOST=127.0.0.1`, the default in Mock mode, or `LAB_PUBLISH=loopback` in Docker) and no proxy.
 - **Live**: the servers named in your settings. It can be chosen only when `PF_URL`, `PF_EXCHANGE_CLIENT_ID` and `PF_EXCHANGE_CLIENT_SECRET` (or the Acme set) are present; otherwise the Live button is disabled and the banner names what is missing.

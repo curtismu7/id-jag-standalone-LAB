@@ -22,7 +22,7 @@ Server 4720, resource-as 4721, mcp-sample 4722, Vite dev server 4723. Block 4720
 
 ## Mock and live
 
-`MODE=mock|live`, default mock (`server/src/mode.js`; the toggle's choice is saved in `DATA_DIR/mode.json`). Mock = the in-process
+`MODE=mock|live`, default mock unless the live `PF_*` settings are set, then live (`server/src/mode.js`; the toggle's choice is saved in `DATA_DIR/mode.json`). Mock = the in-process
 PingFederate, Acme PingFederate, resource AS and MCP server in `server/src/mock/`, reached only through `server/src/netguard.js` (no other
 module may call `fetch`; use `outboundFetch`). Settings are read through `runtimeEnv()`, never `process.env`, so mock mode cannot see real
 settings. Mock tokens carry `mock: true`; EC keys use `createECDH` + `createPrivateKey`. Mock sign-in is guarded (`mockSignin.js`).

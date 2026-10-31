@@ -2,7 +2,7 @@
 
 Presenter script, about 12 minutes. Each `##` heading is one step. Press **Present** in the header (or `P`) for presenter mode: bigger type, and Left and Right arrows move between the playground steps. The simulation banner stays on screen the whole time.
 
-Start the app for this script with `ALLOW_MOCK_SIGNIN=1 npm start` (or `docker compose -f deploy/docker-compose.yml up --build -d`, which sets it) and open http://127.0.0.1:4720. Mock mode is the default and needs no tenant, no network and no setup.
+Start the app for this script with `ALLOW_MOCK_SIGNIN=1 npm start` (or `docker compose -f deploy/docker-compose.yml up --build -d`, which sets it) and open http://localhost:4720. Mock mode is the default and needs no tenant, no network and no setup.
 
 ## Step 1: Say what this is and what is simulated
 

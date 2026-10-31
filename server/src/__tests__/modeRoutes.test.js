@@ -76,6 +76,7 @@ describe('POST /api/mode', () => {
 
   it('switches to live when configured; /api/health shows it at once, and it survives a restart', async () => {
     configureLive();
+    vi.stubEnv('MODE', 'mock'); // live settings present and MODE unset would start live (mode.test.js); this test starts on the mock
     const app = createApp();
     expect((await request(app).get('/api/health')).body.mode).toBe('mock');
     const res = await post(request(app), { mode: 'live' }).expect(200);
@@ -94,6 +95,7 @@ describe('POST /api/mode', () => {
 
   it('ends the web sessions on a switch: a session holds the tokens of one mode only', async () => {
     configureLive();
+    vi.stubEnv('MODE', 'mock'); // start on the mock even though the live settings are present
     const app = createApp();
     const agent = request.agent(app);
     await agent.get('/auth/pi-flow/start').expect(200);
