@@ -99,7 +99,7 @@ It publishes to 127.0.0.1 only: 4720 (playground), 4721 (resource-as) and 4722 (
 npm test
 ```
 
-On Node 22 a good run is 1218 tests: web 391, server 696, resource-as 69, mcp-sample 22 and scripts 40. `check-css.sh` (in the AI-DEMO-Standalone repo) and `npm run check:forbidden` should also pass. Under heavy machine load a timing-based test can time out; rerun that file alone to confirm.
+On Node 22 a good run is 1234 tests: web 392, server 708, resource-as 69, mcp-sample 22 and scripts 43. `check-css.sh` (in the AI-DEMO-Standalone repo) and `npm run check:forbidden` should also pass. Under heavy machine load a timing-based test can time out; rerun that file alone to confirm.
 
 ## Troubleshooting
 
