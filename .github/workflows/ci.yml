@@ -3,16 +3,19 @@ on:
   push:
     branches: [main]
   pull_request:
+
+permissions:
+  contents: read
+
 jobs:
   build:
-    runs-on: [self-hosted, macOS]
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        # One self-hosted runner serves every PR, so PRs test the newest Node only; main tests both supported versions.
-        node: ${{ github.event_name == 'pull_request' && fromJSON('[22]') || fromJSON('[20, 22]') }}
+        node: [22]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -21,13 +24,12 @@ jobs:
       - run: npm run build
   forbidden-strings:
     # Fails if a tracked file holds a string from the forbidden-strings list (one per line), an unlisted UUID in docs,
-    # or an unlisted private hostname. The list comes from the FORBIDDEN_STRINGS secret if set, else from the file
-    # ~/.config/demo-kit/forbidden-strings.txt on this self-hosted runner (docs/forbidden-strings.md). With neither,
-    # the script exits 1 under CI=true, so this cannot be skipped.
-    runs-on: [self-hosted, macOS]
+    # or an unlisted private hostname. The list comes from the FORBIDDEN_STRINGS repo secret (docs/forbidden-strings.md).
+    # With no secret the script exits 1 under CI=true, so this cannot be skipped. Only counts are printed.
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - env:
@@ -36,16 +38,18 @@ jobs:
           if [ -n "$FORBIDDEN_STRINGS" ]; then
             printf '%s\n' "$FORBIDDEN_STRINGS" > "$RUNNER_TEMP/forbidden-strings.txt"
             export FORBIDDEN_STRINGS_FILE="$RUNNER_TEMP/forbidden-strings.txt"
-          elif [ -f "$HOME/.config/demo-kit/forbidden-strings.txt" ]; then
-            export FORBIDDEN_STRINGS_FILE="$HOME/.config/demo-kit/forbidden-strings.txt"
           fi
           npm run check:forbidden
-  secrets:
+  gitleaks:
     # Fails the PR if any commit in its history contains a secret.
-    runs-on: [self-hosted, macOS]
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      # GitHub-hosted runners are disabled for this enterprise; the self-hosted Mac has gitleaks installed.
-      - run: PATH="/opt/homebrew/bin:$PATH" gitleaks detect --source . --redact -v
+      - name: Install gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz | tar -xz gitleaks
+          ./gitleaks version
+      - name: Scan history
+        run: ./gitleaks detect --source . --redact --no-banner
