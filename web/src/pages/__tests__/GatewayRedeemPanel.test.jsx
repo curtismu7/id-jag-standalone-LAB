@@ -109,7 +109,7 @@ describe("write-only fields", () => {
       Redeem: { TokenURL: s.OBO.Redeem.TokenURL, ClientID: "gateway-redeem", AuthMethod: "private_key_jwt", Scope: "ledger:read", KeyID: "gw-redeem-1" }, redeemOn: true, secrets: {}, clear: {}, ...over });
     expect(buildPatch(s, draft())).toBeNull(); // nothing changed, nothing sent
     expect(buildPatch(s, draft({ secrets: { "OBO.ClientSecret": "typed-value-1" } }))).toEqual({ OBO: { ClientSecret: "typed-value-1" } });
-    expect(buildPatch(s, draft({ clear: { "OBO.Redeem.PrivateKeyPEM": true } }))).toEqual({ OBO: { Redeem: { PrivateKeyPEM: null } } });
+    expect(buildPatch(s, draft({ clear: { "Redeem.PrivateKeyPEM": true } }))).toEqual({ OBO: { Redeem: { PrivateKeyPEM: null } } });
     expect(buildPatch(s, draft({ redeemOn: false }))).toEqual({ OBO: { Redeem: null } });
     const changed = draft(); changed.OBO.Scope = "ledger:write";
     expect(buildPatch(s, changed)).toEqual({ OBO: { Scope: "ledger:write" } });
@@ -127,6 +127,29 @@ describe("write-only fields", () => {
     expect(await screen.findByText(/Write-only values were sent once/)).toBeInTheDocument();
     expect(screen.getByLabelText(/OBO\.ClientSecret/)).toHaveValue("");
     expect(document.body.textContent).not.toContain("typed-value-1");
+  });
+
+  it("leg-2 write-only fields can be typed and cleared from the form, not only leg 1", async () => {
+    mount();
+    await ready();
+    put.mockResolvedValue({ data: { spec: spec() } });
+    fireEvent.change(screen.getByLabelText(/OBO\.Redeem\.ClientSecret/), { target: { value: "typed-redeem-secret" } });
+    fireEvent.change(screen.getByLabelText(/OBO\.Redeem\.PrivateKeyPEM/), { target: { value: "typed-redeem-pem" } });
+    fireEvent.click(screen.getByTestId("gr-save"));
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+    expect(put.mock.calls[0][1]).toEqual({ OBO: { Redeem: { ClientSecret: "typed-redeem-secret", PrivateKeyPEM: "typed-redeem-pem" } } });
+    expect(await screen.findByText(/Write-only values were sent once/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/OBO\.Redeem\.ClientSecret/)).toHaveValue("");
+    expect(document.body.textContent).not.toContain("typed-redeem-secret");
+
+    put.mockClear();
+    for (const name of [/OBO\.Redeem\.ClientSecret/, /OBO\.Redeem\.PrivateKeyPEM/]) {
+      const box = within(screen.getByLabelText(name).closest(".gateway-redeem__field")).getByLabelText(/Clear it on save/);
+      fireEvent.click(box);
+    }
+    fireEvent.click(screen.getByTestId("gr-save"));
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+    expect(put.mock.calls[0][1]).toEqual({ OBO: { Redeem: { ClientSecret: null, PrivateKeyPEM: null } } });
   });
 
   it("with nothing changed, Save sends nothing", async () => {
