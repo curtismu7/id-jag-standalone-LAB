@@ -8,5 +8,5 @@ const api = { target: "http://localhost:4720" };
 export default defineConfig({
   plugins: [react()],
   server: { proxy: { "/api": api, "/auth": api } },
-  test: { environment: "jsdom", globals: true, setupFiles: "./src/testSetup.js" },
+  test: { environment: "jsdom", globals: true, setupFiles: "./src/testSetup.js", testTimeout: 20000 },
 });

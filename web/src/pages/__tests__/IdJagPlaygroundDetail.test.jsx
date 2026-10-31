@@ -31,7 +31,8 @@ vi.mock("@xyflow/react", () => ({
   ReactFlowProvider: ({ children }) => children,
   useReactFlow: () => ({ fitView: rf.fitView }),
   useNodesInitialized: () => true,
-  useStore: (sel) => sel({ nodeLookup: rf.lookup }), // empty in most tests: no measured boxes, so no routes
+  useStore: (sel) => sel({ nodeLookup: rf.lookup, transform: [0, 0, 1] }), // empty in most tests: no measured boxes, so no routes
+  useStoreApi: () => ({ getState: () => ({ transform: [0, 0, 1], width: 1000, height: 700 }), subscribe: () => () => {} }),
   EdgeLabelRenderer: ({ children }) => <div>{children}</div>,
   BaseEdge: ({ className }) => <path className={className} />,
   getSmoothStepPath: () => ["M0,0", 0, 0],
@@ -100,8 +101,10 @@ describe("numbered arrows", () => {
 
   it("dashed edges carry the dashed class and the legend explains the notation", () => {
     open("/diagram/pf-as");
-    expect(rf.props.edges.find((e) => e.id === "a3k").markerEnd.color).toBe("#1f5fbf");
-    expect(screen.getByTestId("pgd-legend")).toHaveTextContent(/orange number = step.*solid line = request\/response.*blue dashed = trust source \(JWKS or registry read\) or alternate path/);
+    expect(rf.props.edges.find((e) => e.id === "a3k").data.dashed).toBe(true);
+    expect(document.querySelector('[data-edge-head="a3k"]')).toHaveClass("ijx-head--dashed");
+    expect(document.querySelector('[data-edge-head="a4"]')).toBeNull();
+    expect(screen.getByTestId("pgd-legend")).toHaveTextContent(/red number = step.*solid line = request\/response.*blue dashed = trust source \(JWKS or registry read\) or alternate path/);
   });
 });
 
