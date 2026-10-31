@@ -9,7 +9,7 @@
     "mcp-sample"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=26"
   },
   "scripts": {
     "dev": "npm run dev -w server & npm run dev -w web",

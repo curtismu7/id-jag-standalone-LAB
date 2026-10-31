@@ -1,6 +1,8 @@
 // Token decoding and the draft-04 spec checks, shared by the playground (/api/id-jag-playground) and the
 // Inspector (/api/inspect). Pure except the signature check, which a caller can inject.
 
+import { outboundFetch } from './outbound.js';
+
 export const SPEC = 'draft-ietf-oauth-identity-assertion-authz-grant';
 export const OIDC_ONLY = new Set(['openid', 'profile', 'email', 'offline_access', 'phone', 'address']);
 export const scopeList = (s) => String(s || '').split(/\s+/).filter(Boolean);
@@ -21,7 +23,7 @@ export function decodeJwt(token) {
 export async function verifySignature(idJag, h, s) {
   try {
     const { jwtVerify, createLocalJWKSet, importJWK } = await import('jose');
-    const r = await fetch(s.idp.jwksUrl, { signal: AbortSignal.timeout(10000) });
+    const r = await outboundFetch(s.idp.jwksUrl, { signal: AbortSignal.timeout(10000) });
     const data = await r.json();
     let key;
     if (h.x5t) {

@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { PLAYGROUND_DIAGRAMS, edgeStepNumber, firstStepLighting, focusNode } from "../../utils/idJagPlaygroundDiagrams";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { PLAYGROUND_DIAGRAMS, edgeBadges, edgeStepNumber, firstStepLighting, focusNode } from "../../utils/idJagPlaygroundDiagrams";
 
 // jsdom cannot measure nodes, so ReactFlow would draw no edges: stand in a minimal one that renders the
 // page's own node and edge components, so badges, labels, selection and click handling are real.
@@ -63,27 +63,31 @@ const label = (id) => document.querySelector(`[data-edge="${id}"]`);
 const pressed = () => screen.getAllByRole("button", { pressed: true }).map((b) => b.textContent);
 afterEach(() => { window.history.pushState({}, "", "/"); vi.useRealTimers(); });
 
+// pf-as edges by file order: e0 sign-in, e1 code, e2 button presses (steps 2-5), e3 exchange (2, 5), e4 redeem, e5 registry read,
+// e6 JWKS fetch, e7 tools/list, e8 verify, e9 protected page, e10 negative tests.
 describe("numbered arrows", () => {
-  it("every edge badge shows the first step it belongs to, on the overview too", () => {
+  it("every edge badge starts with the first step it belongs to, with a letter when several calls start there", () => {
     open("/diagram/pf-as");
-    for (const e of d.edges) expect(badge(e.id)).toHaveTextContent(String(Math.min(...e.steps)));
-    expect(badge("a2")).toHaveTextContent("2"); // shared by steps 2 and 5: the first
-    expect(badge("abtn")).toHaveTextContent("2"); // ambient button edge, steps 2-5
-    expect(edgeStepNumber(d.edges.find((e) => e.id === "a3"))).toBe(3);
+    const want = edgeBadges(d);
+    for (const e of d.edges) expect(badge(e.id)).toHaveTextContent(want[e.id]);
+    expect(Object.values(want)).toEqual(["1a", "1b", "2a", "2b", "3a", "3b", "3c", "4a", "4b", "4c", "5"]);
+    expect(new Set(Object.values(want)).size).toBe(d.edges.length); // no two badges on a diagram read the same
+    expect(edgeStepNumber(d.edges[3])).toBe(2); // shared by steps 2 and 5: the first
+    expect(edgeStepNumber(d.edges[4])).toBe(3);
   });
 
-  it("a step with several edges shows the same number on each", () => {
+  it("a step with several edges numbers them 3a, 3b, 3c", () => {
     open("/diagram/pf-as?step=3");
-    for (const id of ["a3", "a3r", "a3k"]) expect(badge(id)).toHaveTextContent("3");
+    expect(["e4", "e5", "e6"].map((id) => badge(id).textContent)).toEqual(["3a", "3b", "3c"]);
   });
 
   it("words show only on edges the step lights; the other badges stay numbers only", () => {
     open("/diagram/pf-as?step=3");
-    expect(label("a3")).toHaveTextContent(/RFC 7523 jwt-bearer/);
-    expect(label("a3").textContent.startsWith("3")).toBe(true);
-    expect(label("a3")).not.toHaveTextContent("③"); // the circled digit is the badge now
-    expect(label("a4")).toHaveTextContent(/^4$/);
-    expect(label("a1a")).toHaveTextContent(/^1$/);
+    expect(label("e4")).toHaveTextContent(/RFC 7523 jwt-bearer/);
+    expect(label("e4").textContent.startsWith("3a")).toBe(true);
+    expect(label("e4")).not.toHaveTextContent("\u2462"); // the circled digit is the badge now
+    expect(label("e7")).toHaveTextContent(/^4a$/);
+    expect(label("e0")).toHaveTextContent(/^1a$/);
   });
 
   it("the overview shows numbers only", () => {
@@ -93,17 +97,17 @@ describe("numbered arrows", () => {
 
   it("hovering an unlit edge's badge shows its words, leaving hides them", () => {
     open("/diagram/pf-as?step=3");
-    fireEvent.mouseEnter(label("a4"));
-    expect(label("a4")).toHaveTextContent(/tools\/list/);
-    fireEvent.mouseLeave(label("a4"));
-    expect(label("a4")).toHaveTextContent(/^4$/);
+    fireEvent.mouseEnter(label("e7"));
+    expect(label("e7")).toHaveTextContent(/tools\/list/);
+    fireEvent.mouseLeave(label("e7"));
+    expect(label("e7")).toHaveTextContent(/^4a$/);
   });
 
   it("dashed edges carry the dashed class and the legend explains the notation", () => {
     open("/diagram/pf-as");
-    expect(rf.props.edges.find((e) => e.id === "a3k").data.dashed).toBe(true);
-    expect(document.querySelector('[data-edge-head="a3k"]')).toHaveClass("ijx-head--dashed");
-    expect(document.querySelector('[data-edge-head="a4"]')).toBeNull();
+    expect(rf.props.edges.find((e) => e.id === "e6").data.dashed).toBe(true);
+    expect(document.querySelector('[data-edge-head="e6"]')).toHaveClass("ijx-head--dashed");
+    expect(document.querySelector('[data-edge-head="e7"]')).toBeNull();
     expect(screen.getByTestId("pgd-legend")).toHaveTextContent(/red number = step.*solid line = request\/response.*blue dashed = trust source \(JWKS or registry read\) or alternate path/);
   });
 });
@@ -153,10 +157,14 @@ describe("select and sync", () => {
     expect(firstStepLighting(d, "ras")).toBe(3);
   });
 
-  it("clicking a callout jumps to the step it belongs to", () => {
-    open("/diagram/pf-as");
-    fireEvent.click(screen.getByTestId("node-n-jti"));
-    expect(pressed()).toEqual(["5 · Negative tests"]);
+  it("shows the step's why (the diagram data's step.why) in the panel, on the steps that have one", () => {
+    open("/diagram/pf-as?step=3");
+    expect(screen.getByTestId("pgd-why")).toHaveTextContent(/resource-as trusts PingFederate because the server's registry read/);
+    fireEvent.click(screen.getByRole("button", { name: "Next ▶" }));
+    expect(screen.getByTestId("pgd-why")).toHaveTextContent(/The ID-JAG stops at resource-as/);
+    cleanup();
+    open("/diagram/mock?step=2");
+    expect(screen.queryByTestId("pgd-why")).toBeNull();
   });
 
   it("scrolls the panel to the step detail, and shows a hidden panel", () => {
@@ -185,7 +193,7 @@ describe("select and sync", () => {
     expect(pressed()).toEqual(["3 · Redeem at resource-as"]);
     expect(ringed()).toEqual(["PingFederate · issues the ID-JAG"]);
     next(); // step 4 does not light pf: its focus actor
-    expect(ringed()).toEqual(["Playground server · the OAuth client"]);
+    expect(ringed()).toEqual(["Browser"]); // the first actor step 4 lights
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(ringed()).toEqual([]);
   });
@@ -205,10 +213,56 @@ describe("select and sync", () => {
   });
 });
 
+describe("Reset, speed and simulate", () => {
+  const dropAt = (id, position) => act(() => rf.props.onNodesChange([{ type: "position", id, position }]));
+  const posOf = (id) => rf.props.nodes.find((n) => n.id === id).position;
+
+  it("Reset puts every moved box back where the diagram data places it, shows the overview and fits the view", () => {
+    open("/diagram/pf-as?step=3");
+    const home = { ...posOf("ras") };
+    dropAt("ras", { x: 9, y: 9 });
+    expect(posOf("ras")).toEqual({ x: 9, y: 9 });
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    expect(posOf("ras")).toEqual(home);
+    expect(pressed()).toEqual(["Overview"]);
+    expect(window.location.search).toBe("");
+  });
+
+  it("Reset also stops a running simulation", () => {
+    vi.useFakeTimers();
+    open("/diagram/pf-as");
+    fireEvent.click(screen.getByRole("button", { name: "▶ Simulate" }));
+    expect(pressed()).toEqual(["1 · Sign in at PingFederate"]);
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    act(() => vi.advanceTimersByTime(20000));
+    expect(pressed()).toEqual(["Overview"]);
+  });
+
+  it("the speed control sets the pause between simulated steps: Fast 1.5 s, Normal 3.5 s, Slow 6 s", () => {
+    vi.useFakeTimers();
+    open("/diagram/pf-as");
+    const speed = screen.getByLabelText("Speed");
+    expect([...speed.options].map((o) => o.textContent)).toEqual(["Slow", "Normal", "Fast"]);
+    expect(speed.value).toBe("normal");
+    fireEvent.change(speed, { target: { value: "fast" } });
+    fireEvent.click(screen.getByRole("button", { name: "▶ Simulate" }));
+    expect(pressed()).toEqual(["1 · Sign in at PingFederate"]);
+    act(() => vi.advanceTimersByTime(1400));
+    expect(pressed()).toEqual(["1 · Sign in at PingFederate"]);
+    act(() => vi.advanceTimersByTime(200));
+    expect(pressed()).toEqual(["2 · Get an ID-JAG from PingFederate"]);
+    fireEvent.change(speed, { target: { value: "slow" } });
+    act(() => vi.advanceTimersByTime(5900));
+    expect(pressed()).toEqual(["2 · Get an ID-JAG from PingFederate"]);
+    act(() => vi.advanceTimersByTime(200));
+    expect(pressed()).toEqual(["3 · Redeem at resource-as"]);
+  });
+});
+
 describe("routed arrows", () => {
   const withBoxes = () => {
     const d = PLAYGROUND_DIAGRAMS["pf-as"];
-    rf.lookup = new Map([...d.nodes, ...d.notes].map((n) => [n.id, { id: n.id, internals: { positionAbsolute: { x: n.x, y: n.y } }, measured: { width: 300, height: 120 } }]));
+    rf.lookup = new Map(d.nodes.map((n) => [n.id, { id: n.id, internals: { positionAbsolute: { x: n.x, y: n.y } }, measured: { width: 300, height: 120 } }]));
     return d;
   };
   afterEach(() => { rf.lookup = new Map(); });

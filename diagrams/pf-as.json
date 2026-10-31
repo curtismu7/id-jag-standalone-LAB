@@ -1,0 +1,227 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "pf-as",
+  "title": "PingFederate → resource AS",
+  "lede": "PingFederate is the IdP: it issues a short-lived, single-use ID-JAG from your session. resource-as is the MCP server's authorization server: it trusts PingFederate because this server's registry read lists PF_URL, redeems the ID-JAG and mints its own token. Only that token travels on to mcp-sample and the protected page.",
+  "groups": {
+    "user": {
+      "label": "Person or app",
+      "color": "dark"
+    },
+    "bff": {
+      "label": "This app",
+      "color": "red"
+    },
+    "pf": {
+      "label": "PingFederate or outside IdP",
+      "color": "red"
+    },
+    "as": {
+      "label": "Authorization server",
+      "color": "red"
+    },
+    "rs": {
+      "label": "Resource server",
+      "color": "grey"
+    }
+  },
+  "nodes": [
+    {
+      "id": "browser",
+      "group": "user",
+      "label": "Browser",
+      "sub": [
+        "the playground page · session cookie only",
+        "Clicks each step's button",
+        "Sees decoded claims and redacted requests, never a raw token"
+      ],
+      "x": 0,
+      "y": 300
+    },
+    {
+      "id": "server",
+      "group": "bff",
+      "label": "Playground server · the OAuth client",
+      "sub": [
+        "server/ · /api/id-jag-playground",
+        "Holds every token server-side: refresh token, ID-JAG, access token",
+        "Runs a pre-flight check before each button"
+      ],
+      "x": 520,
+      "y": 300
+    },
+    {
+      "id": "pf",
+      "group": "pf",
+      "label": "PingFederate · issues the ID-JAG",
+      "sub": [
+        "PF_URL · pf.example.invalid",
+        "Sign-in at its own login page (code + PKCE, offline_access)",
+        "Token exchange policy + SP connection with ID-JAG on",
+        "Signs typ oauth-id-jag+jwt · keys at /pf/JWKS (x5t)"
+      ],
+      "x": 1040,
+      "y": 0
+    },
+    {
+      "id": "ras",
+      "group": "as",
+      "label": "resource-as · resource AS",
+      "sub": [
+        "RESOURCE_AS_ISSUER · POST /token",
+        "Trusts an issuer only if its registry read (or TRUSTED_IDPS_FILE) lists it",
+        "Checks typ, signature, aud = its issuer, client_id, jti single-use",
+        "Mints its own at+jwt, aud = the MCP resource"
+      ],
+      "x": 1040,
+      "y": 600
+    },
+    {
+      "id": "mcp",
+      "group": "rs",
+      "label": "mcp-sample · MCP server",
+      "sub": [
+        "MCP_URL · POST /mcp",
+        "Verifies the token against resource-as /jwks: typ, iss, aud, exp",
+        "tools/list shows only what the scope allows"
+      ],
+      "x": 1560,
+      "y": 300
+    },
+    {
+      "id": "profile",
+      "group": "rs",
+      "label": "Protected resource",
+      "sub": [
+        "GET /protected/profile on mcp-sample",
+        "Same bearer validation as the MCP tools",
+        "Says which check failed when it refuses"
+      ],
+      "x": 520,
+      "y": 640
+    },
+    {
+      "id": "registry",
+      "group": "bff",
+      "label": "Trusted IdPs registry",
+      "sub": [
+        "server · /api/id-jag-playground/trusted-idps/registry",
+        "Lists PF_URL once pf-as is configured, plus admin-approved outside IdPs",
+        "Read with Bearer ID_JAG_REGISTRY_TOKEN; no secrets in an entry"
+      ],
+      "x": 520,
+      "y": 1000
+    }
+  ],
+  "edges": [
+    {
+      "source": "browser",
+      "target": "pf",
+      "label": "sign-in dialog → /issuer/pi-flow (pi.flow at PingFederate, code + PKCE, prompt=login)"
+    },
+    {
+      "source": "pf",
+      "target": "server",
+      "label": "code → /issuer/callback · server keeps the refresh token"
+    },
+    {
+      "source": "browser",
+      "target": "server",
+      "label": "POST /api/id-jag-playground/… (cookie only)"
+    },
+    {
+      "source": "server",
+      "target": "pf",
+      "label": "RFC 8693 token exchange · requested_token_type=id-jag · subject=refresh token · audience=RESOURCE_AS_ISSUER"
+    },
+    {
+      "source": "server",
+      "target": "ras",
+      "label": "RFC 7523 jwt-bearer · client_id RESOURCE_AS_CLIENT_ID · scope ⊆ ID-JAG"
+    },
+    {
+      "source": "ras",
+      "target": "registry",
+      "label": "GET /trusted-idps/registry (Bearer ID_JAG_REGISTRY_TOKEN) · lists PF_URL",
+      "dashed": true
+    },
+    {
+      "source": "ras",
+      "target": "pf",
+      "label": "JWKS fetch · PingFederate /pf/JWKS (x5t)",
+      "dashed": true
+    },
+    {
+      "source": "server",
+      "target": "mcp",
+      "label": "tools/list · tools/call (Bearer resource-as token)"
+    },
+    {
+      "source": "mcp",
+      "target": "ras",
+      "label": "verify vs resource-as /jwks",
+      "dashed": true
+    },
+    {
+      "source": "server",
+      "target": "profile",
+      "label": "GET /protected/profile · token | none | raw ID-JAG"
+    },
+    {
+      "source": "server",
+      "target": "ras",
+      "label": "broken assertions: replay · tampered signature · other client · extra scope"
+    }
+  ],
+  "steps": [
+    {
+      "title": "Sign in at PingFederate",
+      "what": "A fresh sign-in at PingFederate's own login page. The server swaps the code for tokens and keeps the refresh token: the ID-JAG is minted from it.",
+      "why": "Custody: the browser never holds a token. The server keeps each one in its session and returns decoded claims and redacted requests only.",
+      "edges": [
+        0,
+        1
+      ]
+    },
+    {
+      "title": "Get an ID-JAG from PingFederate",
+      "what": "RFC 8693 token exchange at PingFederate with requested_token_type=…:id-jag. subject_token is the refresh token, audience is resource-as's issuer, resource is the MCP server. PingFederate returns a JWT typed oauth-id-jag+jwt that lives about 5 minutes; the page checks it against the draft.",
+      "edges": [
+        2,
+        3
+      ]
+    },
+    {
+      "title": "Redeem at resource-as",
+      "what": "RFC 7523 JWT bearer grant at resource-as. It finds PingFederate on the registry it reads from this server, fetches its keys, checks typ, signature, iss, a single aud equal to its issuer, expiry, that client_id is the client redeeming now, and that the jti is unused. It grants at most the ID-JAG's scope and mints its own access token.",
+      "why": "resource-as trusts PingFederate because the server's registry read (Bearer ID_JAG_REGISTRY_TOKEN) lists PF_URL once pf-as is configured. No token set: \"ID-JAG issuer is not trusted\".",
+      "edges": [
+        2,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "title": "Call mcp-sample",
+      "what": "tools/list and tools/call go straight to mcp-sample with resource-as's token. mcp-sample verifies it against resource-as's JWKS (typ at+jwt, iss, aud, exp) and lists only what the scope allows. Its /protected/profile takes the same token and must refuse no token and the raw ID-JAG.",
+      "why": "The ID-JAG stops at resource-as. The MCP call and the protected page carry resource-as's own token; the raw ID-JAG must be refused there.",
+      "edges": [
+        2,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "title": "Negative tests",
+      "what": "Each test mints a fresh ID-JAG, breaks one thing (replay, signature, client, scope) and expects an OAuth error with no token.",
+      "why": "Each test mints a fresh ID-JAG (② again), breaks one thing and expects an OAuth error with no token. Replay is refused because resource-as keeps jti single-use.",
+      "edges": [
+        2,
+        3,
+        10
+      ]
+    }
+  ]
+}

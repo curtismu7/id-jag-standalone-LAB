@@ -1,18 +1,18 @@
 {
   "id": "S11",
-  "title": "{{lena}} reads shared data from {{vocab.partnerShort}}",
+  "title": "{{cast.lena}} reads shared data from {{vocab.partnerShort}}",
   "modes": ["byo"],
   "demos": ["C1"],
-  "goal": "{{lena}} works at {{vocab.partner}}. Their agent needs to read {{vocab.resource}} that we host, without a second account or a shared password.",
-  "obstacle": "Two companies, two identity providers. We must take {{vocab.partnerShort}}'s word about who {{lena}} is, but only for what we choose to allow.",
+  "goal": "{{cast.lena}} works at {{vocab.partner}}. Their agent needs to read {{vocab.resource}} that we host, without a second account or a shared password.",
+  "obstacle": "Two companies, two identity providers. We must take {{vocab.partnerShort}}'s word about who {{cast.lena}} is, but only for what we choose to allow.",
   "control": "ID-JAG: the partner's IdP issues an Identity Assertion JWT Authorization Grant addressed to our authorization server, which redeems it for its own access token.",
-  "say": "No shared passwords, no duplicate accounts, and we still decide what {{lena}}'s agent can read.",
+  "say": "No shared passwords, no duplicate accounts, and we still decide what {{cast.lena}}'s agent can read.",
   "steps": [
     {
       "n": 1,
       "title": "Bring in the partner's ID-JAG",
-      "tell": "{{vocab.partnerShort}}'s IdP has already signed {{lena}} in and issued an ID-JAG for our authorization server. Here you paste it, or fetch one from xaa.dev's free IdP.",
-      "say": "The partner vouches for {{lena}}. We create no account for them.",
+      "tell": "{{vocab.partnerShort}}'s IdP has already signed {{cast.lena}} in and issued an ID-JAG for our authorization server. Here you paste it, or fetch one from xaa.dev's free IdP.",
+      "say": "The partner vouches for {{cast.lena}}. We create no account for them.",
       "why": "Identity travels from the company that actually knows the person."
     },
     {
@@ -40,7 +40,7 @@
     {
       "n": 4,
       "title": "The agent calls {{vocab.resourceTool}}",
-      "tell": "{{lena}}'s agent calls {{vocab.resourceTool}} with the new access token. The server checks it against our authorization server's keys, so only what the token allows is listed.",
+      "tell": "{{cast.lena}}'s agent calls {{vocab.resourceTool}} with the new access token. The server checks it against our authorization server's keys, so only what the token allows is listed.",
       "say": "The agent sees only what its token says, nothing the partner can widen.",
       "why": "The resource owner decides, not the partner.",
       "blocked": {
@@ -57,7 +57,7 @@
     }
   ],
   "proof": {
-    "happy": "The decoded access token: subject {{lena}}, scope limited to what was granted, issued by our authorization server.",
+    "happy": "The decoded access token: subject {{cast.lena}}, scope limited to what was granted, issued by our authorization server.",
     "blocked": "The refusal: an OAuth error that names the failed check, and no token."
   }
 }

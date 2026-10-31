@@ -9,6 +9,8 @@
 
 import express from 'express';
 import { config } from '../config.js';
+import { mockSigninProblem } from '../mockSignin.js';
+import { outboundFetch } from '../outbound.js';
 import { authorizeRequest, discover, missingConfig, oidcConfig, sameOrigin } from './oidc.js';
 
 const FLOW_ID = /^[A-Za-z0-9_-]{6,64}$/;
@@ -48,7 +50,7 @@ export function piFlowHandlers({ kind, key, redirectUri, prepare }) {
     let body;
     const jar = {};
     try {
-      const r = await fetch(p.url.toString(), { headers: { Accept: 'application/json' }, redirect: 'manual', signal: AbortSignal.timeout(10000) });
+      const r = await outboundFetch(p.url.toString(), { headers: { Accept: 'application/json' }, redirect: 'manual', signal: AbortSignal.timeout(10000) });
       mergeCookies(jar, r);
       const data = r.status === 200 ? await r.json().catch(() => null) : null;
       if (typeof data?.id === 'string' && FLOW_ID.test(data.id) && data.status === 'USERNAME_PASSWORD_REQUIRED') body = data;
@@ -79,7 +81,7 @@ export function piFlowHandlers({ kind, key, redirectUri, prepare }) {
     let r;
     let data;
     try {
-      r = await fetch(`${f.origin}/pf-ws/authn/flows/${f.flowId}`, {
+      r = await outboundFetch(`${f.origin}/pf-ws/authn/flows/${f.flowId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/vnd.pingidentity.checkUsernamePassword+json', Accept: 'application/json',
@@ -125,6 +127,8 @@ export const appHandlers = piFlowHandlers({
   key: 'oidcLogin',
   redirectUri: () => oidcConfig().redirectUri,
   async prepare(req) {
+    const blocked = mockSigninProblem(req);
+    if (blocked) return { fail: [blocked.status, { error: blocked.error, message: blocked.message }] };
     const c = oidcConfig();
     if (missingConfig(c).length) return { fail: [503, { error: 'not_configured' }] };
     if (c.issuer.replace(/\/$/, '') !== config().pfUrl) return { fail: [409, { error: 'pi_flow_unavailable' }] };

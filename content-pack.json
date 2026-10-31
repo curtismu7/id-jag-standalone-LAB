@@ -547,7 +547,7 @@
     },
     {
       "id": "flow-mock",
-      "label": "Mock diagram",
+      "label": "Sample data (browser) diagram",
       "href": "/diagram/mock",
       "mode": "mock"
     },

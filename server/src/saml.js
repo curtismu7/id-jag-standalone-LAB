@@ -9,11 +9,12 @@ import { randomUUID } from 'node:crypto';
 import { DOMParser } from '@xmldom/xmldom';
 import { SignedXml } from 'xml-crypto';
 import { config, secret } from './config.js';
+import { isMock, runtimeEnv } from './mode.js';
 
 const SAML_NS = 'urn:oasis:names:tc:SAML:2.0:assertion';
 const DS_NS = 'http://www.w3.org/2000/09/xmldsig#';
 const ASSERTION = "//*[local-name(.)='Assertion']";
-const env = (k, fallback = '') => String(process.env[k] ?? '').trim() || fallback;
+const env = (k, fallback = '') => String(runtimeEnv()[k] ?? '').trim() || fallback;
 
 export function samlSettings() {
   return {
@@ -39,7 +40,7 @@ export const samlClientProblem = () => (secret('PF_SAML_CLIENT_SECRET') ? null
   : 'SAML needs PF_SAML_CLIENT_SECRET (written to .env by pingfederate/configure-saml.js), then restart the server.');
 
 /** null when this server can sign and exchange, else why not. */
-export const samlUnavailableReason = () => samlFilesProblem() || samlClientProblem();
+export const samlUnavailableReason = () => (isMock() ? 'SAML needs a real PingFederate to trade the assertion; the mock does not simulate it. Switch to Live.' : samlFilesProblem() || samlClientProblem());
 
 /** The signer certificate as PEM: the CERTIFICATE block only, whatever else the file holds. */
 export function signerCertPem() {

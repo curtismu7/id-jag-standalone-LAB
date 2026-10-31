@@ -1,5 +1,6 @@
 // GET /api/health, contract demo-health/1: the one public, coarse answer a launcher (the SE demo shelf) polls.
-//   { schema:'demo-health/1', at, state:'ready'|'needs-setup'|'broken'|'unknown', runtime:'offline'|'live', demo:{id,name,version} }
+//   { schema:'demo-health/1', at, state:'ready'|'needs-setup'|'broken'|'unknown', runtime:'offline'|'live', mode:'mock'|'live', demo:{id,name,version} }
+// mode is the app's Mock/Live setting (mode.js), read per request, so a switch shows at once; state follows within one doctor run.
 // No counts, no message text, no secrets, no per-check detail: that stays on the admin-only /api/doctor.
 // State comes from the doctor, run once at boot and refreshed in the background at most every 60 s with a hard
 // timeout. A request never runs the doctor; before the first run finishes the answer is 'unknown'.
@@ -15,6 +16,7 @@
 import fs from 'node:fs';
 import express from 'express';
 import { runDoctor } from './doctor.js';
+import { currentMode, isMock, runtimeEnv } from './mode.js';
 import { DEFAULT_WORKSPACE, runInWorkspace } from './workspace.js';
 
 const REFRESH_MS = 60_000;
@@ -23,11 +25,11 @@ const RATE_PER_MIN = 60;
 const pkg = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 const DEMO = { id: 'id-jag', name: 'ID-JAG Standalone', version: pkg.version || '0.0.0' };
 
-const val = (k) => String(process.env[k] ?? '').trim();
+const val = (k) => String(runtimeEnv()[k] ?? '').trim();
 const pfAdminSet = () => Boolean(val('PF_ADMIN_URL') || val('PF_ADMIN_PASSWORD'));
 /** Mock unless the environment points at a real PingFederate (HEALTH_MODE overrides: mock|pf-as|pf-pf|byo). */
-export const healthMode = () => val('HEALTH_MODE') || (val('PF_EXCHANGE_CLIENT_ID') || pfAdminSet() ? 'pf-as' : 'mock');
-export const runtimeOf = (mode = healthMode()) => (mode === 'mock' && !pfAdminSet() ? 'offline' : 'live');
+export const healthMode = () => (isMock() ? 'mock' : val('HEALTH_MODE') || (val('PF_EXCHANGE_CLIENT_ID') || pfAdminSet() ? 'pf-as' : 'mock'));
+export const runtimeOf = (mode = healthMode()) => (isMock() || (mode === 'mock' && !pfAdminSet()) ? 'offline' : 'live');
 
 let last = { state: 'unknown', at: null };
 let inflight = null;
@@ -70,6 +72,6 @@ router.all('/', (req, res) => {
   res.set('Cache-Control', 'no-store');
   if (req.method !== 'GET') return res.set('Allow', 'GET').status(405).json({ error: 'method_not_allowed' });
   if (limited(req.ip)) return res.status(429).json({ error: 'rate_limited' });
-  res.json({ schema: 'demo-health/1', at: last.at || new Date().toISOString(), state: last.state, runtime: runtimeOf(), demo: DEMO });
+  res.json({ schema: 'demo-health/1', at: last.at || new Date().toISOString(), state: last.state, runtime: runtimeOf(), mode: currentMode(), demo: DEMO });
 });
 export default router;

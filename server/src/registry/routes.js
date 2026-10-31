@@ -13,6 +13,7 @@
 import crypto from 'node:crypto';
 import express from 'express';
 import { config } from '../config.js';
+import { runtimeEnv } from '../mode.js';
 import { requireAdmin, requireUser, sameOrigin } from '../auth/oidc.js';
 import { withPfAsIssuer } from '../idJagPlayground.js';
 import * as store from '../trustedIdps.js';
@@ -25,7 +26,7 @@ router.use(sameOrigin); // every write is same-origin only (CSRF)
 
 /** Server-to-server reads carry no session: they need the shared ID_JAG_REGISTRY_TOKEN. Unset = refuse (503). */
 function registryAuth(req, res, next) {
-  const expected = process.env.ID_JAG_REGISTRY_TOKEN;
+  const expected = runtimeEnv().ID_JAG_REGISTRY_TOKEN;
   if (!expected) {
     console.error(`[${config().slug}] ID_JAG_REGISTRY_TOKEN is not set; refusing trusted-IdP registry reads`);
     return res.status(503).json({ error: 'registry_auth_unconfigured' });

@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import AppShell from "../../AppShell";
 import StoryPanel from "../../story/StoryPanel";
 
@@ -126,7 +126,7 @@ describe("step counter", () => {
     expect(scroll).toHaveBeenLastCalledWith({ behavior: "smooth", block: "start" });
     expect(document.getElementById("ijp-step-2").closest("section")).toHaveAttribute("data-step-active");
     expect(document.getElementById("ijp-step-1").closest("section")).not.toHaveAttribute("data-step-active");
-    expect(screen.getByRole("status")).toHaveTextContent("Step 2 of 3: Step title 2");
+    expect(within(screen.getByRole("toolbar", { name: "Presenter controls" })).getByRole("status")).toHaveTextContent("Step 2 of 3: Step title 2"); // the mode banner is a status too
   });
 
   it("arrow keys move, but not inside a field and not when presenting is off", async () => {

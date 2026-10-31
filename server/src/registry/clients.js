@@ -5,9 +5,12 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { isMock } from '../mode.js';
+import * as mockClients from '../mock/clients.js';
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const file = () => String(process.env.RESOURCE_AS_CLIENTS_FILE || '').trim();
+// Mock mode keeps the clients in the mock resource AS (in memory), never in the live CLIENTS_FILE.
 
 function read(f) {
   let parsed;
@@ -29,6 +32,7 @@ function write(f, clients) {
 
 /** Create or replace a client with a fresh random secret. Returns the secret: show it once, store it nowhere. */
 export function setClient(clientId, scope) {
+  if (isMock()) return mockClients.setClient(clientId, scope);
   const f = file();
   if (!f) throw fail(409, 'RESOURCE_AS_CLIENTS_FILE is not set: this server cannot provision clients at the resource AS');
   const secret = crypto.randomBytes(32).toString('base64url');
@@ -38,6 +42,7 @@ export function setClient(clientId, scope) {
 }
 
 export function removeClient(clientId) {
+  if (isMock()) return mockClients.removeClient(clientId);
   const f = file();
   if (!f) return;
   const all = read(f);

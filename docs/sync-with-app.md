@@ -50,7 +50,7 @@ As of 2026-10-19. "Shared" = vendored above. Anything marked differs is on purpo
 | Run report download | yes | yes | `runReport.js` is shared |
 | Real-client panel (mcpc, VS Code) | yes (setup guides + step 1) | step 1, localhost only, points at the kit | Setup text shared |
 | Learn (glossary, sources) | yes | yes | Data shared |
-| Per-mode diagrams | yes | yes | Data files are separate and have drifted (**gap**); the app's is the older source |
+| Per-mode diagrams | yes | yes | Here the diagrams are diagram-studio/1 data files in `diagrams/`; the app still holds its own hand-built copy (**gap**) |
 | Trusted IdPs registry | yes (own page) | yes (panel) | |
 | Modes | pf-as, pf-pf (Acme, pi.flow sign-in at Acme), byo, mock | oauth-mcp, pf-pf, byo, mock | different backends |
 
