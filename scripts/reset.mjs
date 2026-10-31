@@ -3,14 +3,14 @@
 // A running server's web sessions live in its memory: they end when it restarts, or use POST /api/admin/reset instead.
 // Both app modes: it clears the current mode's data (live DATA_DIR, or DATA_DIR/mock); the saved Mock/Live choice is kept.
 import { fileURLToPath } from 'node:url';
-import { currentMode, isMock, loadSharedMode } from '../server/src/mode.js';
+import { currentMode, isMock } from '../server/src/mode.js';
 import { removeUserForReset as removeUser } from '../server/src/idp/index.js';
 import { removeClient } from '../server/src/registry/clients.js';
 import { reset } from '../server/src/reset.js';
+import { loadSettings } from '../server/src/settings.js';
 import { DEFAULT_WORKSPACE, dataDir } from '../server/src/workspace.js';
 
-try { process.loadEnvFile(fileURLToPath(new URL('../.env', import.meta.url))); } catch { /* no .env */ }
-loadSharedMode(); // MODE from the shared settings file, like the server
+loadSettings({ repoEnv: fileURLToPath(new URL('../.env', import.meta.url)) });
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
