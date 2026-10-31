@@ -7,6 +7,7 @@ import { buildReport, downloadFile } from "../utils/runReport";
 import { signIn as signInApp, signInIssuer } from "../utils/signIn";
 import { codeSnippet } from "../utils/codeSnippet";
 import InteropPanel from "./InteropPanel";
+import GatewayRedeemPanel from "./GatewayRedeemPanel";
 import { mcpcCommand, vscodeMcpJson, vscodeSettings } from "../utils/realClients";
 import terms from "../data/terms.json";
 import StoryPanel from "../story/StoryPanel";
@@ -27,6 +28,7 @@ const MODES = [
   { id: "pf-as", label: "PingFederate → resource AS" },
   { id: "pf-pf", label: "Acme PingFederate → PingFederate" },
   { id: "byo", label: "Your IdP → our resource AS" },
+  { id: "gateway-redeem", label: "Gateway redeems the ID-JAG (mock only)" },
 ];
 const BYO_TARGETS = [{ id: "resource-as", label: "Resource AS" }, { id: "pingfederate", label: "PingFederate" }];
 const VIEWS = [{ id: "form", label: "Form" }, { id: "json", label: "JSON" }];
@@ -82,6 +84,9 @@ const MODE_TEXT = {
     asRole: "Trusts your IdP's keys, redeems the ID-JAG, mints its own token",
     mcpRole: "mcp-sample: trusts the token our resource AS mints",
     call: "The ID-JAG stops at our authorization server. The MCP call carries the access token it minted; mcp-sample verifies it against the resource AS's keys.",
+  },
+  "gateway-redeem": {
+    story: "Ping release claim (2026-11-02), unverified on our tenant. The Privilege MCP gateway, configured with an On-Behalf-Of spec, exchanges the caller's token for an ID-JAG (leg 1) and, when a Redeem spec with a TokenURL is set, redeems it at the target app's own issuer (leg 2), so the target app sees the user and no one shares a credential. Everything here runs against mocks inside this app; Live is not available for this mode.",
   },
   mock: {
     story: "Mary signs in once at the company's PingFederate, and the agent then reads Mary's data from the sample MCP server without a second sign-in. In this mode every step uses sample data and nothing is sent.",
@@ -566,6 +571,7 @@ export default function IdJagPlaygroundPage() {
 
   const isMock = mode === "mock";
   const isByo = mode === "byo";
+  const isGateway = mode === "gateway-redeem"; // its own panel replaces the six steps (GatewayRedeemPanel)
   // SAML is real only in pf-as when the server can sign assertions; mock always has it. Anywhere else the run is OIDC.
   const samlReady = mode === "pf-as" && !!config?.saml?.available;
   const saml = protocol === "saml" && (isMock || samlReady);
@@ -856,19 +862,27 @@ export default function IdJagPlaygroundPage() {
         <div className="ijp-toolbar">
           <div className="ijp-toolbar__group"><span>Mode</span><Segmented label="Playground mode" options={modeOptions} value={mode} onPick={pickMode} disabled={!!busy} />
             <DiagramLink mode={mode}>View {PLAYGROUND_DIAGRAMS[mode].label} diagram ↗</DiagramLink></div>
-          <div className="ijp-toolbar__group"><span>Sign-in</span><Segmented label="Sign-in protocol" value={saml ? "saml" : "oidc"} onPick={pickProtocol} disabled={!!busy}
-            options={PROTOCOLS.map((p) => (p.id === "saml" && !isMock && !samlReady ? { ...p, disabled: true, title: samlTitle } : p))} /></div>
-          <div className="ijp-toolbar__group"><span>View</span><Segmented label="Data view" options={VIEWS} value={view} onPick={pickView} /></div>
-          <div className="ijp-toolbar__group">
+          {!isGateway && <div className="ijp-toolbar__group"><span>Sign-in</span><Segmented label="Sign-in protocol" value={saml ? "saml" : "oidc"} onPick={pickProtocol} disabled={!!busy}
+            options={PROTOCOLS.map((p) => (p.id === "saml" && !isMock && !samlReady ? { ...p, disabled: true, title: samlTitle } : p))} /></div>}
+          {!isGateway && <div className="ijp-toolbar__group"><span>View</span><Segmented label="Data view" options={VIEWS} value={view} onPick={pickView} /></div>}
+          {!isGateway && <div className="ijp-toolbar__group">
             <button type="button" className="ijp-btn" onClick={startOver} disabled={!!busy || !hasResults} data-testid="ijp-start-over"
               title="Clear every result below and start again from step 2. Your sign-in stays.">Start over</button>
-          </div>
-          <div className="ijp-toolbar__group" data-admin-only=""><span>Report</span>
+          </div>}
+          {!isGateway && <div className="ijp-toolbar__group" data-admin-only=""><span>Report</span>
             <button type="button" className="ijp-btn" onClick={() => downloadReport("md")}>Download report</button>
             <button type="button" className="ijp-btn" onClick={() => downloadReport("json")}>Download JSON</button>
-          </div>
+          </div>}
         </div>
         {gateAt("mode")}
+        {isGateway ? (
+          <>
+            <p className="ijp-story" data-testid="ijp-story"><strong>The story.</strong> {text.story}</p>
+            <StoryPanel mode={mode} />
+            {error && <ErrorNote e={error} resource={config?.request?.resource} saml={saml} />}
+            <GatewayRedeemPanel />
+          </>
+        ) : (<>
         {isMock && <p className="ijp-mock-badge" role="status" data-testid="ijp-mock-badge">Sample data: nothing is sent</p>}
         {config && <BackendsStrip client={client} mode={isMock ? "mock" : config.mode || mode} />}
         {config && !isMock && (config.mode || mode) === "pf-as" && <InteropPanel client={client} base={API} />}
@@ -1156,6 +1170,7 @@ export default function IdJagPlaygroundPage() {
             <a href="https://developer.okta.com/blog/2026/01/20/xaa-dev-playground" target="_blank" rel="noopener noreferrer">xaa.dev</a>.
           </p>
         </section>
+        </>)}
       </main>
     </ViewContext.Provider>
   );

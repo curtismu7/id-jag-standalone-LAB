@@ -1,0 +1,67 @@
+{
+  "id": "S48",
+  "title": "{{cast.mark}}'s agent reaches {{vocab.resource}} through the gateway, as {{cast.mark}}",
+  "modes": [
+    "gateway-redeem"
+  ],
+  "demos": [
+    "C1"
+  ],
+  "goal": "{{cast.mark}}'s agent needs to read {{vocab.resource}} in an app that has its own sign-in server, on {{cast.mark}}'s behalf, without a shared service credential and without handing the agent {{cast.mark}}'s own token.",
+  "obstacle": "The app accepts only tokens its own issuer minted. A shared service account would hide who acted, and {{cast.mark}}'s caller token is not the app's to accept.",
+  "control": "Ping release claim (2026-11-02), unverified on our tenant: the Privilege MCP gateway, configured with an On-Behalf-Of spec, exchanges {{cast.mark}}'s token for an ID-JAG (leg 1) and, when a Redeem spec with a TokenURL is set, redeems it at the app's own issuer (leg 2). Shown here with in-process mocks.",
+  "say": "This is a release claim we have not measured on our tenant. The mock shows the shape: the app sees {{cast.mark}}, and no one shares a credential.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "The agent calls the gateway with {{cast.mark}}'s caller token",
+      "tell": "The company IdP signed {{cast.mark}} in and issued a caller token for the gateway. The gateway checks it before anything else.",
+      "say": "The token is for the gateway only. The app never sees it.",
+      "why": "A token has one audience."
+    },
+    {
+      "n": 2,
+      "title": "Leg 1: exchange it for an ID-JAG",
+      "tell": "The gateway exchanges the caller token at the exchange issuer (RFC 8693). The result is an ID-JAG addressed to the app's issuer (OBO.Resource), with {{cast.mark}} as sub and the calling client in act.",
+      "say": "The assertion names {{cast.mark}} and says who is acting for them.",
+      "why": "Delegation is in the token, not in a shared account.",
+      "blocked": {
+        "tell": "Point OBO.TokenURL at the partner issuer. It exchanges fine, but the app does not trust it, so leg 2 refuses the assertion.",
+        "say": "An assertion from an issuer the app does not trust is worthless."
+      }
+    },
+    {
+      "n": 3,
+      "title": "Leg 2: redeem it at the app's own issuer",
+      "tell": "Only because Redeem.TokenURL is set, the gateway redeems the ID-JAG at the app's issuer (RFC 7523). The app's issuer checks signature, audience, expiry, client and a single-use jti, and mints its own access token for {{cast.mark}}.",
+      "say": "The app's own issuer decides, and it mints its own token.",
+      "why": "Without a Redeem TokenURL the exchange result is not redeemed at all.",
+      "blocked": {
+        "tell": "Run the replay scenario, or change the audience, or let the assertion expire. Each is refused at leg 2 with the check that failed, and no token is issued.",
+        "say": "Expired, replayed, tampered or misaddressed: no token."
+      }
+    },
+    {
+      "n": 4,
+      "title": "The app's API sees {{cast.mark}}",
+      "tell": "The gateway calls the API with the redeemed token. The API verifies it against its own issuer's keys and answers with {{cast.mark}} as the principal.",
+      "say": "The app logs {{cast.mark}}, not a service account.",
+      "why": "Attribution survives the hop.",
+      "blocked": {
+        "tell": "Clear the Redeem TokenURL. The unredeemed assertion goes to the API, which refuses it as not an access token.",
+        "say": "A grant is not a key, and the API says so."
+      }
+    },
+    {
+      "n": 5,
+      "title": "What the API refuses",
+      "tell": "The caller's original token is refused (it was not minted by the app's issuer), and so is the raw ID-JAG. Each refusal names the check, from a real request.",
+      "say": "We show the refusals, not just the happy path.",
+      "why": "A grant you cannot refuse is not a control."
+    }
+  ],
+  "proof": {
+    "happy": "The API's principal is {{cast.mark}}, the access token is issued by the app's own issuer for the API, and the caller's original token is refused.",
+    "blocked": "Each of the ten scenarios shows its own refusal at the stage and check that refused it, with no token issued."
+  }
+}
