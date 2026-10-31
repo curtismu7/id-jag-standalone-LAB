@@ -6,9 +6,11 @@
 import dns from 'node:dns';
 import https from 'node:https';
 import net from 'node:net';
+import { isMock, runtimeEnv } from '../mode.js';
+import { outboundFetch } from '../outbound.js';
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
-const allowPrivate = () => process.env.ALLOW_PRIVATE_ISSUERS === 'true';
+const allowPrivate = () => runtimeEnv().ALLOW_PRIVATE_ISSUERS === 'true';
 
 // One list per family: a BlockList checks IPv4 against IPv4-mapped IPv6 rules too, so ::ffff:0:0/96
 // in a shared list would block every IPv4 address.
@@ -53,8 +55,22 @@ export function guardedLookup(resolve = dns.lookup) {
   });
 }
 
+/** Mock mode: the same GET through the netguard, so only the mock world answers and anything else is refused (and counted). */
+async function getJsonMock(url, { timeoutMs, maxBytes }) {
+  publicHttpsUrl(url, 'URL');
+  let res;
+  try { res = await outboundFetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(timeoutMs) }); } catch (err) {
+    throw fail(502, err.code === 'NETGUARD_REFUSED' ? `${url}: ${err.message}` : `${url}: no answer`);
+  }
+  if (res.status !== 200) throw fail(502, `${url} answered HTTP ${res.status}`);
+  const text = await res.text();
+  if (text.length > maxBytes) throw fail(502, `${url} sent more than ${maxBytes} bytes`);
+  try { return JSON.parse(text); } catch { throw fail(502, `${url} did not answer JSON`); }
+}
+
 /** GET a JSON document from a public https URL. */
 export function getJson(url, { timeoutMs = 4000, maxBytes = 512 * 1024 } = {}) {
+  if (isMock()) return getJsonMock(url, { timeoutMs, maxBytes });
   return new Promise((resolve, reject) => {
     try { publicHttpsUrl(url, 'URL'); } catch (err) { return reject(err); }
     const req = https.get(url, { lookup: guardedLookup(), signal: AbortSignal.timeout(timeoutMs), headers: { accept: 'application/json' } }, (res) => {

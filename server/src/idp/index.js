@@ -1,5 +1,6 @@
 // IdP adapter registry. pf-local registers itself here; local-mock joins in a later step.
 import { demoJson } from '../demoJson.js';
+import { runtimeEnv } from '../mode.js';
 import { validateAdapter } from './contract.js';
 import pfLocal from './pf-local.js';
 
@@ -18,7 +19,7 @@ export function getAdapter(id) {
 }
 
 /** The adapter for this process: IDP, else the first sign-in IdP demo.json declares. */
-export const activeAdapter = (env = process.env) => getAdapter(String(env.IDP ?? '').trim() || demoJson().provider.signIn[0]);
+export const activeAdapter = (env = runtimeEnv()) => getAdapter(String(env.IDP ?? '').trim() || demoJson().provider.signIn[0]);
 
 /** Reset's removal hook: true when removed, false when absent; throws {lastUser} for a user kept as the last one. */
 export async function removeUserForReset(email) {
