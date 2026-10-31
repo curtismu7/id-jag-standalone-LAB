@@ -17,6 +17,7 @@
     "reset": "node scripts/reset.mjs",
     "doctor": "node scripts/doctor.mjs",
     "build": "npm run build -w web",
+    "prestart": "node scripts/shelf-register.mjs",
     "start": "npm start -w server",
     "prepare": "git config core.hooksPath .githooks || true",
     "setup": "node scripts/setup.mjs",
