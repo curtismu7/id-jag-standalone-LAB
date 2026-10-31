@@ -1,0 +1,23 @@
+/* Lives inside .ijp, so it uses that page's tokens (--ijp-*, --th-*). */
+.story { margin: 0 0 1rem; padding: 0.9rem 1.1rem; border: 1px solid var(--th-border); border-left: 5px solid var(--ijp-red); border-radius: 10px; background: var(--th-bg-card); }
+.story__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.story__eyebrow { margin: 0; font-size: var(--font-size-2xs); font-weight: 600; letter-spacing: 0.06em; color: var(--ijp-red-text); }
+.story__title { margin: 0.15rem 0 0; font-size: 1.1rem; }
+.story__controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; margin: 0.6rem 0; }
+.story__field { display: flex; align-items: center; gap: 0.5rem; font-size: var(--font-size-xs); color: var(--th-text-muted); }
+.story__field select { font: inherit; padding: 0.3rem 0.5rem; border: 1px solid var(--th-border); border-radius: 6px; background: var(--th-bg); color: var(--th-text); }
+.story__summary { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.75rem; margin: 0.5rem 0; font-size: var(--font-size-xs); }
+.story__summary dt { font-weight: 600; color: var(--th-text-muted); }
+.story__summary dd { margin: 0; }
+.story__steps { list-style: none; margin: 0.5rem 0; padding: 0; display: grid; gap: 0.25rem; }
+.story__step { display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left; font: inherit; padding: 0.4rem 0.6rem; border: 1px solid var(--th-border); border-radius: 6px; background: var(--th-bg); color: var(--th-text); cursor: pointer; }
+.story__step:focus-visible { outline: 2px solid var(--ijp-red); outline-offset: 2px; }
+.is-current > .story__step { border-color: var(--ijp-red); font-weight: 600; }
+.story__n { display: inline-grid; place-items: center; min-width: 1.4rem; height: 1.4rem; border-radius: 999px; background: var(--ijp-grad); color: var(--brand-on, #fff); font-size: var(--font-size-2xs); }
+.story__tag { margin-left: auto; padding: 0.05rem 0.5rem; border-radius: 999px; border: 1px solid var(--ijp-warn); color: var(--ijp-warn); font-size: var(--font-size-2xs); font-weight: 600; }
+.story__body { margin: 0.4rem 0 0.4rem 2rem; font-size: var(--font-size-xs); }
+.story__body p { margin: 0.3rem 0; }
+.story__say { padding: 0.4rem 0.7rem; border-left: 4px solid var(--ijp-red); background: rgba(210, 14, 15, 0.06); border-radius: 0 6px 6px 0; }
+.story__why { color: var(--th-text-muted); }
+.story__proof { margin: 0.5rem 0 0; font-size: var(--font-size-xs); }
+.story__takeaway { margin: 0.4rem 0 0; font-weight: 600; }

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.env.bak.*
+*.local
+certs/
+.data/
+deploy/local/
+customer.config.json

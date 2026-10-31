@@ -1,0 +1,75 @@
+# The playground (web + server), our resource AS (resource-as) and the sample MCP server (mcp-sample):
+#   HOST_PORT=4720 docker compose -f deploy/docker-compose.yml up --build -d   ->  http://localhost:4720
+#
+# Secrets and PingFederate settings come from ../.env (optional; copy .env.example). The addresses
+# the three services use to find each other are set here instead, from the host ports below, so
+# they always agree. Override one by exporting it in the shell (RESOURCE_AS_ISSUER=… docker compose …);
+# a value for it in ../.env applies to npm runs only.
+#   HOST_PORT      4720  playground (4720 is often taken)
+#   AS_HOST_PORT   4721  resource-as: issuer http://localhost:4721, /token, /jwks
+#   MCP_HOST_PORT  4722  mcp-sample:  resource http://localhost:4722/mcp, /protected/profile
+name: id-jag-standalone
+
+x-addresses:
+  as-issuer: &as-issuer ${RESOURCE_AS_ISSUER:-http://localhost:${AS_HOST_PORT:-4721}}
+  mcp-resource: &mcp-resource ${ID_JAG_RESOURCE:-http://localhost:${MCP_HOST_PORT:-4722}/mcp}
+x-env-file: &env-file
+  - path: ../.env
+    required: false
+
+services:
+  id-jag:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "${HOST_PORT:-4720}:4720"
+    env_file: *env-file
+    environment:
+      PORT: "4720"
+      DATA_DIR: /data
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:${HOST_PORT:-4720}}
+      RESOURCE_AS_ISSUER: *as-issuer
+      RESOURCE_AS_TOKEN_ENDPOINT: http://resource-as:9080/token
+      ID_JAG_RESOURCE: *mcp-resource
+      MCP_URL: http://mcp-sample:9090/mcp
+    volumes:
+      - id-jag-data:/data
+
+  resource-as:
+    build:
+      context: ..
+      dockerfile: deploy/service.Dockerfile
+      args:
+        SERVICE: resource-as
+    ports:
+      - "${AS_HOST_PORT:-4721}:9080"
+    # ponytail: gets the whole ../.env; it needs only RESOURCE_AS_CLIENT_ID/_SECRET and ID_JAG_REGISTRY_TOKEN.
+    env_file: *env-file
+    environment:
+      PORT: "9080"
+      DATA_DIR: /data
+      ISSUER: *as-issuer
+      ACCEPTED_RESOURCES: *mcp-resource
+      # Whom to trust: the playground's Trusted IdPs registry (plus PF_URL once pf-as is configured).
+      TRUSTED_IDPS_REGISTRY_URL: http://id-jag:4720/api/id-jag-playground/trusted-idps/registry
+    volumes:
+      - resource-as-data:/data
+
+  mcp-sample:
+    build:
+      context: ..
+      dockerfile: deploy/service.Dockerfile
+      args:
+        SERVICE: mcp-sample
+    ports:
+      - "${MCP_HOST_PORT:-4722}:9090"
+    environment:
+      PORT: "9090"
+      AS_ISSUER: *as-issuer
+      AS_JWKS_URL: http://resource-as:9080/jwks
+      MCP_RESOURCE: *mcp-resource
+
+volumes:
+  id-jag-data:
+  resource-as-data:

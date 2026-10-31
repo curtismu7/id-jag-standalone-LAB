@@ -1,0 +1,70 @@
+{
+  "id": "S11b",
+  "title": "{{lena}}'s company runs its own PingFederate",
+  "modes": ["pf-pf"],
+  "demos": ["C1"],
+  "goal": "{{lena}} works at {{vocab.partner}}, which runs its own PingFederate. {{lena}}'s agent needs to reach {{vocab.resource}} that we host, on the strength of that company's sign-in.",
+  "obstacle": "Two companies, each with a PingFederate, and an IdP must not redeem its own ID-JAG (draft section 9.3). So the partner's PingFederate issues the grant and ours redeems it, and the resource still decides which tokens it trusts.",
+  "control": "ID-JAG across two PingFederates: the partner's PingFederate issues an ID-JAG addressed to ours, which redeems it through an IdP connection (a JWT bearer grant) and mints the access token. The resource server separately trusts only the tokens of its own authorization server.",
+  "say": "The partner vouches for {{lena}}, we redeem the grant, and we still decide which tokens count at the resource.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "Sign in at the partner's PingFederate",
+      "tell": "{{lena}} signs in at the partner company's PingFederate (shown as Acme). This sign-in is separate from the app's own sign-in, and it happens at the company that knows {{lena}}.",
+      "say": "Identity starts at {{lena}}'s own company, not with us.",
+      "why": "The company that knows the person is the one that signs the person in."
+    },
+    {
+      "n": 2,
+      "title": "The partner issues the ID-JAG",
+      "tell": "The partner's PingFederate issues the ID-JAG by token exchange (RFC 8693), addressed to our PingFederate. Its SP connection fixes the resource and the client_id the ID-JAG carries, and that client_id must be the redeeming client at our PingFederate.",
+      "say": "The ID-JAG names who may redeem it, so it cannot be spent anywhere else.",
+      "why": "A grant addressed to one server is no use at another."
+    },
+    {
+      "n": 3,
+      "title": "Redeem it at our PingFederate",
+      "tell": "Our PingFederate redeems the ID-JAG through an IdP connection set up for the partner's PingFederate (a JWT bearer grant) and mints the access token. That is why there are two PingFederates: an IdP must not redeem its own ID-JAG.",
+      "say": "We take the partner's word because we set up the connection.",
+      "why": "Trust is a connection we configure, not something the token claims for itself.",
+      "blocked": {
+        "tell": "If the partner changes its signing key and our PingFederate still has the old one cached, the redeem fails with Invalid JWT token. Re-saving the IdP connection, or restarting PingFederate, refreshes it.",
+        "say": "A key we do not recognise is refused, never guessed."
+      }
+    },
+    {
+      "n": 4,
+      "title": "The resource decides what it trusts",
+      "tell": "The call carries the access token our PingFederate minted. The sample MCP server trusts only tokens from its own resource authorization server, so this call is meant to be refused, with a message that names the check that failed.",
+      "say": "Being redeemed is not the same as being trusted at the resource. The resource owner picks whom to trust.",
+      "why": "In the PingFederate to resource AS mode the same call is accepted. The refusal here is deliberate.",
+      "blocked": {
+        "tell": "Switch Resource to REST API and open it with the access token. The page lists each check and marks the one that failed.",
+        "say": "The refusal says which check failed, so it is never a mystery."
+      }
+    },
+    {
+      "n": 5,
+      "title": "Prove the refusals",
+      "tell": "Run all makes four live tests. Each mints a fresh ID-JAG at the partner's PingFederate, breaks one thing (replay, a tampered signature, the wrong client, a scope that was not granted) and expects an OAuth error and no token.",
+      "say": "We show the refusals, not just the happy path.",
+      "why": "A grant you cannot refuse is not a control."
+    },
+    {
+      "n": 6,
+      "title": "The partner can cut access off",
+      "tell": "Revoke and retry revokes the refresh token at the partner's PingFederate, the issuer, and then asks for a new ID-JAG. The partner controls its own people.",
+      "say": "When someone leaves the partner, the partner can stop new grants from its own side.",
+      "why": "Access tokens already minted stay valid until they expire. With a SAML sign-in there is no refresh token, so this step is hidden.",
+      "blocked": {
+        "tell": "The retry is refused with an OAuth error, and the verdict reads Proved: PingFederate refused a new ID-JAG.",
+        "say": "No new grant after the partner revokes."
+      }
+    }
+  ],
+  "proof": {
+    "happy": "Step 3's response from our PingFederate: HTTP 200 and an access token, for an ID-JAG that the partner's PingFederate issued.",
+    "blocked": "Step 4's refusal from the sample MCP server, naming the check the token failed, or step 6's verdict that the partner's PingFederate refused a new ID-JAG."
+  }
+}

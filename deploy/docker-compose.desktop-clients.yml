@@ -1,0 +1,10 @@
+# Overlay: lets mcpc and VS Code (enterprise-managed MCP auth) redeem PingFederate ID-JAGs at resource-as.
+# Write deploy/local/ first with pingfederate/configure-desktop-clients.js, then:
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.desktop-clients.yml up --build -d
+services:
+  resource-as:
+    environment:
+      TRUSTED_IDPS_FILE: /config/desktop-trusted-idps.json
+      CLIENTS_FILE: /config/desktop-clients.json
+    volumes:
+      - ./local:/config:ro

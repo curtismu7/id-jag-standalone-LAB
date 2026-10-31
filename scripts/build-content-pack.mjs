@@ -1,0 +1,60 @@
+#!/usr/bin/env node
+/**
+ * Generates content-pack.json (repo root) from web/src/data/terms.json and sources.json, plus the guide list
+ * in GuidesPage.jsx and the diagram modes in idJagPlaygroundDiagrams.js. Format: docs/content-pack.schema.json.
+ * Output is deterministic: lists sorted by id, 2-space JSON, no timestamps. The git commit is recorded only when
+ * passed (--commit=<sha>), so a plain run is reproducible.
+ *
+ *   node scripts/build-content-pack.mjs [--commit=<sha>]
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+export const PACK_PATH = path.join(ROOT, 'content-pack.json');
+const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+const byId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+/** The [id, title] pairs of GUIDES in GuidesPage.jsx (a page component cannot be imported by node). */
+function readGuides() {
+  const block = read('web/src/pages/GuidesPage.jsx').match(/export const GUIDES = \[([\s\S]*?)\n\];/);
+  if (!block) throw new Error('GUIDES not found in GuidesPage.jsx');
+  return [...block[1].matchAll(/\[\s*"([^"]+)",\s*"([^"]+)"\s*\]/g)].map(([, id, title]) => [id, title]);
+}
+
+export async function buildPack({ commit } = {}) {
+  const { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES, playgroundDiagramPath } =
+    await import(pathToFileURL(path.join(ROOT, 'web/src/utils/idJagPlaygroundDiagrams.js')));
+  const glossary = JSON.parse(read('web/src/data/terms.json')).sort(byId);
+  const sources = JSON.parse(read('web/src/data/sources.json')).sort(byId);
+  const cards = [
+    ...readGuides().map(([id, label]) => ({ id: `guide-${id}`, label, group: 'setup', action: { type: 'route', href: `/guides#${id}` } })),
+    { id: 'playground', label: 'ID-JAG Playground', description: 'The flow one step at a time, with every request, response and the code behind it.', group: 'try-it', action: { type: 'route', href: '/' }, terms: ['id-jag', 'jwt-bearer-grant', 'token-exchange'] },
+    { id: 'trusted-idps', label: 'Trusted IdPs', description: 'Register your IdP so our resource authorization server accepts its ID-JAGs.', group: 'try-it', action: { type: 'route', href: '/trusted-idps' }, terms: ['resource-authorization-server'] },
+    { id: 'inspector', label: 'Inspector', description: 'Check an ID-JAG against the draft and the trust registry.', group: 'try-it', action: { type: 'route', href: '/inspect' }, terms: ['jti-replay', 'strict-client-binding'] },
+  ].sort(byId);
+  const termIds = new Set(glossary.map((t) => t.id));
+  for (const c of cards) for (const t of c.terms || []) if (!termIds.has(t)) throw new Error(`card ${c.id}: unknown term ${t}`);
+  const diagrams = [...PLAYGROUND_DIAGRAM_MODES].sort().map((m) => ({ id: `flow-${m}`, label: `${PLAYGROUND_DIAGRAMS[m].label} diagram`, href: playgroundDiagramPath(m), mode: m }));
+  return {
+    schema: 'demo-content-pack/1',
+    id: 'id-jag',
+    title: 'ID-JAG',
+    version: '0.1.0',
+    ...(commit ? { source: { repo: 'ping-sandbox/id-jag-standalone-LAB', commit } } : {}),
+    demo: { id: 'id-jag-standalone', name: 'ID-JAG playground', catalog: 'C1', tags: ['mcp', 'pingfederate', 'tokens'] },
+    glossary,
+    sources,
+    cards,
+    diagrams,
+  };
+}
+
+export const serialize = (pack) => `${JSON.stringify(pack, null, 2)}\n`;
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const commit = process.argv.find((a) => a.startsWith('--commit='))?.slice('--commit='.length);
+  fs.writeFileSync(PACK_PATH, serialize(await buildPack({ commit })));
+  console.log(`wrote ${path.relative(process.cwd(), PACK_PATH)}`);
+}

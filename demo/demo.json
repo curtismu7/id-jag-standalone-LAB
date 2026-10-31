@@ -1,0 +1,13 @@
+{
+  "id": "id-jag-standalone",
+  "name": "ID-JAG Kit",
+  "slug": "idjag",
+  "modes": ["mock", "pf-as", "pf-pf", "byo"],
+  "offlineMode": "mock",
+  "provider": {
+    "signIn": ["pf-local"],
+    "tokenIssuer": "pf",
+    "pfValidatorId": "idJagKitPcv",
+    "setupScripts": { "pf-local": "pingfederate/configure-local-signin.js" }
+  }
+}

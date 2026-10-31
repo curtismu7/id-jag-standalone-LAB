@@ -1,0 +1,28 @@
+{
+  "name": "id-jag-standalone",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "web",
+    "server",
+    "resource-as",
+    "mcp-sample"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "npm run dev -w server & npm run dev -w web",
+    "test": "npm test -w web && npm test -w server && npm test -w resource-as && npm test -w mcp-sample && node --test scripts/*.test.mjs",
+    "reset": "node scripts/reset.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "build": "npm run build -w web",
+    "start": "npm start -w server",
+    "prepare": "git config core.hooksPath .githooks || true",
+    "setup": "node scripts/setup.mjs",
+    "check:forbidden": "node scripts/check-forbidden-strings.mjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0"
+  }
+}

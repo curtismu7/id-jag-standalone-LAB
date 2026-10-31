@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Trace envelope",
+  "description": "Structural contract for one hop event. The credential redaction guard is enforced by validateEvent only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["trace_id", "span_id", "parent_span_id", "product", "hop", "subject", "actor", "spiffe_id", "decision", "latency_ms", "llm", "ts"],
+  "properties": {
+    "trace_id": { "type": "string", "pattern": "^(?!0+$)[0-9a-f]{32}$" },
+    "span_id": { "type": "string", "pattern": "^(?!0+$)[0-9a-f]{16}$" },
+    "parent_span_id": { "type": ["string", "null"], "pattern": "^(?!0+$)[0-9a-f]{16}$" },
+    "product": { "type": "string", "minLength": 1 },
+    "hop": { "type": "string", "minLength": 1 },
+    "subject": { "type": ["string", "null"], "minLength": 1 },
+    "actor": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["sub"],
+      "properties": {
+        "sub": { "type": "string", "minLength": 1 },
+        "client_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "spiffe_id": { "type": ["string", "null"], "pattern": "^spiffe://[A-Za-z0-9.-]+(/[A-Za-z0-9._~-]+)*$" },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "rule", "reason"],
+      "properties": {
+        "result": { "enum": ["allow", "deny", "hold", "error"] },
+        "rule": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    },
+    "latency_ms": { "type": "number", "minimum": 0 },
+    "llm": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["tokens_in", "tokens_out", "cost_usd"],
+      "properties": {
+        "tokens_in": { "type": "integer", "minimum": 0 },
+        "tokens_out": { "type": "integer", "minimum": 0 },
+        "cost_usd": { "type": "number", "minimum": 0 }
+      }
+    },
+    "ts": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$" }
+  }
+}

@@ -1,0 +1,11 @@
+# Overlay: the playground signs SAML assertions for the signed-in user, and PingFederate trades them for ID-JAGs.
+# Write deploy/local/saml/ and the PingFederate objects first with pingfederate/configure-saml.js, then:
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.saml.yml up -d
+# PF_SAML_CLIENT_SECRET comes from ../.env, where configure-saml.js wrote it.
+services:
+  id-jag:
+    environment:
+      SAML_SIGNING_KEY_FILE: /run/saml/signer.key.pem
+      SAML_SIGNING_CERT_FILE: /run/saml/signer.cert.pem
+    volumes:
+      - ./local/saml:/run/saml:ro

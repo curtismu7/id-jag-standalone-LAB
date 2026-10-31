@@ -1,0 +1,18 @@
+{
+  "id": "retail",
+  "displayName": "Great Buy",
+  "tagline": "AI-Powered Retail Demo",
+  "source": "AI-DEMO2 demo_api_server/config/verticals/retail/manifest.json (identity, theme)",
+  "brand": { "primary": "#FFE000", "headerStart": "#1D1D1B", "headerEnd": "#2d2d2b" },
+  "vocab": {
+    "partner": "a supplier",
+    "partnerShort": "the supplier",
+    "resource": "the shared inventory feed",
+    "resourceTool": "the inventory MCP server"
+  },
+  "cast": {
+    "lena": { "name": "Lena", "role": "Account manager at the supplier" },
+    "mark": { "name": "Mark", "role": "Store buyer at the retailer" },
+    "mary": { "name": "Mary", "role": "Merchandising analyst at the retailer" }
+  }
+}
