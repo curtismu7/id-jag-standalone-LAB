@@ -3,7 +3,7 @@ import { ReactFlow, ReactFlowProvider, useReactFlow, useNodesInitialized, useSto
   Background, Controls, Handle, Position, ConnectionMode, MarkerType } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "./IdJagPlaygroundDiagramPage.css";
-import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES, playgroundDiagramPath, stepParts, edgeStepNumber, stepLights, firstStepLighting, focusNode } from "../utils/idJagPlaygroundDiagrams";
+import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES, playgroundDiagramPath, stepParts, edgeBadges, stepLights, firstStepLighting, focusNode } from "../utils/idJagPlaygroundDiagrams";
 import { stepDetail } from "../utils/idJagStepDetail";
 import { pathFromPoints, labelPoint } from "../utils/orthoRoute";
 import { routeEdges } from "../utils/idJagPlaygroundRouting";
@@ -27,17 +27,8 @@ function Card({ data, selected }) {
     </div>
   );
 }
-function Note({ data, selected }) {
-  return (
-    <div className={`note ${data.dim ? "dim" : ""} ${data.sel ? "sel" : ""}`}>
-      <NodeResizer isVisible={selected} minWidth={160} minHeight={50} />
-      {data.text}
-    </div>
-  );
-}
 // Edge with a token dot travelling along the path while the simulation runs it. The numbered badge always
 // shows the step number; the words show only while the step lights the edge, or on hover.
-const stripCircled = (label) => label.replace(/^[\u2460-\u2468\u2013]+\s*/, "");
 // data.route is the routed path around the boxes; without it (while a box is dragged, or when no route was found) the plain smooth-step path is drawn.
 function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label, markerEnd, style, data }) {
   const [smooth, sx, sy] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
@@ -70,13 +61,13 @@ function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targ
           style={{ transform: place ? `translate(${lx}px,${ly}px) translate(var(--bx-x),-50%)` : `translate(-50%,-50%) translate(${lx}px,${ly}px)`, maxWidth: place && words ? place.w : undefined }}
           onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
           <span className="enum" data-testid={`pgd-badge-${id}`}>{data.num}</span>
-          {words ? <span className="ewords">{stripCircled(label)}</span> : null}
+          {words ? <span className="ewords">{label}</span> : null}
         </div>
       </EdgeLabelRenderer>
     </>
   );
 }
-const nodeTypes = { card: Card, note: Note };
+const nodeTypes = { card: Card };
 const edgeTypes = { flow: FlowEdge };
 
 /** Computed nodes made draggable: remembers where each node was dropped (view-only, resets on reload). */
@@ -87,8 +78,12 @@ function useDraggableNodes(computed) {
     const drags = changes.filter((c) => c.type === "position" && c.position);
     if (drags.length) setMoved((m) => ({ ...m, ...Object.fromEntries(drags.map((c) => [c.id, c.position])) }));
   }, []);
-  return { nodes, onNodesChange };
+  const resetPositions = useCallback(() => setMoved({}), []);
+  return { nodes, onNodesChange, resetPositions };
 }
+
+// Pause between simulated steps, by the speed control.
+const SPEEDS = [{ id: "slow", label: "Slow", ms: 6000 }, { id: "normal", label: "Normal", ms: 3500 }, { id: "fast", label: "Fast", ms: 1500 }];
 
 const DETAIL_KIND = { rfc: "RFC", spec: "Spec", emerging: "Emerging" };
 const json = (o) => JSON.stringify(o, null, 2);
@@ -148,6 +143,7 @@ function PlaygroundFlow({ mode, d }) {
     window.history.replaceState(null, "", playgroundDiagramPath(mode, n));
   };
   const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState("normal");
   const [panel, setPanel] = useState(true);
   const [side, setSide] = useState(380);
   const lit = stepParts(d, step);
@@ -162,12 +158,11 @@ function PlaygroundFlow({ mode, d }) {
   const computed = useMemo(() => [
     ...d.nodes.map((n) => ({ id: n.id, type: "card", position: { x: n.x, y: n.y }, style: { width: 300 },
       data: { ...n, dim: !!step && !lit.nodes.includes(n.id), on: !!step && lit.nodes.includes(n.id), sel: sel === n.id } })),
-    ...d.notes.map((n) => ({ id: n.id, type: "note", position: { x: n.x, y: n.y }, style: { width: 300 },
-      data: { text: n.text, dim: !!step && !lit.notes.includes(n.id), sel: sel === n.id } })),
   // lit is derived from (d, step)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [d, step, sel]);
-  const { nodes, onNodesChange } = useDraggableNodes(computed);
+  const { nodes, onNodesChange, resetPositions } = useDraggableNodes(computed);
+  const badges = useMemo(() => edgeBadges(d), [d]);
 
   // Arrows are routed around every box from React Flow's real box positions and sizes. The string key changes
   // only when a box lands or is resized, which re-routes; while a box is dragged the plain path is drawn.
@@ -197,7 +192,7 @@ function PlaygroundFlow({ mode, d }) {
     const on = lit.edges.includes(e.id);
     return {
       id: e.id, source: e.from, target: e.to, sourceHandle: e.fh, targetHandle: e.th, label: e.label, type: "flow",
-      data: { on: !!step && on, num: edgeStepNumber(e), dashed: !!e.dashed, route: routing.routes[e.id], place: routing.places?.[e.id], pulse: step && on ? step : 0, dur: 2 },
+      data: { on: !!step && on, num: badges[e.id], dashed: !!e.dashed, route: routing.routes[e.id], place: routing.places?.[e.id], pulse: step && on ? step : 0, dur: 2 },
       markerEnd: { type: MarkerType.ArrowClosed },
       style: { strokeWidth: on ? 2.4 : 1.2, opacity: on ? 1 : 0.15, strokeDasharray: e.dashed ? "6 4" : undefined },
     };
@@ -206,17 +201,17 @@ function PlaygroundFlow({ mode, d }) {
   // Zoom to the lit actors and callouts (or the whole map on the overview).
   useEffect(() => {
     const ids = step ? lit.focus.map((id) => ({ id })) : undefined;
-    const t = setTimeout(() => rf.fitView({ nodes: ids, padding: step ? 0.15 : 0.05, duration: 500, maxZoom: 1 }), 60);
+    const t = setTimeout(() => rf.fitView({ nodes: ids, padding: step ? 0.4 : 0.05, duration: 500, maxZoom: 1 }), 60);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, panel, measured]);
 
   useEffect(() => {
     if (!playing) return undefined;
-    const t = setTimeout(() => (step >= last ? setPlaying(false) : setStep(step + 1)), 3500);
+    const t = setTimeout(() => (step >= last ? setPlaying(false) : setStep(step + 1)), SPEEDS.find((s) => s.id === speed).ms);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, step]);
+  }, [playing, step, speed]);
 
   // A node click selects it, jumps to the first step that lights it and brings that step's detail into view.
   // A drag that just ended is not a click.
@@ -238,6 +233,8 @@ function PlaygroundFlow({ mode, d }) {
 
   const play = () => { if (!step || step >= last) setStep(1); setPlaying(true); };
   const go = (n) => { setPlaying(false); setStep(n); };
+  // Reset: stop the simulation, show the overview, put every box back where the data places it, and fit the view.
+  const reset = () => { setPlaying(false); setStep(0); resetPositions(); setTimeout(() => rf.fitView({ padding: 0.05, duration: 300 }), 60); };
   const fullscreen = () => {
     const el = document.querySelector(".ijx");
     if (document.fullscreenElement) document.exitFullscreen();
@@ -256,8 +253,7 @@ function PlaygroundFlow({ mode, d }) {
     <div className="ijx-app" style={{ "--ijx-cols": panel ? `${side}px 6px 1fr` : "0 0 1fr" }}>
       <aside ref={asideRef} style={panel ? undefined : { padding: 0, border: 0, overflow: "hidden", visibility: "hidden" }}>
         <h1>ID-JAG Playground: {d.label}</h1>
-        <p className="lede">{d.lede}</p>
-        <nav className="modes" aria-label="Playground mode">
+                <nav className="modes" aria-label="Playground mode">
           {PLAYGROUND_DIAGRAM_MODES.map((m) => (
             <a key={m} href={playgroundDiagramPath(m, step)} aria-current={m === mode ? "page" : undefined}>{PLAYGROUND_DIAGRAMS[m].label}</a>
           ))}
@@ -266,7 +262,12 @@ function PlaygroundFlow({ mode, d }) {
           <button className="pri" onClick={playing ? () => setPlaying(false) : play}>{playing ? "Pause" : "▶ Simulate"}</button>
           <button onClick={() => go(Math.max(0, step - 1))} disabled={step === 0}>◀ Back</button>
           <button onClick={() => go(Math.min(last, step + 1))} disabled={step === last}>Next ▶</button>
-          <button onClick={() => go(0)}>Reset</button>
+          <button onClick={reset}>Reset</button>
+          <label className="speed">Speed
+            <select value={speed} onChange={(e) => setSpeed(e.target.value)}>
+              {SPEEDS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+          </label>
           <span className="hint">Drag nodes to rearrange</span>
         </div>
         <nav aria-label="Steps">
@@ -281,10 +282,12 @@ function PlaygroundFlow({ mode, d }) {
           <p>{current.text}</p>
           <h3>{step ? "Calls in this step" : "Every call"}</h3>
           <ul data-testid="pgd-calls">{d.edges.filter((e) => lit.edges.includes(e.id)).map((e) => <li key={e.id}>{e.label}</li>)}</ul>
+          {step && current.why ? <p className="why" data-testid="pgd-why">{current.why}</p> : null}
           {detail ? <div ref={detailRef}><StepDetail detail={detail} /></div> : null}
         </section>
-        <p className="legend" data-testid="pgd-legend"><span className="enum">1</span> red number = step · solid line = request/response · <span className="blue">blue dashed</span> = trust source (JWKS or registry read) or alternate path</p>
-        <p className="legend"><a href="/">Open the playground</a> to run this mode for real.</p>
+        <p className="legend" data-testid="pgd-legend"><span className="enum">1</span> red number = step (3a, 3b when a step starts several calls) · solid line = request/response · <span className="blue">blue dashed</span> = trust source (JWKS or registry read) or alternate path</p>
+        <p className="legend" data-testid="pgd-simulated">{mode === "mock" ? "Sample data: every box here is stood in for by fixtures in the page; nothing is sent." : "In Mock mode (the switch in the header) the PingFederate, resource-as and mcp-sample boxes are simulated inside this app and no call leaves this machine. In Live mode they are the real servers named in your settings."}</p>
+        <p className="legend"><a href="/">Open the playground</a> to run this mode.</p>
       </aside>
       <div className="split" style={panel ? undefined : { visibility: "hidden" }} onPointerDown={startSplit} title="Drag to resize panel" />
       <main data-route-fallbacks={routing.fallbacks ?? undefined}>
