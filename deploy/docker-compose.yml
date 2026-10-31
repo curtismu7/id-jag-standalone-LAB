@@ -23,11 +23,15 @@ services:
       context: ..
       dockerfile: Dockerfile
     ports:
-      - "${HOST_PORT:-4720}:4720"
+      - "127.0.0.1:${HOST_PORT:-4720}:4720"
     env_file: *env-file
     environment:
       PORT: "4720"
       DATA_DIR: /data
+      # Listens wide inside the container; the port above is published on 127.0.0.1 only. Mock sign-in checks this (rule 11).
+      HOST: "0.0.0.0"
+      LAB_PUBLISH: loopback
+      ALLOW_MOCK_SIGNIN: ${ALLOW_MOCK_SIGNIN:-1}
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:${HOST_PORT:-4720}}
       RESOURCE_AS_ISSUER: *as-issuer
       RESOURCE_AS_TOKEN_ENDPOINT: http://resource-as:9080/token
@@ -43,7 +47,7 @@ services:
       args:
         SERVICE: resource-as
     ports:
-      - "${AS_HOST_PORT:-4721}:9080"
+      - "127.0.0.1:${AS_HOST_PORT:-4721}:9080"
     # ponytail: gets the whole ../.env; it needs only RESOURCE_AS_CLIENT_ID/_SECRET and ID_JAG_REGISTRY_TOKEN.
     env_file: *env-file
     environment:
@@ -63,7 +67,7 @@ services:
       args:
         SERVICE: mcp-sample
     ports:
-      - "${MCP_HOST_PORT:-4722}:9090"
+      - "127.0.0.1:${MCP_HOST_PORT:-4722}:9090"
     environment:
       PORT: "9090"
       AS_ISSUER: *as-issuer

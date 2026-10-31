@@ -115,7 +115,7 @@ by every service. Compose sets the addresses the services use to find each other
 `RESOURCE_AS_ISSUER`, `RESOURCE_AS_TOKEN_ENDPOINT`, `ID_JAG_RESOURCE`, `MCP_URL`) from the host ports, so
 they always agree; export one in the shell to override it.
 
-### Local development (Node 20+)
+### Local development (Node 22+)
 
 ```sh
 npm ci
@@ -127,6 +127,23 @@ npm run build                   # web/dist, served by the server in production
 ```
 
 `npm start` serves `web/dist` and the API on `PORT`.
+
+## Mock and live
+
+`MODE=mock|live` (default mock) decides what the app talks to; the **Mock / Live** switch in the header of every page shows it
+and changes it, and `GET /api/health` reports it as `mode`. The choice is saved in `DATA_DIR/mode.json`, so it survives a restart; without
+a saved choice `MODE` is read from the environment, `.env`, or the shared settings file (`STANDALONE_ENV`, else `~/Development/.env`).
+
+- **Mock**: a PingFederate, an outside "Acme" PingFederate, a resource authorization server and an MCP server run inside the app and
+  answer like the real ones (pi.flow with PKCE, RFC 8693 exchange, RFC 7523 redemption, single-use `jti`, scope-gated tools). Every token
+  carries `"mock": true`, every playground answer says `simulated`, and a netguard refuses every outbound call except to the mock and to
+  loopback, counting what it refuses (`npm run doctor` runs its self-test). Mock data lives in `DATA_DIR/mock`. xaa.dev, SAML and the
+  interop panel need a real server and are Live only. The demo account is `alice@mock.example` / `mock-password`; mock sign-in needs
+  `ALLOW_MOCK_SIGNIN=1`, a loopback bind (`HOST=127.0.0.1`, the default in mock mode, or `LAB_PUBLISH=loopback` in Docker) and no proxy.
+- **Live**: today's behaviour, against the servers named in `.env`. It can be chosen only when `PF_URL`, `PF_EXCHANGE_CLIENT_ID` and
+  `PF_EXCHANGE_CLIENT_SECRET` (or the Acme set) are present; otherwise the switch says what is missing.
+
+`npm run reset` and `POST /api/admin/reset` clear the current mode's data and keep the saved choice.
 
 ## Layout
 
