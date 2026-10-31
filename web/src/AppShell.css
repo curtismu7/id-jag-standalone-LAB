@@ -12,11 +12,11 @@
   --th-text-muted: var(--muted);
   --th-border: var(--border);
 
-  /* Semantic colours the shared file does not have yet: aliases of shared tokens (see the PR notes). */
+  /* Semantic colours: aliases of the shared status and shadow tokens. */
   --th-ok: var(--status-ok);
-  --th-info: var(--focus);
-  --th-warn: var(--text);
-  --th-shadow: color-mix(in srgb, var(--text) 16%, transparent);
+  --th-info: var(--status-info);
+  --th-warn: var(--status-warn);
+  --th-shadow: var(--shadow-ink);
   --th-veil: color-mix(in srgb, var(--surface-2) 88%, transparent);
 
   /* Accent used as text. A customer brand colour wins when it reads on the theme. */

@@ -22,6 +22,13 @@
 .ijp-seg button[aria-pressed="true"] { background: var(--ijp-grad); color: var(--brand-on, var(--on-accent)); font-weight: 600; }
 .ijp-seg button:disabled { opacity: 0.45; cursor: not-allowed; }
 .ijp-seg button:focus-visible { outline-offset: -3px; }
+/* Phone width: each control group takes a full row; the segmented buttons wrap into a two-column grid with hairline dividers. */
+@media (max-width: 600px) {
+  .ijp-toolbar__group { flex-wrap: wrap; width: 100%; }
+  .ijp-seg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; width: 100%; background: var(--th-border); }
+  .ijp-seg button { min-width: 0; border-right: 0; background: var(--th-bg); }
+  .ijp-seg button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
 .ijp-mock-badge { display: inline-block; margin: 0.25rem 0; padding: 0.3rem 0.75rem; border-radius: 999px; background: var(--ijp-grad); color: var(--brand-on, var(--on-accent)); font-size: var(--font-size-xs); font-weight: 600; }
 .ijp--mock .ijp-step { border-style: dashed; }
 .ijp-actors { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
