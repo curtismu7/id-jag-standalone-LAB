@@ -45,11 +45,11 @@ const get = (rep, id) => rep.checks.find((c) => c.id === id);
 const checkPfAdmin = (env, adminCall) => pfLocal.doctor({ env, adminCall });
 
 describe('individual checks', () => {
-  it('node: passes on 20+, fails below with a fix', () => {
+  it('node: passes on 22+, fails below with a fix', () => {
     expect(doctor.checkNode('22.1.0').status).toBe('pass');
-    const f = doctor.checkNode('18.19.0');
+    const f = doctor.checkNode('20.19.0');
     expect(f.status).toBe('fail');
-    expect(f.fix).toMatch(/Node 20/);
+    expect(f.fix).toMatch(/Node 22/);
   });
   it('env file: mock does not need it, a real mode warns', () => {
     const none = { existsSync: () => false };

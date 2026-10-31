@@ -1,6 +1,6 @@
 // Run report: a Markdown and a JSON summary of the current playground run, built in the browser from
-// what the page already shows (decoded claims, redacted requests). Never a raw token: the server never
-// sends one, and anything JWT-shaped (say, a pasted ID-JAG) is replaced before the file is made.
+// what the page already shows (decoded claims, redacted requests). Never a raw token: the server sends none in Live
+// mode, and anything JWT-shaped (a mock token that Mock mode shows raw, or a pasted ID-JAG) is replaced before the file is made.
 
 const JWT = /eyJ[\w-]*\.[\w-]+\.[\w-]*/g;
 const scrub = (value) => JSON.parse(JSON.stringify(value ?? null).replace(JWT, "[redacted JWT]"));

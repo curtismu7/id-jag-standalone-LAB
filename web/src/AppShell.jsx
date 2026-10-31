@@ -3,6 +3,8 @@ import { useMe } from "./auth/useMe";
 import { signIn } from "./utils/signIn";
 import { CustomerProvider, useCustomer } from "./customer/CustomerConfig";
 import SignInModal from "./components/SignInModal";
+import { ModeProvider } from "./mode/ModeContext";
+import { ModeBanner, ModeToggle } from "./mode/ModeToggle";
 import { PresentBar, PresentProvider, PresentToggle } from "./present/PresentMode";
 import "./AppShell.css";
 
@@ -54,11 +56,13 @@ function Shell({ children }) {
           </form>
         )}
         {me === null && <button type="button" className="shell-theme" onClick={() => signIn()}>Sign in</button>}
+        <ModeToggle />
         <PresentToggle />
         <button type="button" className="shell-theme" onClick={flip} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>
           {theme === "dark" ? "Light" : "Dark"}
         </button>
       </header>
+      <ModeBanner />
       <PresentBar />
       {children}
       <SignInModal />
@@ -67,5 +71,5 @@ function Shell({ children }) {
 }
 
 export default function AppShell({ children }) {
-  return <CustomerProvider><PresentProvider><Shell>{children}</Shell></PresentProvider></CustomerProvider>;
+  return <CustomerProvider><ModeProvider><PresentProvider><Shell>{children}</Shell></PresentProvider></ModeProvider></CustomerProvider>;
 }

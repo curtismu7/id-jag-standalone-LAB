@@ -20,6 +20,26 @@ Docker: `docker compose -f deploy/docker-compose.yml up --build -d` (publishes 1
 
 Server 4720, resource-as 4721, mcp-sample 4722, Vite dev server 4723. Block 4720-4729. Never 8080, 5173 or 18080/19080/19090.
 
+## Mock and live
+
+`MODE=mock|live`, default mock unless the live `PF_*` settings are set, then live (`server/src/mode.js`; the toggle's choice is saved in `DATA_DIR/mode.json`). Mock = the in-process
+PingFederate, Acme PingFederate, resource AS and MCP server in `server/src/mock/`, reached only through `server/src/netguard.js` (no other
+module may call `fetch`; use `outboundFetch`). Settings are read through `runtimeEnv()`, never `process.env`, so mock mode cannot see real
+settings. Mock tokens carry `mock: true`; EC keys use `createECDH` + `createPrivateKey`. Mock sign-in is guarded (`mockSignin.js`).
+The server suite runs with `MODE=live` (vitest config); `mock*.test.js` choose mock themselves.
+
+## Diagrams, stories, talk track
+
+- Diagrams are diagram-studio/1 data files in `diagrams/` (one per playground mode: `mock`, `pf-as`, `pf-pf`, `byo`), loaded by name
+  (`web/src/diagrams/loadDiagram.js`) and turned into the page's model by `playgroundModel.js`. Do not hand-build nodes or edges. Edit the
+  JSON (box positions, arrows, steps; a step's `why` is its gotcha callout). Arrow handles are chosen from box positions, and a test fails
+  when two arrows share a slot or run. The Dockerfile copies `diagrams/` into the web build.
+- After any diagram change, run the overlap check in a real browser: evaluate `AI-DEMO-Standalone/scripts/diagram-overlap.js` on `/diagram/<mode>`
+  (and `?step=1` to `5`) and expect `pass: true` with no lit label clipped.
+- Stories (`web/src/data/stories`) name people only as `{{cast.<id>}}` and nouns as `{{vocab.<key>}}`. Names come from the vertical pack and
+  from `customer.config.json` `persona`. A test fails on an undefined token or a written-out cast name.
+- `docs/talk-track.md` is the presenter script. A test checks that every bold button name in it still exists in `web/src`.
+
 ## Rules that bite
 
 - Mock mode works with no configuration. Live PingFederate use is owner-run.
@@ -27,4 +47,4 @@ Server 4720, resource-as 4721, mcp-sample 4722, Vite dev server 4723. Block 4720
 - Never commit `.env` files or keys. The one settings file is `~/Development/.env` (mode 600).
 - CSS follows `STANDALONE-CSS-STANDARD.md`: tokens only, no colour literals, no `!important`.
 - Diagram labels (web/src/utils/idJagLabelPlacement.js) are placed in screen pixels and drawn counter-scaled, so they keep one size at any zoom. Change a diagram or its zoom limit and run the placement tests; no label may cover a box or another label.
-- Node 22 only.
+- Node 26 only (engines, Dockerfile and CI).

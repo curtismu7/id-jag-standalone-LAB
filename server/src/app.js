@@ -14,7 +14,10 @@ import resetRoutes from './resetRoutes.js';
 import { sessionStore } from './sessionStore.js';
 import { DEFAULT_WORKSPACE, requireDefaultWorkspace, workspaceMiddleware } from './workspace.js';
 import doctor from './doctorRoute.js';
+import modeRoutes from './modeRoutes.js';
+import { isMock } from './mode.js';
 import health from './health.js';
+import { hostCheck } from './hostCheck.js';
 
 const DEFAULT_WEB_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
 
@@ -25,6 +28,7 @@ export function createApp({ workspaceResolver = () => DEFAULT_WORKSPACE } = {}) 
   const c = config();
   const app = express();
   app.disable('x-powered-by');
+  app.use(hostCheck()); // first: a request for any other Host name is refused before it reaches a route (DNS rebinding)
   app.use(workspaceMiddleware(workspaceResolver));
   if (process.env.TRUST_PROXY) app.set('trust proxy', process.env.TRUST_PROXY);
   let secret = process.env.SESSION_SECRET;
@@ -44,6 +48,16 @@ export function createApp({ workspaceResolver = () => DEFAULT_WORKSPACE } = {}) 
   app.use('/api', resetRoutes); // /api/admin/reset
   app.use('/api/health', health); // public, coarse (demo-health/1)
   app.use('/api/doctor', doctor); // admin only
+  app.use('/api/mode', modeRoutes); // public GET, same-origin POST
+  // Mock mode: say so on every answer that shows tokens or requests (the object gets simulated:true, the response X-Simulated).
+  app.use(['/api/id-jag-playground', '/api/inspect'], (_req, res, next) => {
+    if (isMock()) {
+      res.set('X-Simulated', 'mock');
+      const send = res.json.bind(res);
+      res.json = (body) => send(body && typeof body === 'object' && !Array.isArray(body) ? { ...body, simulated: true } : body);
+    }
+    next();
+  });
   for (const { path: mount, router, auth: level, singleTenant } of demo.routes) {
     app.use(mount, ...(singleTenant ? [requireDefaultWorkspace] : []), ...(level === 'admin' ? [requireAdmin] : level === 'user' ? [requireUser] : []), router);
   }

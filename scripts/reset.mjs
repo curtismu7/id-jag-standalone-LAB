@@ -1,7 +1,9 @@
 // Return the demo to a fresh state between customers: npm run reset -- --yes [--dry-run]
 // Clears DATA_DIR registrations and Trusted IdPs, archives the audit log, removes registered PingFederate users.
 // A running server's web sessions live in its memory: they end when it restarts, or use POST /api/admin/reset instead.
+// Both app modes: it clears the current mode's data (live DATA_DIR, or DATA_DIR/mock); the saved Mock/Live choice is kept.
 import { fileURLToPath } from 'node:url';
+import { currentMode, isMock } from '../server/src/mode.js';
 import { removeUserForReset as removeUser } from '../server/src/idp/index.js';
 import { removeClient } from '../server/src/registry/clients.js';
 import { reset } from '../server/src/reset.js';
@@ -17,9 +19,13 @@ if (!dryRun && !args.includes('--yes')) {
   process.exit(2);
 }
 const r = await reset({ dataDir: dataDir(DEFAULT_WORKSPACE), now: new Date(), actor: 'cli', dryRun, removeUser, removeClient });
+console.log(`App mode: ${currentMode()}.`);
 console.log(`${dryRun ? 'Would clear' : 'Cleared'} in ${dataDir(DEFAULT_WORKSPACE)}: ${r.registrations} registration request(s), ${r.idps} trusted IdP(s), ${r.clients.length} resource-AS client(s); audit log ${r.auditArchive ? `archived as ${r.auditArchive}` : 'had nothing to archive'}.`);
 console.log(`${dryRun ? 'Would remove' : 'Removed'} PingFederate users: ${r.users.join(', ') || 'none'}`);
-if (!dryRun) console.log('Web sessions of a running server are not touched by the CLI (restart it, or use the admin route).');
+if (!dryRun) {
+  const held = isMock() ? 'Web sessions and the mock servers\' memory (sign-ins, used ID-JAGs, registered users)' : 'Web sessions';
+  console.log(`${held} of a running server are not touched by the CLI (restart it, or use the admin route).`);
+}
 for (const e of r.pfKept || []) console.log(`Kept ${e} in PingFederate: it is the last user and PingFederate needs at least one.`);
 for (const f of r.pfFailed) console.error(`Could not remove ${f.email} from PingFederate: ${f.error}`);
 for (const c of r.clientsFailed) console.error(`Could not remove resource-AS client ${c}`);

@@ -4,10 +4,11 @@
 // PF_ADMIN_INSECURE_TLS=true to accept PingFederate's self-signed admin certificate (local runs).
 
 import { demoJson } from './demoJson.js';
+import { runtimeEnv } from './mode.js';
 import { pfAdmin } from './idp/pfAdmin.js';
 
 const VALIDATOR = () => demoJson().provider.pfValidatorId;
-const env = (k) => String(process.env[k] ?? '').trim();
+const env = (k) => String(runtimeEnv()[k] ?? '').trim();
 const fail = (status, message) => Object.assign(new Error(message), { status });
 
 export const adminConfigured = () => Boolean(env('PF_ADMIN_URL') && env('PF_ADMIN_PASSWORD'));

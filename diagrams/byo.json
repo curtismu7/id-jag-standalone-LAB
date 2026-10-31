@@ -1,0 +1,306 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "byo",
+  "title": "Your IdP → our resource AS",
+  "lede": "An outside agent signs its user in at its own IdP and gets an ID-JAG addressed to our authorization server. You paste it here, or tools/outside-agent.js presents it directly. Or click \"Get an ID-JAG from xaa.dev\": IdenX, the IdP of Okta's free xaa.dev playground, signs you in and issues one to this server. Our authorization server only trusts an outside IdP because an admin approved it on the Trusted IdPs registry.",
+  "groups": {
+    "user": {
+      "label": "Person or app",
+      "color": "dark"
+    },
+    "pf": {
+      "label": "PingFederate or outside IdP",
+      "color": "red"
+    },
+    "bff": {
+      "label": "This app",
+      "color": "red"
+    },
+    "as": {
+      "label": "Authorization server",
+      "color": "red"
+    },
+    "rs": {
+      "label": "Resource server",
+      "color": "grey"
+    }
+  },
+  "nodes": [
+    {
+      "id": "agent",
+      "group": "user",
+      "label": "Outside agent",
+      "sub": [
+        "tools/outside-agent.js · or you",
+        "Signs its user in at its own IdP",
+        "Gets an ID-JAG addressed to our authorization server"
+      ],
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "extidp",
+      "group": "pf",
+      "label": "Outside IdP · issues",
+      "sub": [
+        "e.g. Acme PingFederate, Okta",
+        "Token exchange → ID-JAG, aud = our AS issuer",
+        "client_id = the one it registered for us",
+        "Publishes its own JWKS"
+      ],
+      "x": 1040,
+      "y": 0
+    },
+    {
+      "id": "idenx",
+      "group": "pf",
+      "label": "xaa.dev IdenX · free outside IdP",
+      "sub": [
+        "idp.xaa.dev · Okta's public Cross App Access playground",
+        "Any email signs in (cap it to read)",
+        "Token exchange → ID-JAG, aud = resource-as's public issuer",
+        "Approved Trusted IdP · keys at idp.xaa.dev/jwks"
+      ],
+      "x": 260,
+      "y": -500
+    },
+    {
+      "id": "browser",
+      "group": "user",
+      "label": "Browser · paste or xaa.dev",
+      "sub": [
+        "the playground page · session cookie only",
+        "Pastes the ID-JAG once, or clicks Get an ID-JAG from xaa.dev",
+        "Sees decoded claims only"
+      ],
+      "x": 0,
+      "y": 340
+    },
+    {
+      "id": "server",
+      "group": "bff",
+      "label": "Playground server · the OAuth client",
+      "sub": [
+        "server/ · /api/id-jag-playground",
+        "Holds every token server-side: refresh token, ID-JAG, access token",
+        "Runs a pre-flight check before each button"
+      ],
+      "x": 520,
+      "y": 340
+    },
+    {
+      "id": "ras",
+      "group": "as",
+      "label": "resource-as · resource AS",
+      "sub": [
+        "target resource-as · RESOURCE_AS_ISSUER/token",
+        "Trusts an issuer only if its registry read (or TRUSTED_IDPS_FILE) lists it",
+        "Checks typ, signature, aud = its issuer, client_id, jti single-use",
+        "Mints its own at+jwt, aud = the MCP resource"
+      ],
+      "x": 1040,
+      "y": 680
+    },
+    {
+      "id": "ourpf",
+      "group": "as",
+      "label": "Our PingFederate · resource AS",
+      "sub": [
+        "target pingfederate · PF_URL",
+        "JWT bearer via an IdP connection synced from the registry",
+        "Client PF_REDEEMER_CLIENT_ID"
+      ],
+      "x": 1040,
+      "y": 1000
+    },
+    {
+      "id": "registry",
+      "group": "bff",
+      "label": "Trusted IdPs registry",
+      "sub": [
+        "server · /api/id-jag-playground/trusted-idps",
+        "Admin-approved: issuer, JWKS URL, client_id the IdP writes, targets, scope cap",
+        "No secrets in an entry"
+      ],
+      "x": 520,
+      "y": 1000
+    },
+    {
+      "id": "mcp",
+      "group": "rs",
+      "label": "mcp-sample · MCP server",
+      "sub": [
+        "MCP_URL · POST /mcp",
+        "Verifies the token against resource-as /jwks: typ, iss, aud, exp",
+        "tools/list shows only what the scope allows"
+      ],
+      "x": 1560,
+      "y": 340
+    },
+    {
+      "id": "profile",
+      "group": "rs",
+      "label": "Protected resource",
+      "sub": [
+        "GET /protected/profile on mcp-sample",
+        "Same bearer validation as the MCP tools",
+        "Says which check failed when it refuses"
+      ],
+      "x": 520,
+      "y": 680
+    }
+  ],
+  "edges": [
+    {
+      "source": "agent",
+      "target": "extidp",
+      "label": "sign in + RFC 8693 token exchange · requested_token_type=id-jag · aud=our AS issuer"
+    },
+    {
+      "source": "agent",
+      "target": "browser",
+      "label": "paste the ID-JAG (compact JWT)"
+    },
+    {
+      "source": "browser",
+      "target": "server",
+      "label": "POST /byo/inspect · { idJag, target }"
+    },
+    {
+      "source": "browser",
+      "target": "idenx",
+      "label": "or: /xaa/login → IdenX sign-in (PKCE)"
+    },
+    {
+      "source": "idenx",
+      "target": "server",
+      "label": "code → /xaa/callback"
+    },
+    {
+      "source": "server",
+      "target": "idenx",
+      "label": "/xaa/id-jag: RFC 8693 → ID-JAG"
+    },
+    {
+      "source": "browser",
+      "target": "server",
+      "label": "POST /api/id-jag-playground/… (cookie only)"
+    },
+    {
+      "source": "server",
+      "target": "registry",
+      "label": "iss on the Trusted IdPs list for this target?"
+    },
+    {
+      "source": "server",
+      "target": "extidp",
+      "label": "JWKS fetch · verify the signature",
+      "dashed": true
+    },
+    {
+      "source": "server",
+      "target": "ras",
+      "label": "RFC 7523 jwt-bearer · client_id from the registry entry (default RESOURCE_AS_CLIENT_ID)"
+    },
+    {
+      "source": "server",
+      "target": "ourpf",
+      "label": "or target=pingfederate · client_id PF_REDEEMER_CLIENT_ID"
+    },
+    {
+      "source": "ras",
+      "target": "registry",
+      "label": "GET /trusted-idps/registry (Bearer ID_JAG_REGISTRY_TOKEN)",
+      "dashed": true
+    },
+    {
+      "source": "ourpf",
+      "target": "registry",
+      "label": "pingfederate/sync-id-jag-trusted-idps.js → IdP connection",
+      "dashed": true
+    },
+    {
+      "source": "ras",
+      "target": "extidp",
+      "label": "JWKS fetch · the outside IdP's keys",
+      "dashed": true
+    },
+    {
+      "source": "server",
+      "target": "mcp",
+      "label": "tools/list · tools/call (Bearer resource-as token)"
+    },
+    {
+      "source": "mcp",
+      "target": "ras",
+      "label": "verify vs resource-as /jwks",
+      "dashed": true
+    },
+    {
+      "source": "server",
+      "target": "profile",
+      "label": "GET /protected/profile"
+    },
+    {
+      "source": "server",
+      "target": "ras",
+      "label": "your ID-JAG, broken one way at a time (replay skipped)"
+    }
+  ],
+  "steps": [
+    {
+      "title": "Paste an ID-JAG, or get one from xaa.dev",
+      "what": "Your IdP signs its user in and issues the ID-JAG (aud = our authorization server's issuer). You paste it; the server keeps it and shows only its decoded claims. Or use xaa.dev: this server signs you in at IdenX (code + PKCE), exchanges IdenX's refresh token for an ID-JAG addressed to resource-as's public issuer, and loads it the same way.",
+      "why": "tools/outside-agent.js runs the same flow with none of our code in its path: its IdP, then our public token endpoint, then (optionally) the MCP server.",
+      "edges": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "title": "Check it against the draft",
+      "what": "The server finds the issuer on the Trusted IdPs registry (enabled, and targeting the server you picked), verifies the signature with that IdP's JWKS, and runs the draft checks.",
+      "why": "Trust comes from the Trusted IdPs registry: an admin approves the issuer, its JWKS URL, the client_id it writes and the targets. An issuer not on the list (or not for this target) is refused before any redemption.",
+      "edges": [
+        7,
+        8
+      ]
+    },
+    {
+      "title": "Redeem at our resource AS",
+      "what": "RFC 7523 JWT bearer grant at resource-as (client from the registry entry) or at our PingFederate (PF_REDEEMER_CLIENT_ID). resource-as reads the registry from this server; PingFederate gets it as an IdP connection from the sync script. Either one verifies against the outside IdP's keys and mints its own token. For IdenX: keys at idp.xaa.dev/jwks, and its client_id must be the one its entry maps to idp-<id>.",
+      "why": "Trust comes from the Trusted IdPs registry: an admin approves the issuer, its JWKS URL, the client_id it writes and the targets. An issuer not on the list (or not for this target) is refused before any redemption.",
+      "edges": [
+        6,
+        9,
+        10,
+        11,
+        12,
+        13
+      ]
+    },
+    {
+      "title": "Call mcp-sample",
+      "what": "tools/list and tools/call go straight to mcp-sample with resource-as's token; mcp-sample verifies it against resource-as's JWKS. The protected page takes the same token. (A token from our PingFederate is refused there: mcp-sample trusts resource-as only.)",
+      "edges": [
+        6,
+        14,
+        15,
+        16
+      ]
+    },
+    {
+      "title": "Negative tests",
+      "what": "We cannot mint at your IdP, so each test reuses your pasted ID-JAG and breaks one thing. Replay is skipped.",
+      "why": "Replay is skipped: it would use up your ID-JAG. The other tests reuse your pasted token, broken one way at a time.",
+      "edges": [
+        6,
+        17
+      ]
+    }
+  ]
+}

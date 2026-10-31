@@ -19,8 +19,8 @@ test that fails when the committed file differs from the generator output. This 
 node scripts/build-content-pack.mjs
 ```
 
-Run it after changing `terms.json`, `sources.json`, the `GUIDES` list in `GuidesPage.jsx` or the diagram modes in
-`idJagPlaygroundDiagrams.js`, then commit the result. Output is deterministic (lists sorted by id, no timestamps).
+Run it after changing `terms.json`, `sources.json`, the `GUIDES` list in `GuidesPage.jsx` or the diagram files in
+`diagrams/`, then commit the result. Output is deterministic (lists sorted by id, no timestamps).
 The pack records a git commit only when asked: `node scripts/build-content-pack.mjs --commit=<sha>`. Do not commit that
 variant, because the commit would make the drift test fail.
 
@@ -31,7 +31,7 @@ variant, because the commit would make the drift test fail.
 | `glossary` | `terms.json`, sorted by id |
 | `sources` | `sources.json`, sorted by id |
 | `cards` | the `GUIDES` list, plus the playground, Trusted IdPs and Inspector pages (their routes and descriptions are written in the generator, taken from `LearnPage.jsx`) |
-| `diagrams` | `PLAYGROUND_DIAGRAMS` modes |
+| `diagrams` | one per file in `diagrams/` (diagram-studio/1 data), labelled by its title |
 | `demo` | constants in the generator; `catalog: "C1"` is the family-plan catalog id |
 
 ## Not populated yet

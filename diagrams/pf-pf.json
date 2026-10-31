@@ -1,0 +1,201 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "pf-pf",
+  "title": "Acme PingFederate → PingFederate",
+  "lede": "Two PingFederates: Acme is an outside company's IdP and issues the ID-JAG after a sign-in at its own login page; ours is the resource authorization server and redeems it with a JWT bearer grant through an IdP connection. mcp-sample trusts resource-as's tokens only, so step 4 shows a refusal here.",
+  "groups": {
+    "user": {
+      "label": "Person or app",
+      "color": "dark"
+    },
+    "bff": {
+      "label": "This app",
+      "color": "red"
+    },
+    "pf": {
+      "label": "PingFederate or outside IdP",
+      "color": "red"
+    },
+    "as": {
+      "label": "Authorization server",
+      "color": "red"
+    },
+    "rs": {
+      "label": "Resource server",
+      "color": "grey"
+    }
+  },
+  "nodes": [
+    {
+      "id": "browser",
+      "group": "user",
+      "label": "Browser",
+      "sub": [
+        "the playground page · session cookie only",
+        "Clicks each step's button",
+        "Sees decoded claims and redacted requests, never a raw token"
+      ],
+      "x": 0,
+      "y": 300
+    },
+    {
+      "id": "server",
+      "group": "bff",
+      "label": "Playground server · the OAuth client",
+      "sub": [
+        "server/ · /api/id-jag-playground",
+        "Holds every token server-side: refresh token, ID-JAG, access token",
+        "Runs a pre-flight check before each button"
+      ],
+      "x": 520,
+      "y": 300
+    },
+    {
+      "id": "acme",
+      "group": "pf",
+      "label": "Acme PingFederate · issuer",
+      "sub": [
+        "ACME_PF_URL · pf-acme.example.invalid",
+        "Its own login page (code + PKCE, offline_access)",
+        "Token exchange policy issues the ID-JAG, aud = PF_URL",
+        "Signs with the key published at /pf/JWKS"
+      ],
+      "x": 1040,
+      "y": 0
+    },
+    {
+      "id": "ourpf",
+      "group": "as",
+      "label": "Our PingFederate · resource AS",
+      "sub": [
+        "PF_URL · /as/token.oauth2",
+        "JWT bearer grant through an IdP connection to Acme",
+        "Client PF_REDEEMER_CLIENT_ID (id-jag-redeemer)",
+        "Mints from its access token manager"
+      ],
+      "x": 1040,
+      "y": 600
+    },
+    {
+      "id": "mcp",
+      "group": "rs",
+      "label": "mcp-sample · MCP server",
+      "sub": [
+        "MCP_URL · POST /mcp",
+        "Verifies the token against resource-as /jwks: typ, iss, aud, exp",
+        "tools/list shows only what the scope allows"
+      ],
+      "x": 1560,
+      "y": 300
+    },
+    {
+      "id": "profile",
+      "group": "rs",
+      "label": "Protected resource",
+      "sub": [
+        "GET /protected/profile on mcp-sample",
+        "Same bearer validation as the MCP tools",
+        "Says which check failed when it refuses"
+      ],
+      "x": 520,
+      "y": 640
+    }
+  ],
+  "edges": [
+    {
+      "source": "browser",
+      "target": "acme",
+      "label": "sign-in dialog → /issuer/pi-flow (pi.flow at Acme, code + PKCE, prompt=login)"
+    },
+    {
+      "source": "acme",
+      "target": "server",
+      "label": "code → /issuer/callback · server keeps the Acme refresh token"
+    },
+    {
+      "source": "browser",
+      "target": "server",
+      "label": "POST /api/id-jag-playground/… (cookie only)"
+    },
+    {
+      "source": "server",
+      "target": "acme",
+      "label": "RFC 8693 token exchange · requested_token_type=id-jag · audience=PF_URL"
+    },
+    {
+      "source": "server",
+      "target": "ourpf",
+      "label": "RFC 7523 jwt-bearer · client_id PF_REDEEMER_CLIENT_ID"
+    },
+    {
+      "source": "ourpf",
+      "target": "acme",
+      "label": "IdP connection fetches Acme's /pf/JWKS (single key)",
+      "dashed": true
+    },
+    {
+      "source": "server",
+      "target": "mcp",
+      "label": "tools/list · tools/call (Bearer PingFederate token) → refused"
+    },
+    {
+      "source": "server",
+      "target": "profile",
+      "label": "GET /protected/profile → refused, names the failed check"
+    },
+    {
+      "source": "server",
+      "target": "ourpf",
+      "label": "broken assertions: replay · tampered signature · other client · extra scope"
+    }
+  ],
+  "steps": [
+    {
+      "title": "Sign in at Acme",
+      "what": "A sign-in at the Acme PingFederate's own login page, separate from this app's sign-in. The server runs code + PKCE against Acme and keeps its refresh token.",
+      "why": "Two PingFederates on purpose: an IdP must not redeem its own ID-JAG (draft §9.3).",
+      "edges": [
+        0,
+        1
+      ]
+    },
+    {
+      "title": "Get an ID-JAG from Acme",
+      "what": "RFC 8693 token exchange at Acme with requested_token_type=…:id-jag, subject = the Acme refresh token, audience = our PingFederate's issuer (PF_URL).",
+      "why": "Two PingFederates on purpose: an IdP must not redeem its own ID-JAG (draft §9.3).",
+      "edges": [
+        2,
+        3
+      ]
+    },
+    {
+      "title": "Redeem at our PingFederate",
+      "what": "RFC 7523 JWT bearer grant at our PingFederate as PF_REDEEMER_CLIENT_ID. Its IdP connection to Acme verifies the signature with Acme's JWKS, then its access token manager mints the access token.",
+      "why": "Gotcha: PingFederate cannot pick a key by x5t. Acme must publish a single-key JWKS, and our PingFederate caches it: re-save the IdP connection (or restart it) after a key change, or redeem fails with \"Invalid JWT token\".",
+      "edges": [
+        2,
+        4,
+        5
+      ]
+    },
+    {
+      "title": "Call mcp-sample (refused)",
+      "what": "tools/list and the protected page go to mcp-sample with our PingFederate's token. mcp-sample trusts resource-as's tokens only, so it refuses and names the failed check: the expected outcome in this mode.",
+      "why": "Our PingFederate minted this access token, and mcp-sample trusts resource-as only, so the MCP call and the protected page refuse it and say which check failed. PingFederate → resource AS shows them accepted.",
+      "edges": [
+        2,
+        6,
+        7
+      ]
+    },
+    {
+      "title": "Negative tests",
+      "what": "Each test mints a fresh ID-JAG at Acme, breaks one thing and expects our PingFederate to refuse it with no token.",
+      "edges": [
+        2,
+        3,
+        8
+      ]
+    }
+  ]
+}

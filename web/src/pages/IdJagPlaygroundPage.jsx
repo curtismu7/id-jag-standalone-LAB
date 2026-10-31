@@ -23,7 +23,7 @@ const MODE_KEY = "idjag.playground.mode";
 const VIEW_KEY = "idjag.playground.view";
 
 const MODES = [
-  { id: "mock", label: "Mock (no sign-in)" },
+  { id: "mock", label: "Sample data (browser)" },
   { id: "pf-as", label: "PingFederate → resource AS" },
   { id: "pf-pf", label: "Acme PingFederate → PingFederate" },
   { id: "byo", label: "Your IdP → our resource AS" },
@@ -86,7 +86,7 @@ const MODE_TEXT = {
   mock: {
     story: "Mary signs in once at the company's PingFederate, and the agent then reads Mary's data from the sample MCP server without a second sign-in. In this mode every step uses sample data and nothing is sent.",
     signInTitle: "Sign in with PingFederate",
-    signInNote: "Mock mode needs no sign-in: every step below uses sample data in your browser.",
+    signInNote: "Sample data needs no sign-in: every step below uses sample data in your browser and sends nothing. (The Mock/Live switch in the header is separate: it chooses what the other modes talk to.)",
     redeemTitle: "Redeem it at the MCP authorization server",
     asRole: "Redeems the ID-JAG, mints its own token",
     mcpRole: "The sample MCP server",
@@ -829,7 +829,7 @@ export default function IdJagPlaygroundPage() {
   // Why SAML is off here: the server's reason, or that it needs pf-as, or (an older server) the old text.
   const samlTitle = !config?.saml ? SAML_UNVERIFIED : config.saml.available ? SAML_ONLY_PF_AS : config.saml.reason || SAML_ONLY_PF_AS;
   const signedInHere = realSaml ? !!config?.saml?.appSignedIn : !!config?.signedIn; // SAML needs the app sign-in; OIDC the issuer's
-  const signInStatus = isMock ? "Mock: no sign-in needed."
+  const signInStatus = isMock ? "Sample data: no sign-in needed."
     : realSaml ? `${signedInHere ? "Signed in" : "Not signed in"} to this app.`
     : `${config?.signedIn ? "Signed in" : "Not signed in"} at ${config?.idp?.name || "the issuer PingFederate"}.`;
 
@@ -842,7 +842,7 @@ export default function IdJagPlaygroundPage() {
             <h1>ID-JAG Playground</h1>
             <p className="ijp-lede">
               Run the real flow one step at a time against your PingFederate, our resource authorization server and
-              the sample MCP server. Every request and response is shown (tokens decoded, never raw), each button runs a
+              the sample MCP server. Every request and response is shown (in Mock mode the mock tokens are shown raw and labelled mock; real tokens stay on the server and are shown decoded), each button runs a
               pre-flight check first, the ID-JAG is checked against the IETF draft, and live negative tests confirm the
               authorization server refuses what it should.
             </p>
@@ -869,7 +869,7 @@ export default function IdJagPlaygroundPage() {
           </div>
         </div>
         {gateAt("mode")}
-        {isMock && <p className="ijp-mock-badge" role="status" data-testid="ijp-mock-badge">Mock: sample data, nothing is sent</p>}
+        {isMock && <p className="ijp-mock-badge" role="status" data-testid="ijp-mock-badge">Sample data: nothing is sent</p>}
         {config && <BackendsStrip client={client} mode={isMock ? "mock" : config.mode || mode} />}
         {config && !isMock && (config.mode || mode) === "pf-as" && <InteropPanel client={client} base={API} />}
         <p className="ijp-story" data-testid="ijp-story"><strong>The story.</strong> {text.story}</p>
