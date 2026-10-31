@@ -1,0 +1,6 @@
+{
+  "name": "Northwind Bank",
+  "vertical": "banking",
+  "persona": { "lena": "Priya" },
+  "brand": { "primary": "#0b6bcb", "headerStart": "#0a2540", "headerEnd": "#12395f" }
+}

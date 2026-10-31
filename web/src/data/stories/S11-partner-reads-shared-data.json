@@ -1,0 +1,63 @@
+{
+  "id": "S11",
+  "title": "{{lena}} reads shared data from {{vocab.partnerShort}}",
+  "modes": ["byo"],
+  "demos": ["C1"],
+  "goal": "{{lena}} works at {{vocab.partner}}. Their agent needs to read {{vocab.resource}} that we host, without a second account or a shared password.",
+  "obstacle": "Two companies, two identity providers. We must take {{vocab.partnerShort}}'s word about who {{lena}} is, but only for what we choose to allow.",
+  "control": "ID-JAG: the partner's IdP issues an Identity Assertion JWT Authorization Grant addressed to our authorization server, which redeems it for its own access token.",
+  "say": "No shared passwords, no duplicate accounts, and we still decide what {{lena}}'s agent can read.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "Bring in the partner's ID-JAG",
+      "tell": "{{vocab.partnerShort}}'s IdP has already signed {{lena}} in and issued an ID-JAG for our authorization server. Here you paste it, or fetch one from xaa.dev's free IdP.",
+      "say": "The partner vouches for {{lena}}. We create no account for them.",
+      "why": "Identity travels from the company that actually knows the person."
+    },
+    {
+      "n": 2,
+      "title": "Check it against the draft",
+      "tell": "Before trusting it, the ID-JAG is checked against the IETF draft: type, issuer, a single audience, client_id, expiry.",
+      "say": "Every check has a name, so a refusal is never a mystery.",
+      "why": "Most partner-access failures are one wrong claim; this names it.",
+      "blocked": {
+        "tell": "Change one claim, a wrong audience for example, and the same check fails and names the claim.",
+        "say": "One bad claim and the grant is refused, with the reason."
+      }
+    },
+    {
+      "n": 3,
+      "title": "Redeem it at our authorization server",
+      "tell": "Our authorization server verifies the partner's signature against the Trusted IdPs list and redeems the ID-JAG for its own access token, never granting more than the ID-JAG's scope.",
+      "say": "We trust {{vocab.partnerShort}} only because an admin approved it.",
+      "why": "Trust is an explicit, audited decision, not a side effect.",
+      "blocked": {
+        "tell": "If the partner's IdP is not on the Trusted IdPs list, or not yet approved, redemption is refused and the reason is recorded.",
+        "say": "Unknown or unapproved IdP: no token."
+      }
+    },
+    {
+      "n": 4,
+      "title": "The agent calls {{vocab.resourceTool}}",
+      "tell": "{{lena}}'s agent calls {{vocab.resourceTool}} with the new access token. The server checks it against our authorization server's keys, so only what the token allows is listed.",
+      "say": "The agent sees only what its token says, nothing the partner can widen.",
+      "why": "The resource owner decides, not the partner.",
+      "blocked": {
+        "tell": "Call with no token, or with the raw ID-JAG: both are refused, and the server says which check failed.",
+        "say": "The ID-JAG is not an access token, and the server knows the difference."
+      }
+    },
+    {
+      "n": 5,
+      "title": "Prove the refusals",
+      "tell": "Live negative tests break the assertion one way at a time and confirm the authorization server refuses each with an OAuth error and no token.",
+      "say": "We show the refusals, not just the happy path.",
+      "why": "A grant you cannot refuse is not a control."
+    }
+  ],
+  "proof": {
+    "happy": "The decoded access token: subject {{lena}}, scope limited to what was granted, issued by our authorization server.",
+    "blocked": "The refusal: an OAuth error that names the failed check, and no token."
+  }
+}

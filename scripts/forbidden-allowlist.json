@@ -1,0 +1,14 @@
+{
+  "_comment": "Hosts and ids the forbidden-string gate lets through, each with the reason. Add nothing here without a reason.",
+  "hosts": [
+    {
+      "host": "pf.example.invalid",
+      "reason": "Placeholder default PF_URL in server/src/config.js and .env.example. Replace it with your own PingFederate host in your local .env; never commit a real host."
+    },
+    {
+      "host": "pf-acme.example.invalid",
+      "reason": "Placeholder default ACME_PF_URL in server/src/config.js and .env.example. Replace it with your own outside-company PingFederate host in your local .env."
+    }
+  ],
+  "uuids": []
+}

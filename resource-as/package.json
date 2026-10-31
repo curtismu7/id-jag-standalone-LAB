@@ -1,0 +1,18 @@
+{
+  "name": "id-jag-resource-as",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Resource authorization server that redeems ID-JAGs (draft-ietf-oauth-identity-assertion-authz-grant) for audience-bound access tokens",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "jose": "^6.1.3"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}

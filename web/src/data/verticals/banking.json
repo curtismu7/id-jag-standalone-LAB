@@ -1,0 +1,18 @@
+{
+  "id": "banking",
+  "displayName": "Super Banking",
+  "tagline": "AI-Powered Banking Demo",
+  "source": "AI-DEMO2 demo_api_server/config/verticals/banking/manifest.json (identity, theme)",
+  "brand": { "primary": "#b91c1c", "headerStart": "#1d4ed8", "headerEnd": "#1d4ed8" },
+  "vocab": {
+    "partner": "a partner bank",
+    "partnerShort": "the partner bank",
+    "resource": "the shared account and statement data",
+    "resourceTool": "the banking MCP server"
+  },
+  "cast": {
+    "lena": { "name": "Lena", "role": "Relationship manager at the partner bank" },
+    "mark": { "name": "Mark", "role": "Banker at the bank" },
+    "mary": { "name": "Mary", "role": "Analyst at the bank" }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "id": "S13",
+  "title": "{{mark}} leaves the company in the middle of a task",
+  "modes": ["pf-as"],
+  "demos": ["C12"],
+  "goal": "{{mark}} has left the company, and IT must stop {{mark}}'s agent, which is signed in and part-way through a task on {{vocab.resourceTool}}.",
+  "obstacle": "The agent holds a refresh token at PingFederate, so on its own it could keep asking for new ID-JAGs, and through them new access tokens, after {{mark}} is gone.",
+  "control": "ID-JAG from PingFederate, plus token revocation (RFC 7009): PingFederate decides whether the agent may act, our resource authorization server decides what it may read, and revoking the refresh token makes PingFederate refuse the next ID-JAG request.",
+  "say": "The agent works only while PingFederate says it may, and revoking stops it getting anything new.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "Sign in once at PingFederate",
+      "tell": "{{mark}} signs in at the issuer PingFederate. This app's server keeps the refresh token from that sign-in, and the ID-JAG is minted from it. Raw tokens never reach the browser. If you already signed in to this app, this step is done.",
+      "say": "One sign-in at the company's own identity provider. That session is what the agent borrows.",
+      "why": "Everything the agent gets later traces back to this one session."
+    },
+    {
+      "n": 2,
+      "title": "The agent asks PingFederate for an ID-JAG",
+      "tell": "Acting as the agent, the app asks PingFederate for an ID-JAG by token exchange (RFC 8693), addressed to our resource authorization server. PingFederate decides whether the agent may act and returns a short-lived JWT typed oauth-id-jag+jwt.",
+      "say": "The decision to let the agent act is made at the identity provider, not by the agent.",
+      "why": "A single place decides, so a single place can take the decision back."
+    },
+    {
+      "n": 3,
+      "title": "Redeem it at the resource authorization server",
+      "tell": "Our resource authorization server trusts PingFederate as an issuer, verifies the ID-JAG and trades it for its own access token, never granting more than the ID-JAG's scope. The authorization server's own page lists every redemption it accepted or refused.",
+      "say": "We accept the grant because PingFederate issued it, and we still mint our own token.",
+      "why": "The resource side keeps its own record of what it accepted."
+    },
+    {
+      "n": 4,
+      "title": "The agent calls {{vocab.resourceTool}}",
+      "tell": "The agent calls the sample MCP server with the new access token. The server verifies it against the resource authorization server's keys, so the tools listed are whatever the token's scope allows.",
+      "say": "While {{mark}} is here, the agent does the work.",
+      "why": "This is the working state that the revoke in step 6 will cut off."
+    },
+    {
+      "n": 5,
+      "title": "Prove the grant cannot be bent",
+      "tell": "Run all makes four live tests. Each mints a fresh ID-JAG, breaks one thing (replay, a tampered signature, the wrong client, a scope that was not granted) and expects an OAuth error and no token.",
+      "say": "Before trusting the flow, we show it refuses broken grants.",
+      "why": "A grant you cannot refuse is not a control."
+    },
+    {
+      "n": 6,
+      "title": "Revoke and prove it",
+      "tell": "Revoke and retry first asks PingFederate for an ID-JAG, as a control, so a later refusal cannot be a setup problem. That works while {{mark}}'s session is live.",
+      "say": "First we show the agent could still get a grant.",
+      "why": "The control shows the refusal is caused by the revoke and nothing else. With a SAML sign-in there is no refresh token, so this step is hidden.",
+      "blocked": {
+        "tell": "Then it revokes this session's refresh token at PingFederate and asks again. The retry is refused with an OAuth error, and the verdict reads Proved: PingFederate refused a new ID-JAG. Access tokens already minted stay valid until they expire, and the resource authorization server is not told.",
+        "say": "Revoking stops the agent getting anything new. What it already holds runs out on its own."
+      }
+    }
+  ],
+  "proof": {
+    "happy": "The decoded access token from our resource authorization server: issued by it, with scope no wider than the ID-JAG's.",
+    "blocked": "Step 6's verdict, Proved: PingFederate refused a new ID-JAG, with the control exchange before the revoke and the refused retry after it."
+  }
+}

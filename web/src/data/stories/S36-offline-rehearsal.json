@@ -1,0 +1,65 @@
+{
+  "id": "S36",
+  "title": "{{mary}}'s agent calls {{vocab.resourceTool}}, rehearsed offline",
+  "modes": ["mock"],
+  "goal": "{{mary}}'s agent needs to call tools on {{vocab.resourceTool}} on {{mary}}'s behalf. You can show the whole flow with no sign-in and no tenant.",
+  "obstacle": "The agent starts with a grant, an ID-JAG, and a resource server must not accept that as a key. It has to be traded for an access token first, and the server must refuse anything else.",
+  "control": "ID-JAG in mock mode: a sample PingFederate issues the ID-JAG, a sample authorization server redeems it for an access token, and the sample resource server accepts only that token. Everything is sample data in the browser and nothing is sent.",
+  "say": "Even with no network and no tenant, we can show every step, and what the server accepts and what it refuses.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "Nothing to sign in to",
+      "tell": "Mock mode needs no sign-in. The page is marked Mock: sample data, nothing is sent, and every step uses sample data in the browser.",
+      "say": "This runs with no sign-in and no tenant, so it cannot fail on the day.",
+      "why": "A rehearsal that cannot break, before the live demo."
+    },
+    {
+      "n": 2,
+      "title": "Request the ID-JAG",
+      "tell": "Request ID-JAG returns a sample from the sample PingFederate: typ oauth-id-jag+jwt, addressed to the sample authorization server, valid for 300 seconds, for the sample subject user.0042.",
+      "say": "The grant is short-lived and addressed to one authorization server.",
+      "why": "A grant that could be replayed anywhere would be a bearer token by another name."
+    },
+    {
+      "n": 3,
+      "title": "Redeem it",
+      "tell": "The sample authorization server trades the ID-JAG for an access token (typ at+jwt, valid for an hour). Under Scope to request, leave all scopes or pick just mcp:read: the token carries no more than the ID-JAG's scope. The authorization server's record of the redemption is shown, marked as a sample.",
+      "say": "The access token can carry less than the grant, never more.",
+      "why": "The resource owner's side decides what is actually granted."
+    },
+    {
+      "n": 4,
+      "title": "The agent calls {{vocab.resourceTool}}",
+      "tell": "List tools shows the sample tools search_records, get_record and create_note, and notes that delete_record is hidden from this token by scope (it needs mcp:admin). Results are sample data.",
+      "say": "The agent sees only what its token allows.",
+      "why": "The tools the agent never sees are the ones it cannot be tricked into calling.",
+      "blocked": {
+        "tell": "Switch Resource to REST API, then try without a token and with the raw ID-JAG. Both are refused with 401: no Authorization: Bearer header, or an ID-JAG that is a grant for the authorization server to redeem, never an access token for a resource.",
+        "say": "The grant is not a key, and the server says exactly why."
+      }
+    },
+    {
+      "n": 5,
+      "title": "Run the refusals",
+      "tell": "Run all shows four sample refusals, each with an OAuth error and no token: a replayed ID-JAG, a tampered signature, a different client, and a scope the IdP did not grant.",
+      "say": "A real authorization server refuses all four, and this shows what that looks like.",
+      "why": "A grant you cannot refuse is not a control."
+    },
+    {
+      "n": 6,
+      "title": "Revoke and prove it",
+      "tell": "Revoke and retry shows a sample control exchange that works, a sample revocation of the refresh token, and then a refused retry.",
+      "say": "Once the session is revoked, no new grant is issued.",
+      "why": "In mock mode the revoke, like everything else here, is sample data.",
+      "blocked": {
+        "tell": "The sample retry is refused with invalid_request, and the verdict reads Proved: PingFederate refused a new ID-JAG (invalid_request).",
+        "say": "After the revoke, the same request gets nothing."
+      }
+    }
+  ],
+  "proof": {
+    "happy": "The decoded sample access token: issued by the sample authorization server, audience the sample MCP resource, scope no wider than the ID-JAG's.",
+    "blocked": "The resource page's 401 for no token or for the raw ID-JAG, naming the failed check, and the sample OAuth errors from the refusals."
+  }
+}

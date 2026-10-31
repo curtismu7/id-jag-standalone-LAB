@@ -1,0 +1,12 @@
+.signin-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 1rem; background: rgba(5, 23, 39, 0.6); }
+.signin-dialog { width: min(24rem, 100%); padding: 1.5rem; border-top: 3px solid var(--ping-red); border-radius: 8px; background: var(--th-bg-card); color: var(--th-text); }
+.signin-dialog h2 { margin: 0 0 1rem; font-size: 1.15rem; }
+.signin-dialog label { display: block; margin: 0.75rem 0 0.25rem; font-size: var(--font-size-xs); font-weight: 600; }
+.signin-dialog input { width: 100%; box-sizing: border-box; padding: 0.5rem 0.65rem; border: 1px solid var(--th-border); border-radius: 6px; background: var(--th-bg); color: var(--th-text); font: inherit; }
+.signin-dialog input:focus-visible, .signin-dialog button:focus-visible { outline: 2px solid var(--ping-red); outline-offset: 2px; }
+.signin-error { margin: 0.75rem 0 0; color: var(--ping-red-deep); font-size: var(--font-size-xs); font-weight: 600; }
+:root[data-theme="dark"] .signin-error { color: #ff8a8a; }
+.signin-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem; }
+.signin-actions button { padding: 0.45rem 1rem; border-radius: 6px; font: inherit; font-size: var(--font-size-xs); font-weight: 600; cursor: pointer; }
+.signin-cancel { border: 1px solid var(--th-border); background: transparent; color: var(--th-text); }
+.signin-submit { border: 0; background: var(--ping-grad); color: var(--brand-on, #fff); }
