@@ -145,6 +145,7 @@ describe("label words and scale", () => {
     expect(wordsShown({ place, on: true, dragging: true })).toBe(false);
     expect(wordsShown({ place: { ...place, ok: false }, on: true, hover: true })).toBe(false);
     expect(wordsShown({ on: true })).toBe(true); // no route, so no place to choose: the words sit on the plain path
+    expect(wordsShown({ on: true, fallback: true })).toBe(false); // the router found no way round: drawn plain, not placed, so no words that could cover a box
   });
   it("counter-scales the label by 1 / zoom and anchors the badge centre on the arrow for every side and alignment", () => {
     expect(labelTransform(place, 100, 50, 0.5)).toBe("translate(100px,50px) scale(2) translate(-12px,-50%)");

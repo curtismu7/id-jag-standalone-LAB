@@ -20,7 +20,7 @@ The flow: get an ID-JAG from an IdP (RFC 8693 token exchange), check it against 
 
 ## Run from a clone
 
-Prerequisites: Node 22 or newer (Node 22 is what the tests and CI run on). Docker is needed only for the Docker form.
+Prerequisites: Node 26 or newer (Node 26 is what the tests and CI run on). Docker is needed only for the Docker form.
 
 ```sh
 git clone https://github.com/ping-sandbox/id-jag-standalone-LAB.git
@@ -99,7 +99,7 @@ It publishes to 127.0.0.1 only: 4720 (playground), 4721 (resource-as) and 4722 (
 npm test
 ```
 
-On Node 22 a good run is 1234 tests: web 392, server 708, resource-as 69, mcp-sample 22 and scripts 43. `check-css.sh` (in the AI-DEMO-Standalone repo) and `npm run check:forbidden` should also pass. Under heavy machine load a timing-based test can time out; rerun that file alone to confirm.
+On Node 26 a good run is 1337 tests: web 477, server 708, resource-as 69, mcp-sample 22 and scripts 61. `check-css.sh` (in the AI-DEMO-Standalone repo) and `npm run check:forbidden` should also pass. Under heavy machine load a timing-based test can time out; rerun that file alone to confirm.
 
 ## Troubleshooting
 

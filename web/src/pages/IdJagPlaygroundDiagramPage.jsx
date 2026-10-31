@@ -31,10 +31,11 @@ function Card({ data, selected }) {
 /**
  * Do the words show on the diagram? For a lit arrow, or on hover (the arrow's or its entry in the step list), and only
  * where they found a clear place: words that would cover a box or another label are not drawn, and stay in the step list
- * and in the badge's tooltip. While a box is dragged only the badges move. An arrow with no route at all (boxes not measured
- * yet, or no way round) has no place to choose: its words then sit on the plain path.
+ * and in the badge's tooltip. While a box is dragged only the badges move. An arrow whose boxes are not measured yet has no
+ * place to choose: its words sit on the plain path. An arrow the router found no way round for (`fallback`, boxes dragged
+ * close together) is drawn plain and is not placed, so its words are not drawn either: they could cover a box or a label.
  */
-export const wordsShown = ({ place, on, hover, dragging }) => !dragging && !!(hover || on) && (place ? place.ok : true);
+export const wordsShown = ({ place, on, hover, dragging, fallback }) => !dragging && !fallback && !!(hover || on) && (place ? place.ok : true);
 
 /**
  * CSS transform of a label whose anchor is (lx, ly) in flow pixels: counter-scaled by 1 / zoom around the anchor so it keeps
@@ -60,7 +61,7 @@ function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targ
   const place = routed ? data.place : undefined;
   const { x: lx, y: ly } = place || (routed ? labelPoint(data.route.pts) : { x: sx, y: sy });
   const [hover, setHover] = useState(false);
-  const words = wordsShown({ place, on: data.on, hover: hover || data.listHover, dragging: data.dragging });
+  const words = wordsShown({ place, on: data.on, hover: hover || data.listHover, dragging: data.dragging, fallback: !!data.route && !data.route.ok });
   const transform = labelTransform(place, lx, ly, zoom);
   return (
     <>
