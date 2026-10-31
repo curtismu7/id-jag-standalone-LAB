@@ -6,6 +6,7 @@
  *
  *   kubectl -n <ns> port-forward svc/pingfederate-admin 19999:9999 &
  *   node pingfederate/configure-signin.js --ns=<ns> [--port=19999] [--app-origin=https://…]
+ *   node pingfederate/configure-signin.js --local [--app-origin=https://…]    # no PingOne: see below
  *
  * Creates (ids prefixed idJagKit, client PF_EXCHANGE_CLIENT_ID else id-jag-kit):
  *   - an OIDC IdP connection to STANDALONE_P1_ISSUER with the PingOne app STANDALONE_P1_PF_APP_CLIENT_ID / _SECRET
@@ -15,6 +16,9 @@
  *     ${APP_ORIGIN}/api/id-jag-playground/issuer/callback (a rerun with another --app-origin adds that origin's pair)
  *   - a new FIRST authentication policy: "is it this client?" yes → PingOne, no → CONTINUE to the policies that were
  *     already there, which are not changed.
+ * With --local (used by `npm run setup`, mode pf-local) there is no PingOne: everything above is created except the IdP
+ * connection and the authentication policy, plus the OAuth scopes a new PingFederate lacks. configure-local-signin.js then adds the policy, signing the kit's users in
+ * at PingFederate itself. The admin API is reached by PF_ADMIN_URL (see pf-admin.js), so --ns and --port are not needed.
  * Writes PF_EXCHANGE_CLIENT_ID / PF_EXCHANGE_CLIENT_SECRET to the repo-root .env when it creates the client
  * (the secret is generated here and never printed).
  */
@@ -24,9 +28,10 @@ const { args, setting, secret, report, writeEnv, acceptAll, from, same } = pf;
 
 const NS = setting('ns', null, 'the namespace holding the pingfederate-admin secret');
 const PORT = args.port || '19999';
-const P1_ISSUER = setting('p1-issuer', 'STANDALONE_P1_ISSUER', 'the PingOne issuer (run tools/provision-pingone-signin.js)');
-const P1_CLIENT = setting('p1-client', 'STANDALONE_P1_PF_APP_CLIENT_ID', 'the PingOne app for PingFederate');
-const P1_SECRET = secret('STANDALONE_P1_PF_APP_CLIENT_SECRET');
+const LOCAL = Boolean(args.local);
+const P1_ISSUER = LOCAL ? '' : setting('p1-issuer', 'STANDALONE_P1_ISSUER', 'the PingOne issuer (run tools/provision-pingone-signin.js)');
+const P1_CLIENT = LOCAL ? '' : setting('p1-client', 'STANDALONE_P1_PF_APP_CLIENT_ID', 'the PingOne app for PingFederate');
+const P1_SECRET = LOCAL ? '' : secret('STANDALONE_P1_PF_APP_CLIENT_SECRET');
 const APP_ORIGIN = String(args['app-origin'] || process.env.APP_ORIGIN || 'http://localhost:4720').replace(/\/$/, '');
 const CLIENT = process.env.PF_EXCHANGE_CLIENT_ID || 'id-jag-kit';
 const ID = { conn: 'idJagKitP1', apc: 'idJagKitApc', atm: 'idJagKitAtm', oidc: 'idJagKitOidc', selector: 'idJagKitClientSelector' };
@@ -36,16 +41,16 @@ const api = pf.adminApi(NS, PORT);
 const ensure = (...a) => pf.ensure(api, ...a);
 
 (async () => {
-  console.log(`[pf] sign-in for ${CLIENT} at PingOne ${P1_ISSUER} (admin via localhost:${PORT}, ns ${NS})`);
+  console.log(LOCAL ? `[pf] sign-in objects for ${CLIENT} (local users, no PingOne)` : `[pf] sign-in for ${CLIENT} at PingOne ${P1_ISSUER} (admin via localhost:${PORT}, ns ${NS})`);
 
-  const meta = await fetch(`${P1_ISSUER}/.well-known/openid-configuration`).then((r) => r.json());
-  if (meta.issuer !== P1_ISSUER) { console.error(`PingOne discovery names issuer ${meta.issuer}`); process.exit(1); }
+  const meta = LOCAL ? null : await fetch(`${P1_ISSUER}/.well-known/openid-configuration`).then((r) => r.json());
+  if (meta && meta.issuer !== P1_ISSUER) { console.error(`PingOne discovery names issuer ${meta.issuer}`); process.exit(1); }
 
   await ensure(`policy contract ${ID.apc}`, `/authenticationPolicyContracts/${ID.apc}`, '/authenticationPolicyContracts', {
     id: ID.apc, name: 'ID-JAG Kit sign-in', coreAttributes: [{ name: 'subject' }], extendedAttributes: CLAIMS.map((name) => ({ name })),
   });
 
-  await ensure(`IdP connection ${ID.conn} (PingOne)`, `/sp/idpConnections/${ID.conn}`, '/sp/idpConnections', {
+  if (!LOCAL) await ensure(`IdP connection ${ID.conn} (PingOne)`, `/sp/idpConnections/${ID.conn}`, '/sp/idpConnections', {
     type: 'IDP', id: ID.conn, name: 'ID-JAG Kit: PingOne sign-in', entityId: P1_ISSUER, active: true, loggingMode: 'STANDARD',
     oidcClientCredentials: { clientId: P1_CLIENT, clientSecret: P1_SECRET },
     idpBrowserSso: {
@@ -107,6 +112,15 @@ const ensure = (...a) => pf.ensure(api, ...a);
     report(`${ID.oidc}: return an ID token on refresh`, await api('PUT', `/oauth/openIdConnect/policies/${ID.oidc}`, { ...oidc.body, returnIdTokenOnRefreshGrant: true }));
   }
 
+  if (LOCAL) { // a new PingFederate defines none of the scopes the kit's client is restricted to (the client create answers 422)
+    const settings = (await api('GET', '/oauth/authServerSettings')).body || {}; // scopes = the common scopes
+    const have = new Set([...(settings.scopes || []), ...(settings.exclusiveScopes || [])].map((x) => x.name));
+    for (const name of ['openid', 'profile', 'email', 'offline_access']) {
+      if (have.has(name)) console.log(`  keep scope ${name}`);
+      else report(`create scope ${name}`, await api('POST', '/oauth/authServerSettings/scopes/commonScopes', { name, description: `${name} (ID-JAG Kit)` }));
+    }
+  }
+
   const redirects = [`${APP_ORIGIN}/auth/callback`, `${APP_ORIGIN}/api/id-jag-playground/issuer/callback`];
   const client = await api('GET', `/oauth/clients/${encodeURIComponent(CLIENT)}`);
   if (client.status === 200) {
@@ -142,6 +156,7 @@ const ensure = (...a) => pf.ensure(api, ...a);
     configuration: { fields: [], tables: [{ name: 'Clients', rows: [{ defaultRow: false, fields: [{ name: 'Client ID', value: CLIENT }] }] }] },
   });
 
+  if (LOCAL) { pf.done('pf', '[pf] done. Next: configure-local-signin.js adds the sign-in policy and the kit users.'); return; }
   const policy = await api('GET', '/authenticationPolicies/default');
   if (policy.body.authnSelectionTrees.some((t) => t.rootNode.action.authenticationSelectorRef?.id === ID.selector)) console.log('  keep authentication policy');
   else {
