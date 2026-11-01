@@ -93,13 +93,11 @@ function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targ
   );
 }
 const nodeTypes = { card: Card };
-// Labels keep one size on screen, so below this zoom the diagram is too small to hold them without covering each other.
-// The view never zooms out further (a phone shows part of the diagram and pans); the Fit button fits down to this zoom.
-const MIN_ZOOM = 0.4;
-// A diagram whose text must stay readable never zooms out below this: a card's smallest text is 11.52px, so at 0.9 it is 10.4px on screen
-// (10px is the floor). Its boxes sit close together so the whole map still fits a desktop canvas; a phone pans.
-const READABLE_MIN_ZOOM = 0.9;
-const READABLE_MODES = new Set(["gateway-redeem"]);
+// No diagram zooms out below this, so no card text on screen is under 10px: a card's smallest text is 11.52px (.72rem), which is
+// 10.37px at 0.9 (10px is the floor; a test reads the CSS and pins both). Boxes sit close together so the whole map still fits a
+// desktop canvas where it can; a phone, or a map wider than the canvas, shows part of it and pans. Labels keep one size on screen
+// and are placed in screen pixels, so this floor also keeps them from crowding. The Fit button fits down to this zoom.
+export const READABLE_MIN_ZOOM = 0.9;
 const edgeTypes = { flow: FlowEdge };
 
 /** Computed nodes made draggable: remembers where each node was dropped (view-only, resets on reload). */
@@ -173,7 +171,11 @@ function textMeasure() {
 
 function PlaygroundFlow({ mode, d }) {
   const rf = useReactFlow();
-  const measured = useNodesInitialized(); // a ?step deep link can only zoom once nodes have sizes
+  const measuredNow = useNodesInitialized(); // a ?step deep link can only zoom once nodes have sizes
+  // Latched: dropping a dragged box hands React Flow new node objects, which briefly reads as "not measured" and back. Without the
+  // latch that blip re-ran the step's fit on every drag, so the view jumped under the pointer and boxes landed far from where they were dropped.
+  const [measured, setMeasured] = useState(false);
+  useEffect(() => { if (measuredNow) setMeasured(true); }, [measuredNow]);
   const last = d.steps.length;
   const [step, setStepState] = useState(() => readStep(last));
   // The selected actor follows the step: kept when the step lights it, else the step's focus actor (none on the overview).
@@ -385,7 +387,7 @@ function PlaygroundFlow({ mode, d }) {
         </div>
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
           onNodesChange={onNodesChange} nodesDraggable nodeDragThreshold={5} onNodeClick={onNodeClick} onNodeDragStart={() => setDragging(true)} onNodeDragStop={() => { lastDrag.current = Date.now(); setDragging(false); }} connectionMode={ConnectionMode.Loose}
-          fitView fitViewOptions={{ padding: 0.05 }} minZoom={READABLE_MODES.has(mode) ? READABLE_MIN_ZOOM : MIN_ZOOM} nodesConnectable={false} proOptions={{ hideAttribution: true }}>
+          fitView fitViewOptions={{ padding: 0.05 }} minZoom={READABLE_MIN_ZOOM} nodesConnectable={false} proOptions={{ hideAttribution: true }}>
           <Background gap={24} />
           <Controls showInteractive={false} />
         </ReactFlow>

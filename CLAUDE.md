@@ -50,5 +50,5 @@ Mock-only playground mode `gateway-redeem`: the gateway exchanges the caller tok
 - No real tenant IDs, internal hostnames, personal names or customer names. Use `.invalid` or `.example` hosts. `npm run check:forbidden` must pass.
 - Never commit `.env` files or keys. The one settings file is `~/Development/.env` (mode 600).
 - CSS follows `STANDALONE-CSS-STANDARD.md`: tokens only, no colour literals, no `!important`.
-- Diagram labels (web/src/utils/idJagLabelPlacement.js) are placed in screen pixels and drawn counter-scaled, so they keep one size at any zoom. Change a diagram or its zoom limit and run the placement tests; no label may cover a box or another label.
+- Diagram labels (web/src/utils/idJagLabelPlacement.js) are placed in screen pixels and drawn counter-scaled, so they keep one size at any zoom. Change a diagram or its zoom limit and run the placement tests; no label may cover a box or another label. No diagram zooms out below `READABLE_MIN_ZOOM` (0.9, so card text is 10px or more on screen), boxes sit 120-200px apart, and a box dropped never refits the view; tests in `diagrams.test.js` and `IdJagDiagramLegibility.test.jsx` pin all three, so a map wider than the canvas pans instead of shrinking.
 - Node 26 only (engines, Dockerfile and CI).
