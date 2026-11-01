@@ -55,6 +55,20 @@ describe("diagram text stays readable at every zoom the page allows", () => {
     expect(px(".ijx .card ul")).toEqual([0.72 * 16]);
   });
 
+  it("reads every stylesheet the app ships, not only the diagram page's (the body size comes from standalone-ui.css)", () => {
+    expect(cssFiles.length).toBeGreaterThan(3);
+    expect(scan().findings.filter((f) => f.selector === "body").map((f) => f.px)).toContain(14);
+  });
+
+  it("the line is 10px on screen at the floor: 11.12px and up passes, 11.1px does not (rem follows the root size)", () => {
+    expect(bad(".ijx .cs{font-size:11.12px}")).toEqual([]);
+    expect(bad(".ijx .cs{font-size:11.1px}")).toHaveLength(1);
+    expect(bad(".ijx .cs{font-size:.7rem}"), ".7rem is 11.2px at 16px per rem").toEqual([]);
+    expect(bad(".ijx .cs{font-size:.69rem}"), ".69rem is 11.04px").toHaveLength(1);
+    expect(bad("html{font-size:125%}\n.ijx .cs{font-size:.56rem}"), "a root of 125% is 20px, so .56rem is 11.2px").toEqual([]);
+    expect(bad(".ijx .cs{font-size:.56rem}"), ".56rem is 8.96px at 16px per rem").toHaveLength(1);
+  });
+
   it("every rule that can change card text is at least 10px on screen at the lowest zoom, and none zooms or scales it", () => {
     expect(bad()).toEqual([]);
   });
@@ -99,6 +113,7 @@ describe("diagram text stays readable at every zoom the page allows", () => {
 
   // The helper itself: the ways a rule could hide from a scan that is only almost right.
   it.each([
+    ["a selector the DOM cannot parse (read as matching)", ".ijx li:totally-made-up{font-size:.4rem}"],
     ["a comment before the declaration", ".cs{/* c */font-size:.4rem}"],
     ["a comment inside the selector list", ".x,/* c */.cs{font-size:.4rem}"],
     ["the card's selector second in a comma list", ".ijx .nothing,.ijx .cs{font-size:.4rem}"],
