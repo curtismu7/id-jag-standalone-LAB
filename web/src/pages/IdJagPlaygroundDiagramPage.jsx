@@ -53,7 +53,7 @@ export function labelTransform(place, lx, ly, zoom) {
 // The label keeps one size on screen whatever the zoom: it is counter-scaled by 1 / zoom around its anchor,
 // and placeLabels (see PlaygroundFlow) chose the anchor in screen pixels, so no two labels cover each other.
 // data.route is the routed path around the boxes; without it (while a box is dragged, or when no route was found) the plain smooth-step path is drawn.
-function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label, markerEnd, style, data }) {
+export function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label, markerEnd, style, data }) {
   const [smooth, sx, sy] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
   const zoom = useStore((st) => st.transform[2]);
   const routed = data.route && data.route.ok;
@@ -97,9 +97,10 @@ function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targ
 }
 const nodeTypes = { card: Card };
 // No diagram zooms out below this, so no card text on screen is under 10px: a card's smallest text is 11.52px (.72rem), which is
-// 10.37px at 0.9 (10px is the floor; a test reads the CSS and pins both). Boxes sit close together so the whole map still fits a
-// desktop canvas where it can; a phone, or a map wider than the canvas, shows part of it and pans. Labels keep one size on screen
-// and are placed in screen pixels, so this floor also keeps them from crowding. The Fit button fits down to this zoom.
+// 10.37px at 0.9 (10px is the floor; a test reads the CSS and pins both). At this zoom NO diagram fits its canvas at the overview, on a desktop
+// or a phone (measured): the map is wider or taller than the canvas, so the view shows part of it and the user pans (drag the background) or
+// zooms in. Fit and Reset both fit down to this zoom and no further. Boxes sit close together (130 to 190px apart) only so that the part you see
+// holds as many boxes as it can, and so a dragged box still has room for its arrows. Labels keep one size on screen and are placed in screen pixels.
 export const READABLE_MIN_ZOOM = 0.9;
 const edgeTypes = { flow: FlowEdge };
 
@@ -388,8 +389,10 @@ function PlaygroundFlow({ mode, d }) {
           <button onClick={() => rf.fitView({ padding: 0.05, duration: 300 })}>Fit</button>
           <button onClick={fullscreen}>Fullscreen</button>
         </div>
+        {/* autoPanOnNodeDrag off: with the pointer near the canvas edge (a 343px phone canvas is all edge) React Flow pans the view while a box is held, so the box lands further than the pointer moved,
+            often on another box. The view still pans by dragging the background, and Fit refits it. */}
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
-          onNodesChange={onNodesChange} nodesDraggable nodeDragThreshold={5} onNodeClick={onNodeClick} onNodeDragStart={() => setDragging(true)} onNodeDragStop={() => { lastDrag.current = Date.now(); setDragging(false); }} connectionMode={ConnectionMode.Loose}
+          onNodesChange={onNodesChange} nodesDraggable autoPanOnNodeDrag={false} nodeDragThreshold={5} onNodeClick={onNodeClick} onNodeDragStart={() => setDragging(true)} onNodeDragStop={() => { lastDrag.current = Date.now(); setDragging(false); }} connectionMode={ConnectionMode.Loose}
           fitView fitViewOptions={{ padding: 0.05 }} minZoom={READABLE_MIN_ZOOM} nodesConnectable={false} proOptions={{ hideAttribution: true }}>
           <Background gap={24} />
           <Controls showInteractive={false} />
