@@ -100,17 +100,18 @@ export function scanCardCss(cssText, card, kinds = [""]) {
   // whether a selector can match anything in `reach` in any card state: decided once per selector per card (the card does not change between calls)
   const known = (memo.get(card) ?? memo.set(card, new Map()).get(card));
   const queries = [...new Set(rules.map((r) => r.query))].filter((q) => !known.has(q));
-  const matchesAny = (query) => reach.some((el) => { try { return el.matches(query); } catch { return true; } }); // a selector the DOM cannot parse is read as matching: fail closed
+  const safeMatches = (el, query) => { try { return el.matches(query); } catch { return true; } }; // a selector the DOM cannot parse is read as matching: fail closed
+  const matchesAny = (query) => reach.some((el) => safeMatches(el, query));
   const todo = new Set(queries);
   forEachState(card, kinds, () => { for (const q of todo) if (matchesAny(q)) { known.set(q, true); todo.delete(q); } });
   for (const q of todo) known.set(q, false);
   const matched = new Set(rules.filter((r) => known.get(r.query)));
-  const root = [...matched].filter((r) => document.documentElement.matches(staticForm(r.part)) && r.sizes.length);
+  const root = [...matched].filter((r) => safeMatches(document.documentElement, staticForm(r.part)) && r.sizes.length);
   const rootPx = root.length ? Math.min(...root.flatMap((r) => r.sizes.map(rootSize))) : 16;
   const out = [];
   for (const r of rules) {
     if (!matched.has(r)) continue;
-    for (const v of r.sizes) out.push({ selector: r.part, type: "font-size", value: v, px: toPx(v, rootPx) });
+    for (const v of r.sizes) out.push({ selector: r.part, type: "font-size", value: v, px: root.includes(r) ? rootSize(v) : toPx(v, rootPx) });
     for (const v of r.zooms) if (!IDENTITY.test(v)) out.push({ selector: r.part, type: "zoom", value: v, px: null });
     for (const v of r.scales) if (!IDENTITY.test(v) && !identityScale(v)) out.push({ selector: r.part, type: "scale", value: v, px: null });
   }
