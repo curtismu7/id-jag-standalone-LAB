@@ -94,13 +94,13 @@ Click **Run all ten**. Walk the refusals: an assertion from an issuer the target
 
 ## Step 13: Why it matters (DRAFT, not Ping wording)
 
-Say: "Ping's deck has a value panel for each feature, but the copy this lab was given has none for the gateway redeeming the ID-JAG. These three lines are a draft written for this lab from the field names and the feature description. They are not Ping's words, and nothing here is verified on our tenant."
+Say: "Ping's deck has a value panel for each feature, but the copy this lab was given has none for the gateway redeeming the ID-JAG. These three lines are a draft written for this lab from the field names and the feature description, then checked against the IETF draft and how other vendors describe the problem. They are not Ping's words, and nothing here is verified on our tenant."
 
-Challenge: "An agent that calls a third-party app for a user either shares one standing credential with that app, so the app cannot tell which user acted, or has no way to present the user's identity to the app's own issuer."
+Challenge: "Agents often reach other apps through a separate consent screen for each app, which the company's identity provider does not see, or through a static API key that carries no user context. Either way, it is hard to tie the agent's access to a specific user."
 
-Technical: "The gateway exchanges the caller's token for an ID-JAG and, when a Redeem spec with a TokenURL is set, redeems it at the target app's own issuer as an assertion grant, so the app gets a token for the user and no shared secret sits on the agent side. Without Redeem the exchange result is not redeemed."
+Technical: "The gateway trades the caller's token for an ID-JAG (Identity Assertion JWT Authorization Grant), a signed statement that this user may access the other app. When a Redeem setting with a token URL is configured, the gateway presents it to that app's own authorization server to get an access token for the user; without Redeem, it is not presented."
 
-Business: "A third-party app can be brought under per-user, attributable access without issuing it a standing service credential, which shrinks the standing-secret inventory and lets an audit show which user an agent acted for."
+Business: "The app receives a token issued for the individual user, not for an identity shared by every user, so it can tie its access to that user, and it still applies its own policy at its own authorization server. ID-JAG is still an IETF draft and may change."
 
 ## Step 14: Make it the customer's story
 

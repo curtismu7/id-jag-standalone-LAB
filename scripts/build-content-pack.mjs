@@ -25,12 +25,14 @@ function readGuides() {
 
 // DRAFT value text for the gateway redeem feature. Section 10 of the feature prompt has no On-Behalf-Of or ID-JAG row (the slide 48 row there is
 // Intent, Purpose, Behaviour, a different feature), so this is written by this lab's author from the swagger field names (OBO.Redeem) and the
-// feature description. It is NOT Ping wording and is UNVERIFIED on our tenant. The owner replaces it with the real row.
+// feature description, then checked against the IETF draft (-06, 2026-10-31) and how Okta and Auth0 describe the same problem (2026-11-01 review).
+// It claims nothing the swagger does not show: no audit, revocation, consent-removal or no-secret claims. It is NOT Ping wording and is UNVERIFIED on
+// our tenant. The owner replaces it with the real row.
 const WHY_IT_MATTERS = [
   'DRAFT by the lab author, not Ping wording; the owner replaces it. Ping release claim (2026-11-02), UNVERIFIED on our tenant.',
-  "Challenge: An agent that calls a third-party app for a user either shares one standing credential with that app, so the app cannot tell which user acted, or has no way to present the user's identity to the app's own issuer.",
-  "Technical: The gateway exchanges the caller's token for an ID-JAG (leg 1) and, when a Redeem spec with a TokenURL is set, redeems it at the target app's own issuer as an assertion grant (leg 2), so the app gets a token for the user and no shared secret sits on the agent side. Without Redeem the exchange result is not redeemed.",
-  'Business: A third-party app can be brought under per-user, attributable access without issuing it a standing service credential, which shrinks the standing-secret inventory and lets an audit show which user an agent acted for.',
+  "Challenge: Agents often reach other apps through a separate consent screen for each app, which the company's identity provider does not see, or through a static API key that carries no user context. Either way, it is hard to tie the agent's access to a specific user.",
+  "Technical: The gateway trades the caller's token for an ID-JAG (Identity Assertion JWT Authorization Grant), a signed statement that this user may access the other app. When a Redeem setting with a token URL is configured, the gateway presents it to that app's own authorization server to get an access token for the user; without Redeem, it is not presented.",
+  "Business: The app receives a token issued for the individual user, not for an identity shared by every user, so it can tie its access to that user, and it still applies its own policy at its own authorization server. ID-JAG is still an IETF draft and may change.",
 ].join(' ');
 
 export async function buildPack({ commit } = {}) {
