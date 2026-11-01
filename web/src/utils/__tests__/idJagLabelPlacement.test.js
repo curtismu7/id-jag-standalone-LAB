@@ -138,19 +138,23 @@ describe("placeLabels", () => {
   describe("a short run between two boxes", () => {
     const reach = (c, r) => Math.max(0, BADGE / 2 - Math.hypot(Math.max(r.x - c.x, 0, c.x - r.x - r.w), Math.max(r.y - c.y, 0, c.y - r.y - r.h)));
     const cases = [];
-    for (let gap = 22; gap <= 40; gap += 1) for (const dy of [0, 40, 90, -60]) for (const zoom of [0.9, 1.2]) cases.push([gap, dy, zoom]);
-    it("the badge never touches either box from a 24px gap up, and dips under 2.5px into one below that", () => {
+    for (let gap = 22; gap <= 40; gap += 1) for (const off of [0, 40, 90, -60, 7]) for (const zoom of [0.9, 1.2]) for (const across of [true, false]) cases.push([gap, off, zoom, across]);
+    it("the badge never touches either box from a 24px gap up, and dips at most 1.5px into one in a 22 to 24px gap", () => {
       const worst = [];
-      for (const [gap, dy, zoom] of cases) {
-        const a = { x: 0, y: 0, w: 300, h: 150 }, b = { x: 300 + gap / zoom, y: dy, w: 300, h: 150 };
-        const edges = [{ id: "e", from: "a", fh: "R2", to: "b", th: "L2", label: "x" }];
+      let tight = 0;
+      for (const [gap, off, zoom, across] of cases) {
+        // `across`: the boxes side by side (arrow runs left to right), else one above the other (arrow runs downwards)
+        const a = { x: 0, y: 0, w: 300, h: 150 }, b = across ? { x: 300 + gap / zoom, y: off, w: 300, h: 150 } : { x: off, y: 150 + gap / zoom, w: 300, h: 150 };
+        const edges = [{ id: "e", from: "a", fh: across ? "R2" : "B2", to: "b", th: across ? "L2" : "T2", label: "x" }];
         const { routes } = routeEdges({ a, b }, edges);
-        const out = placeLabels(routes, { a, b }, edges, { zoom, tx: 30, ty: 30, view: { w: 1100, h: 600 } }).e;
+        const out = placeLabels(routes, { a, b }, edges, { zoom, tx: 30, ty: 30, view: { w: 1100, h: 800 } }).e;
         const c = { x: out.x * zoom + 30, y: out.y * zoom + 30 };
         const screen = [a, b].map((r) => ({ x: r.x * zoom + 30, y: r.y * zoom + 30, w: r.w * zoom, h: r.h * zoom }));
         const dip = Math.max(...screen.map((r) => reach(c, r)));
-        if (dip > (gap >= BADGE ? 0.01 : 2.5)) worst.push({ gap, dy, zoom, dip: +dip.toFixed(2) });
+        if (gap < BADGE) tight += 1;
+        if (dip > (gap >= BADGE ? 0.01 : 1.5)) worst.push({ gap, off, zoom, across, dip: +dip.toFixed(2) });
       }
+      expect(tight, "the sweep includes gaps too narrow for the badge").toBeGreaterThan(10);
       expect(worst).toEqual([]);
     }, 60000);
   });
