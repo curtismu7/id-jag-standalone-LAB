@@ -1,5 +1,5 @@
 import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES } from "../idJagPlaygroundDiagrams";
-import { handleDir, handlePoint, routeEdges, separateRoutes } from "../idJagPlaygroundRouting";
+import { handleDir, handlePoint, plainRoute, routeEdges, separateRoutes } from "../idJagPlaygroundRouting";
 
 const box = { x: 100, y: 200, w: 300, h: 80 };
 
@@ -40,6 +40,30 @@ describe("routeEdges", () => {
     expect(r.routes.e.pts).toHaveLength(2);
     expect(r.fallbacks).toBe(1);
     expect(r.routes.x).toBeUndefined();
+  });
+});
+
+describe("an arrow with no route is drawn as a plain orthogonal line from handle to handle", () => {
+  const P = (x, y) => ({ x, y });
+  const orthogonal = (pts) => pts.slice(1).every((q, i) => q.x === pts[i].x || q.y === pts[i].y);
+  it("plainRoute is a straight run, an L or a Z, starting and ending on the handles", () => {
+    for (const [a, b, ad, bd] of [[P(0, 0), P(100, 0), "r", "l"], [P(0, 0), P(100, 40), "r", "l"], [P(0, 0), P(100, 40), "b", "t"], [P(0, 0), P(100, 40), "r", "t"], [P(0, 0), P(100, 40), "b", "l"], [P(100, 40), P(0, 0), "l", "r"]]) {
+      const pts = plainRoute(a, b, ad, bd);
+      expect(pts[0]).toEqual(a);
+      expect(pts.at(-1)).toEqual(b);
+      expect(orthogonal(pts), `${ad}${bd} ${JSON.stringify(pts)}`).toBe(true);
+    }
+    expect(plainRoute(P(0, 0), P(100, 0), "r", "l")).toHaveLength(2);
+    expect(plainRoute(P(0, 0), P(100, 40), "r", "l")).toHaveLength(4);
+  });
+  it("routeEdges hands back that line, not a diagonal, when it finds no way round (ok stays false and it is counted)", () => {
+    const rects = { a: { x: 0, y: 0, w: 100, h: 100 }, b: { x: 400, y: 60, w: 100, h: 100 }, wall: { x: 330, y: -2000, w: 69, h: 4000 } };
+    const { routes, fallbacks } = routeEdges(rects, [{ id: "e", from: "a", fh: "R2", to: "b", th: "L2" }]);
+    expect(routes.e.ok).toBe(false);
+    expect(fallbacks).toBe(1);
+    expect(routes.e.pts[0]).toEqual(handlePoint(rects.a, "R2"));
+    expect(routes.e.pts.at(-1)).toEqual(handlePoint(rects.b, "L2"));
+    expect(orthogonal(routes.e.pts), JSON.stringify(routes.e.pts)).toBe(true);
   });
 });
 

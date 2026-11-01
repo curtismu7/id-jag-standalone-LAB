@@ -10,6 +10,7 @@ import { labelPoint } from "./orthoRoute";
 // A label is a badge (24px circle with the step number) that sits ON its arrow, plus optional words in a
 // pill beside it. The words show while the arrow is lit by the step (or on hover). The pill grows to the
 // right or left of the badge (side r|l) and sits level with it, or just above or below it (valign c|u|d).
+// An arrow that found no way round the boxes (one dragged onto another) is drawn as a plain line and gets a badge only, placed on that line.
 // A lit label whose words cannot be placed without covering a box or another label is NOT drawn with its
 // words (ok: false): its badge stays on the arrow and the words stay in the step list and on hover.
 
@@ -124,7 +125,7 @@ export function placeLabels(routes, rects, edges, opts = {}) {
   const S = (p) => ({ x: p.x * zoom + tx, y: p.y * zoom + ty });
   const ext = (r) => ({ x0: r.x - AIR, y0: r.y - AIR, x1: r.x + r.w + AIR, y1: r.y + r.h + AIR });
   const boxes = [...Object.values(rects).map((r) => ({ x: r.x * zoom + tx, y: r.y * zoom + ty, w: r.w * zoom, h: r.h * zoom })), ...avoid].map(ext);
-  const ids = edges.filter((e) => routes[e.id]?.ok && routes[e.id].pts.length >= 2).map((e) => e.id);
+  const ids = edges.filter((e) => routes[e.id]?.pts.length >= 2).map((e) => e.id); // an arrow with no route round the boxes has its plain line (routeEdges), so its badge is placed too
   const byId = Object.fromEntries(edges.map((e) => [e.id, e]));
   const screen = Object.fromEntries(ids.map((id) => [id, routes[id].pts.map(S)]));
   const mid = Object.fromEntries(ids.map((id) => [id, labelPoint(screen[id])]));
@@ -132,7 +133,7 @@ export function placeLabels(routes, rects, edges, opts = {}) {
   const sizes = Object.fromEntries(ids.map((id) => [id, pillSizes(stripLabel(byId[id].label ?? ""), measure)]));
   // every run of every arrow as its bounding box (the runs are straight and axis-aligned)
   const runs = Object.fromEntries(ids.map((id) => [id, screen[id].slice(1).map((q, i) => { const a = screen[id][i]; return { x0: Math.min(a.x, q.x), y0: Math.min(a.y, q.y), x1: Math.max(a.x, q.x), y1: Math.max(a.y, q.y) }; })]));
-  let showing = new Set(ids.filter((id) => lit.has(id))); // edges currently drawn with their words
+  let showing = new Set(ids.filter((id) => lit.has(id) && routes[id].ok !== false)); // edges currently drawn with their words (an arrow with no route never shows its words)
   const demoted = new Set();
   const overlap = (a, b) => a.x < b.x1 && a.x + a.w > b.x0 && a.y < b.y1 && a.y + a.h > b.y0; // rect vs extent
 

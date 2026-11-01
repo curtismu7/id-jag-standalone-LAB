@@ -17,6 +17,18 @@ export function handlePoint({ x, y, w, h }, id) {
   }
 }
 
+/** An orthogonal line from `a` to `b` that leaves `a` along its side's axis and arrives along `b`'s: a straight run, an L or a Z. No box is avoided. */
+export function plainRoute(a, b, aDir, bDir) {
+  const horiz = (d) => d === "l" || d === "r";
+  let mid;
+  if (horiz(aDir) && horiz(bDir)) { const x = (a.x + b.x) / 2; mid = [{ x, y: a.y }, { x, y: b.y }]; }
+  else if (!horiz(aDir) && !horiz(bDir)) { const y = (a.y + b.y) / 2; mid = [{ x: a.x, y }, { x: b.x, y }]; }
+  else if (horiz(aDir)) mid = [{ x: b.x, y: a.y }];
+  else mid = [{ x: a.x, y: b.y }];
+  const pts = [a, ...mid, b];
+  return pts.filter((p, i) => i === 0 || i === pts.length - 1 || !(pts[i - 1].x === p.x && p.x === pts[i + 1].x) && !(pts[i - 1].y === p.y && p.y === pts[i + 1].y));
+}
+
 /**
  * Route every edge ({ id, from, fh, to, th }) around all boxes in `rects` ({ [id]: {x, y, w, h} }).
  * Every box is an obstacle, an edge's own two included (the lead in/out reaches the handle). Edge order
@@ -30,7 +42,9 @@ export function routeEdges(rects, edges) {
     const a = rects[e.from], b = rects[e.to];
     if (!a || !b) continue;
     const r = router.route({ start: handlePoint(a, e.fh), end: handlePoint(b, e.th), startDir: handleDir(e.fh), endDir: handleDir(e.th) });
-    routes[e.id] = r;
+    // No way round (boxes dragged onto each other): the arrow is still drawn, as a plain orthogonal line, so its badge can be placed ON that line
+    // and kept off every box (see placeLabels). Left as [start, end] it was drawn by React Flow's own smooth step and its badge sat at that line's midpoint, often on a box.
+    routes[e.id] = r.ok ? r : { ...r, pts: plainRoute(handlePoint(a, e.fh), handlePoint(b, e.th), handleDir(e.fh), handleDir(e.th)) };
     if (!r.ok) fallbacks += 1;
   }
   return { routes: separateRoutes(routes, rects, edges), fallbacks };
