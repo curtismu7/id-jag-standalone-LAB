@@ -73,14 +73,17 @@ export function labelRect(p, side, valign, size) {
 }
 const badgeRect = (p) => ({ x: p.x - BADGE / 2, y: p.y - BADGE / 2, w: BADGE, h: BADGE });
 
-/** Points along an arrow where a badge may sit: `clear` px away from both ends (the boxes) and `bend` px from corners. */
-export function badgeSpots(pts, { clear = 26, bend = 14, step = 8 } = {}) {
+/** Points along an arrow where a badge may sit: `clear` px away from both ends (the boxes) and `bend` px from corners. `mids` adds the middle of every run. */
+export function badgeSpots(pts, { clear = 26, bend = 14, step = 8, mids = false } = {}) {
   const out = [];
   let run = 0;
   const total = pts.slice(1).reduce((s, q, i) => s + Math.abs(q.x - pts[i].x) + Math.abs(q.y - pts[i].y), 0);
   pts.slice(1).forEach((q, i) => {
     const a = pts[i], len = Math.abs(q.x - a.x) + Math.abs(q.y - a.y);
-    for (let t = 0; t <= len; t += step) {
+    // `mids`: the middle of each run is a candidate too, so a short run between two boxes can hold its badge in the centre of the gap, not on the grid
+    const ts = []; for (let t = 0; t <= len; t += step) ts.push(t);
+    if (mids && len > 0) ts.push(len / 2);
+    for (const t of ts) {
       const at = run + t;
       if (at < clear || total - at < clear || t < bend || len - t < bend) continue;
       out.push({ x: a.x + ((q.x - a.x) * t) / len, y: a.y + ((q.y - a.y) * t) / len });
@@ -98,7 +101,7 @@ function spotTiers(pts) {
   const thin = (s) => (s.length > MAX_SPOTS ? Array.from({ length: MAX_SPOTS }, (_, i) => s[Math.round((i * (s.length - 1)) / (MAX_SPOTS - 1))]) : s);
   const tiers = [];
   for (const o of TIERS) {
-    const s = thin(badgeSpots(pts, { ...o, step: STEP }));
+    const s = thin(badgeSpots(pts, { ...o, step: STEP, mids: o.clear <= 12 }));
     if (s.length > (tiers.at(-1)?.length ?? 0)) tiers.push(s);
   }
   if (!tiers.length) tiers.push([labelPoint(pts)]);
@@ -124,7 +127,8 @@ export function placeLabels(routes, rects, edges, opts = {}) {
   const { zoom = 1, tx = 0, ty = 0, view = null, lit = new Set(), measure, avoid = [] } = opts;
   const S = (p) => ({ x: p.x * zoom + tx, y: p.y * zoom + ty });
   const ext = (r) => ({ x0: r.x - AIR, y0: r.y - AIR, x1: r.x + r.w + AIR, y1: r.y + r.h + AIR });
-  const boxes = [...Object.values(rects).map((r) => ({ x: r.x * zoom + tx, y: r.y * zoom + ty, w: r.w * zoom, h: r.h * zoom })), ...avoid].map(ext);
+  const real = [...Object.values(rects).map((r) => ({ x: r.x * zoom + tx, y: r.y * zoom + ty, w: r.w * zoom, h: r.h * zoom })), ...avoid];
+  const boxes = real.map(ext);
   const ids = edges.filter((e) => routes[e.id]?.pts.length >= 2).map((e) => e.id); // an arrow with no route round the boxes has its plain line (routeEdges), so its badge is placed too
   const byId = Object.fromEntries(edges.map((e) => [e.id, e]));
   const screen = Object.fromEntries(ids.map((id) => [id, routes[id].pts.map(S)]));
@@ -143,7 +147,19 @@ export function placeLabels(routes, rects, edges, opts = {}) {
     const rect = labelRect(p, side, valign, size);
     const badge = { x: p.x - BADGE / 2 - AIR, y: p.y - BADGE / 2 - AIR, w: BADGE + 2 * AIR, h: BADGE + 2 * AIR };
     let c = 0;
-    for (const bx of boxes) if (overlap(rect, bx)) { c += 1000; if (c >= limit) return c; }
+    if (size) {
+      for (const bx of boxes) if (overlap(rect, bx)) { c += 1000; if (c >= limit) return c; }
+    } else {
+      // A badge alone is a circle. How far it reaches into a box counts (squared, so two small dips beat one deep one): where the gap between two boxes is
+      // too narrow for it (24px) the centre of the gap wins over a spot that sits further into one box. Reaching only into the air kept around a box costs
+      // less than any touch, but still enough (over CLEAN) that a looser tier is looked at.
+      for (const r of real) {
+        const d = Math.hypot(Math.max(r.x - p.x, 0, p.x - r.x - r.w), Math.max(r.y - p.y, 0, p.y - r.y - r.h));
+        if (d < BADGE / 2) c += 600 + 60 * (BADGE / 2 - d) ** 2;
+        else if (d < BADGE / 2 + AIR) c += 250 + 10 * (BADGE / 2 + AIR - d);
+        if (c >= limit) return c;
+      }
+    }
     if (view) {
       const inside = rect.x >= 0 && rect.y >= 0 && rect.x + rect.w <= view.w && rect.y + rect.h <= view.h;
       if (!inside) { c += rect.x < view.w && rect.x + rect.w > 0 && rect.y < view.h && rect.y + rect.h > 0 ? (isLit ? 500 : 350) : (isLit ? HARD : 0); if (c >= limit) return c; } // cut by the canvas edge / words out of sight

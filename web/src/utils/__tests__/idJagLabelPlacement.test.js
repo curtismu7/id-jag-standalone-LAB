@@ -29,6 +29,15 @@ describe("pillSizes and stripLabel", () => {
 });
 
 describe("badgeSpots", () => {
+  it("with mids, the middle of every run is offered too (a short run holds its badge in the centre)", () => {
+    const pts = [P(0, 0), P(23, 0)];
+    const plain = badgeSpots(pts, { clear: 0, bend: 0, step: 10 }).map((s) => s.x);
+    const withMids = badgeSpots(pts, { clear: 0, bend: 0, step: 10, mids: true }).map((s) => s.x);
+    expect(plain).not.toContain(11.5);
+    expect(withMids).toContain(11.5);
+    expect(withMids.filter((x) => x !== 11.5)).toEqual(plain);
+    expect(badgeSpots(pts, { clear: 11, bend: 11, step: 10, mids: true }).map((s) => s.x)).toEqual([11.5]); // the same clearances still apply to it
+  });
   it("offers spots only well away from both ends and from bends", () => {
     const pts = [P(0, 0), P(14, 0), P(14, 200), P(300, 200)];
     const spots = badgeSpots(pts);
@@ -93,7 +102,7 @@ describe("placeLabels", () => {
     expect(Math.hypot(out.x - free.x, out.y - free.y)).toBeGreaterThan(20);
   });
 
-  it("places the badge of an arrow with no route on its plain line, clear of the boxes, and never gives it words", () => {
+  it("places the badge of an arrow with no route on its plain line, clear of the boxes", () => {
     // boxes 60px apart with a third box between them: the router finds no way, routeEdges hands back the plain line, and a lit label still shows its badge only
     const a = { x: 0, y: 0, w: 100, h: 100 }, b = { x: 400, y: 0, w: 100, h: 100 }, mid = { x: 150, y: -50, w: 200, h: 200 };
     const wall = { x: 330, y: -2000, w: 69, h: 4000 }; // abuts b's left side: nothing can arrive at b's left handle
@@ -103,9 +112,47 @@ describe("placeLabels", () => {
     expect(routes.e.pts.length).toBeGreaterThanOrEqual(2);
     const out = placeLabels(routes, rects, [{ id: "e", label: "x", steps: [1] }], { lit: new Set(["e"]) }).e;
     expect(out).toBeDefined();
-    expect(out.ok).toBe(false); // no words: the page draws the badge only
     const r = labelRect({ x: out.x, y: out.y }, "r", "c", null);
     expect(hit(r, mid), "the badge is not on the box between them").toBe(false);
+  });
+
+  // An arrow with no route never takes room for its words: its badge is placed as if the arrow were not lit. The pin is a crowded pair, where a lit
+  // arrow that did take room would push the other one's words and badge about (a lone label has room anyway, so it could not tell).
+  describe("an arrow with no route never claims room for words", () => {
+    const left = { x: 0, y: 0, w: 100, h: 100 }, right = { x: 800, y: 0, w: 100, h: 100 };
+    const rects = { left, right };
+    const text = "POST /token with the subject token and the requested token type";
+    const edges = [{ id: "A", label: text }, { id: "B", label: text }];
+    const line = (y) => [P(100, y), P(800, y)];
+    const run = (a, litA) => placeLabels({ A: { ok: a, pts: line(30) }, B: { ok: true, pts: line(46) } }, rects, edges, { zoom: 1, tx: 0, ty: 0, view: { w: 1000, h: 300 }, lit: new Set(litA ? ["A", "B"] : ["B"]) });
+    it("the pair places the same whether the unrouted arrow is lit or not", () => {
+      expect(run(false, true)).toEqual(run(false, false));
+    });
+    it("control: the same pair with A routed does change when A is lit (the crowding is real), so the test above can tell", () => {
+      expect(run(true, true)).not.toEqual(run(true, false));
+    });
+  });
+
+  // A box dragged to end 22 to 40px from a neighbour leaves the arrow between them a short run. The badge is a 24px circle: from 24px up it sits in the
+  // gap touching neither box; below that nothing fits, and the centre of the gap (the least reach into either box) is chosen.
+  describe("a short run between two boxes", () => {
+    const reach = (c, r) => Math.max(0, BADGE / 2 - Math.hypot(Math.max(r.x - c.x, 0, c.x - r.x - r.w), Math.max(r.y - c.y, 0, c.y - r.y - r.h)));
+    const cases = [];
+    for (let gap = 22; gap <= 40; gap += 1) for (const dy of [0, 40, 90, -60]) for (const zoom of [0.9, 1.2]) cases.push([gap, dy, zoom]);
+    it("the badge never touches either box from a 24px gap up, and dips under 2.5px into one below that", () => {
+      const worst = [];
+      for (const [gap, dy, zoom] of cases) {
+        const a = { x: 0, y: 0, w: 300, h: 150 }, b = { x: 300 + gap / zoom, y: dy, w: 300, h: 150 };
+        const edges = [{ id: "e", from: "a", fh: "R2", to: "b", th: "L2", label: "x" }];
+        const { routes } = routeEdges({ a, b }, edges);
+        const out = placeLabels(routes, { a, b }, edges, { zoom, tx: 30, ty: 30, view: { w: 1100, h: 600 } }).e;
+        const c = { x: out.x * zoom + 30, y: out.y * zoom + 30 };
+        const screen = [a, b].map((r) => ({ x: r.x * zoom + 30, y: r.y * zoom + 30, w: r.w * zoom, h: r.h * zoom }));
+        const dip = Math.max(...screen.map((r) => reach(c, r)));
+        if (dip > (gap >= BADGE ? 0.01 : 2.5)) worst.push({ gap, dy, zoom, dip: +dip.toFixed(2) });
+      }
+      expect(worst).toEqual([]);
+    }, 60000);
   });
 
   it("is deterministic", () => {
