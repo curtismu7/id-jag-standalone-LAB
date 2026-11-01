@@ -94,14 +94,15 @@ export function badgeSpots(pts, { clear = 26, bend = 14, step = 8, mids = false 
 }
 
 // Candidate spots in tiers: full clearance from the boxes and bends first, then less and less. The placer only
-// looks at a looser tier when the tiers before it leave the label covering something.
+// looks at a looser tier when the tiers before it leave the label covering something. The loosest tier also offers the middle of every run, so a short
+// run between two boxes (a box dragged to end 22 to 40px from another) gets its badge in the centre of the gap, not on the 10px grid.
 const NUDGE = [5, 9];           // px a badge may sit off its line (see spotTiers)
 const TIERS = [{ clear: 26, bend: 14 }, { clear: 18, bend: 10 }, { clear: 12, bend: 6 }, { clear: 0, bend: 0 }];
 function spotTiers(pts) {
   const thin = (s) => (s.length > MAX_SPOTS ? Array.from({ length: MAX_SPOTS }, (_, i) => s[Math.round((i * (s.length - 1)) / (MAX_SPOTS - 1))]) : s);
   const tiers = [];
   for (const o of TIERS) {
-    const s = thin(badgeSpots(pts, { ...o, step: STEP, mids: o.clear <= 12 }));
+    const s = thin(badgeSpots(pts, { ...o, step: STEP, mids: o.clear === 0 }));
     if (s.length > (tiers.at(-1)?.length ?? 0)) tiers.push(s);
   }
   if (!tiers.length) tiers.push([labelPoint(pts)]);
@@ -155,7 +156,7 @@ export function placeLabels(routes, rects, edges, opts = {}) {
       // less than any touch, but still enough (over CLEAN) that a looser tier is looked at.
       for (const r of real) {
         const d = Math.hypot(Math.max(r.x - p.x, 0, p.x - r.x - r.w), Math.max(r.y - p.y, 0, p.y - r.y - r.h));
-        if (d < BADGE / 2) c += 600 + 60 * (BADGE / 2 - d) ** 2;
+        if (d < BADGE / 2) c += 700 + 300 * (BADGE / 2 - d) ** 2;
         else if (d < BADGE / 2 + AIR) c += 250 + 10 * (BADGE / 2 + AIR - d);
         if (c >= limit) return c;
       }
