@@ -1,5 +1,6 @@
 import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES, stepParts } from "../idJagPlaygroundDiagrams";
 import { routeEdges } from "../idJagPlaygroundRouting";
+import { READABLE_MIN_ZOOM } from "../../pages/IdJagPlaygroundDiagramPage";
 import { BADGE, badgeSpots, labelRect, pillSizes, placeLabels, stripLabel } from "../idJagLabelPlacement";
 
 const P = (x, y) => ({ x, y });
@@ -92,8 +93,19 @@ describe("placeLabels", () => {
     expect(Math.hypot(out.x - free.x, out.y - free.y)).toBeGreaterThan(20);
   });
 
-  it("places nothing for a fallback (straight line) route", () => {
-    expect(placeLabels({ e: { ok: false, pts: [P(0, 0), P(5, 5)] } }, { a: boxA }, [{ id: "e", label: "x", steps: [1] }])).toEqual({});
+  it("places the badge of an arrow with no route on its plain line, clear of the boxes, and never gives it words", () => {
+    // boxes 60px apart with a third box between them: the router finds no way, routeEdges hands back the plain line, and a lit label still shows its badge only
+    const a = { x: 0, y: 0, w: 100, h: 100 }, b = { x: 400, y: 0, w: 100, h: 100 }, mid = { x: 150, y: -50, w: 200, h: 200 };
+    const wall = { x: 330, y: -2000, w: 69, h: 4000 }; // abuts b's left side: nothing can arrive at b's left handle
+    const rects = { a, b, mid, wall };
+    const { routes } = routeEdges(rects, [{ id: "e", from: "a", fh: "R2", to: "b", th: "L2" }]);
+    expect(routes.e.ok).toBe(false);
+    expect(routes.e.pts.length).toBeGreaterThanOrEqual(2);
+    const out = placeLabels(routes, rects, [{ id: "e", label: "x", steps: [1] }], { lit: new Set(["e"]) }).e;
+    expect(out).toBeDefined();
+    expect(out.ok).toBe(false); // no words: the page draws the badge only
+    const r = labelRect({ x: out.x, y: out.y }, "r", "c", null);
+    expect(hit(r, mid), "the badge is not on the box between them").toBe(false);
   });
 
   it("is deterministic", () => {
@@ -137,4 +149,63 @@ describe("the four diagrams, every step, at three zooms", () => {
     }
     expect(kept / lit).toBeGreaterThan(0.5);
   });
+});
+
+// ---- after a box is dragged ---------------------------------------------------------------------------------------------
+// A box dragged (by hand, or carried further by the canvas panning while it is held) can leave an arrow with no way round the boxes. Its badge
+// must still not end up on a box. The checks run what the page runs: routeEdges, then placeLabels in the screen view, at the zoom floor.
+describe("after a box is dragged, no badge or shown words sit on a box", () => {
+  const Z = READABLE_MIN_ZOOM, VIEW = { w: 343, h: 486 }; // the 375px phone canvas, the tightest
+  const AVOID = [{ x: VIEW.w - 243, y: 10, w: 233, h: 40 }, { x: 15, y: VIEW.h - 135, w: 26, h: 120 }]; // the tool buttons and the zoom controls
+  const DRAGS = [[40, 30], [-40, -30], [100, 60], [-100, 60], [300, 200], [-300, 200], [300, -200], [-300, -200], [500, 0], [0, 400]]; // screen px
+  const heightOf = (n) => 90 + 14 * (n.lines?.length ?? 2);
+  // the share of a label's own area that lies on a box: diagram-overlap.js flags a label over 25%
+  const onBox = (r, b) => { const w = Math.min(r.x + r.w, b.x + b.w) - Math.max(r.x, b.x), h = Math.min(r.y + r.h, b.y + b.h) - Math.max(r.y, b.y); return w > 0 && h > 0 ? (w * h) / (r.w * r.h) : 0; };
+
+  // Is there any point on the arrow's line where a badge sits clear of every box? (An arrow that runs along the seam between two boxes has none: nothing to place.)
+  const hasClearSpot = (pts, boxes) => pts.slice(1).some((q, i) => {
+    const a = pts[i], len = Math.hypot(q.x - a.x, q.y - a.y);
+    for (let t = 0; t <= len; t += 3) {
+      const c = { x: a.x + ((q.x - a.x) * t) / (len || 1), y: a.y + ((q.y - a.y) * t) / (len || 1)};
+      const r = { x: c.x - BADGE / 2 - 3, y: c.y - BADGE / 2 - 3, w: BADGE + 6, h: BADGE + 6 };
+      if (!boxes.some((b) => hit(r, b))) return true;
+    }
+    return false;
+  });
+
+  it.each(PLAYGROUND_DIAGRAM_MODES.filter((m) => m !== "gateway-redeem"))("%s: every arrow keeps a badge clear of every box after any one box is dragged, at three places on the canvas", (mode) => {
+    const d = PLAYGROUND_DIAGRAMS[mode];
+    const bad = [];
+    let checked = 0, unrouted = 0, judged = 0;
+    for (const moved of d.nodes) for (const [sx, sy] of DRAGS) {
+      const rects = Object.fromEntries(d.nodes.map((n) => [n.id, { x: n.x + (n.id === moved.id ? sx / Z : 0), y: n.y + (n.id === moved.id ? sy / Z : 0), w: 300, h: heightOf(n) }]));
+      const m = rects[moved.id];
+      // a box dropped ON another has no clear place for any badge between them: not a case the placement can solve
+      if (Object.entries(rects).some(([k, r]) => k !== moved.id && r.x < m.x + m.w + 6 && r.x + r.w + 6 > m.x && r.y < m.y + m.h + 6 && r.y + r.h + 6 > m.y)) continue;
+      const { routes } = routeEdges(rects, d.edges);
+      for (const [fx, fy] of [[10, 60], [VIEW.w / 2 - 135, VIEW.h / 2 - 50], [VIEW.w - 280, VIEW.h - 120]]) { // where the dragged box shows on the canvas
+        const tx = fx - m.x * Z, ty = fy - m.y * Z;
+        const lit = new Set(stepParts(d, (checked % 5) + 1).edges); // a different step's arrows show their words each time
+        const out = placeLabels(routes, rects, d.edges, { zoom: Z, tx, ty, view: VIEW, avoid: AVOID, lit });
+        const boxes = Object.values(rects).map((r) => ({ x: r.x * Z + tx, y: r.y * Z + ty, w: r.w * Z, h: r.h * Z }));
+        checked += 1;
+        for (const e of d.edges) {
+          const p = out[e.id];
+          if (!p) { bad.push(`${moved.id} ${sx},${sy} ${e.id}: no place`); continue; }
+          const c = { x: p.x * Z + tx, y: p.y * Z + ty };
+          const badge = labelRect(c, "r", "c", null);
+          const words = lit.has(e.id) && routes[e.id].ok && p.ok ? labelRect(c, p.side, p.valign, p) : null; // shown words must clear the boxes too
+          if (words && boxes.some((b) => onBox(words, b) > 0.25)) bad.push(`${moved.id} ${sx},${sy} @${fx},${fy} ${e.id}: words on a box`);
+          if (!hasClearSpot(routes[e.id].pts.map((q) => ({ x: q.x * Z + tx, y: q.y * Z + ty })), boxes)) continue;
+          judged += 1;
+          if (!routes[e.id].ok) unrouted += 1;
+          if (boxes.some((b) => onBox(badge, b) > 0.25)) bad.push(`${moved.id} ${sx},${sy} @${fx},${fy} ${e.id}: badge on a box${routes[e.id].ok ? "" : " (no route)"}`);
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
+    expect(judged).toBeGreaterThan(checked * 5);
+    expect(unrouted, "the drags include ones that leave an arrow with no route, or this test pins nothing about them").toBeGreaterThan(0);
+    expect(bad).toEqual([]);
+  }, 120000);
 });

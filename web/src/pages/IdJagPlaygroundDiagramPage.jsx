@@ -33,7 +33,8 @@ function Card({ data, selected }) {
  * where they found a clear place: words that would cover a box or another label are not drawn, and stay in the step list
  * and in the badge's tooltip. While a box is dragged only the badges move. An arrow whose boxes are not measured yet has no
  * place to choose: its words sit on the plain path. An arrow the router found no way round for (`fallback`, boxes dragged
- * close together) is drawn plain and is not placed, so its words are not drawn either: they could cover a box or a label.
+ * close together) is drawn as a plain right-angled line (route.pts, from routeEdges) with its badge placed on that line clear of the
+ * boxes, but its words are not drawn: they could cover a box or a label.
  */
 export const wordsShown = ({ place, on, hover, dragging, fallback }) => !dragging && !fallback && !!(hover || on) && (place ? place.ok : true);
 
@@ -56,10 +57,12 @@ function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targ
   const [smooth, sx, sy] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
   const zoom = useStore((st) => st.transform[2]);
   const routed = data.route && data.route.ok;
-  const path = routed ? pathFromPoints(data.route.pts) : smooth;
-  // place = where the routed badge sits on the line and which way its words grow (see placeLabels); without it the label is centred on the path
-  const place = routed ? data.place : undefined;
-  const { x: lx, y: ly } = place || (routed ? labelPoint(data.route.pts) : { x: sx, y: sy });
+  // an arrow with no way round the boxes carries its plain line in route.pts (routeEdges): drawn and labelled like a routed one, badge only
+  const plain = data.route && !data.route.ok && data.route.pts.length >= 2 ? data.route.pts : null;
+  const path = routed ? pathFromPoints(data.route.pts) : plain ? pathFromPoints(plain) : smooth;
+  // place = where the badge sits on the line and which way its words grow (see placeLabels); without it the label is centred on the path
+  const place = routed || plain ? data.place : undefined;
+  const { x: lx, y: ly } = place || (routed || plain ? labelPoint(data.route.pts) : { x: sx, y: sy });
   const [hover, setHover] = useState(false);
   const words = wordsShown({ place, on: data.on, hover: hover || data.listHover, dragging: data.dragging, fallback: !!data.route && !data.route.ok });
   const transform = labelTransform(place, lx, ly, zoom);
