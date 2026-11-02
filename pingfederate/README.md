@@ -31,6 +31,8 @@ Owner-run (Acme):
 - `configure-acme-idp.js` configures a fresh PingFederate as the demo's Acme. **Do not run it against the shared Acme**: it rewrites the demo's
   `acmeToPingFed` connection. It stays as the reference for how Acme was built.
 
+Other scripts (they reach a cluster by port-forward unless `PF_ADMIN_URL` is set; `configure-signin.js --local` is part of the local setup above):
+
 - `configure-signin.js` sets up this app's sign-in at our PingFederate: an OIDC IdP connection to the kit's own PingOne
   environment (from `tools/provision-pingone-signin.js`), the `id-jag-kit` client (written to the settings file as `PF_EXCHANGE_*`), a
   token manager and OIDC policy only that client uses (`email`, boolean `email_verified`, `name`, `groups` in the ID

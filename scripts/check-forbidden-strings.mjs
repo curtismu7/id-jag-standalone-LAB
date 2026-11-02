@@ -2,7 +2,7 @@
 // npm run check:forbidden
 // Fails if a tracked file contains: any line of FORBIDDEN_STRINGS_FILE (never committed; matched case-insensitively,
 // reported by line number and entry number, not by value); a UUID in docs/examples that forbidden-allowlist.json does
-// not list; or a private Ping hostname that it does not list.
+// not list; a private Ping hostname that it does not list; or a ping-devops-<name> cluster namespace.
 // No FORBIDDEN_STRINGS_FILE: notice and exit 0 locally, exit 1 when CI=true so CI cannot skip the check.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 const PRIVATE_HOST = /\b(?:[a-z0-9-]+\.)+ping-devops\.com\b/gi;
+const PRIVATE_NAMESPACE = /\bping-devops-[a-z0-9-]+/gi; // a cluster namespace of the shared environments, whoever it is named after
 const DOC_FILE = /(^|\/)(\.env[^/]*|[^/]+\.md|docs\/.*|deploy\/.*)$/;
 // This script, its allowlist and its tests name the things they look for.
 const SELF = new Set(['scripts/check-forbidden-strings.mjs', 'scripts/check-forbidden-strings.test.mjs', 'scripts/forbidden-allowlist.json', 'package-lock.json']);
@@ -41,6 +42,7 @@ export function scan({ files, read, forbidden, allowlist }) {
       for (const h of text.match(PRIVATE_HOST) ?? []) {
         if (!hosts.has(h.toLowerCase())) findings.push({ file, line, rule: 'private-host', detail: h });
       }
+      for (const n of text.match(PRIVATE_NAMESPACE) ?? []) findings.push({ file, line, rule: 'private-namespace', detail: n });
       if (DOC_FILE.test(file)) {
         for (const u of text.match(UUID) ?? []) {
           if (!uuids.has(u.toLowerCase())) findings.push({ file, line, rule: 'uuid', detail: u });

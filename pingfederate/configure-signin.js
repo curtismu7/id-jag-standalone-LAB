@@ -20,7 +20,7 @@
  * With --local (used by `npm run setup`, mode pf-local) there is no PingOne: everything above is created except the IdP
  * connection and the authentication policy, plus the OAuth scopes a new PingFederate lacks. configure-local-signin.js then adds the policy, signing the kit's users in
  * at PingFederate itself. The admin API is reached by PF_ADMIN_URL (see pf-admin.js), so --ns and --port are not needed.
- * Writes PF_EXCHANGE_CLIENT_ID / PF_EXCHANGE_CLIENT_SECRET to the repo-root .env when it creates the client
+ * Writes PF_EXCHANGE_CLIENT_ID / PF_EXCHANGE_CLIENT_SECRET to the shared settings file (PF_SETTINGS_FILE, else STANDALONE_ENV, else ~/Development/.env) when it creates the client
  * (the secret is generated here and never printed).
  */
 const crypto = require('crypto');
