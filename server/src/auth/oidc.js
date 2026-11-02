@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import express from 'express';
 import * as jose from 'jose';
 import { config } from '../config.js';
-import { isMock, runtimeEnv } from '../mode.js';
+import { runtimeEnv } from '../mode.js';
 import { outboundFetch } from '../outbound.js';
 import { allowedDomains, checkEmail } from './emailRules.js';
 
@@ -41,8 +41,9 @@ export const missingConfig = (c) => [
   !c.clientSecret && !c.privateKey && 'OIDC_CLIENT_SECRET (or OIDC_PRIVATE_KEY_JWT, or PF_EXCHANGE_CLIENT_SECRET)',
 ].filter(Boolean);
 
-// Mock mode: the keys are read through the netguard (jose's own remote JWKS would open a socket), fresh on every check.
-const mockJwks = (url) => async (header, token) => jose.createLocalJWKSet(await (await outboundFetch(url)).json())(header, token);
+// The keys are read through the netguard in both modes (jose's own remote JWKS opens its own socket, which ignores the
+// mock and PF_CA_FILE), fresh on every check.
+const fetchedJwks = (url) => async (header, token) => jose.createLocalJWKSet(await (await outboundFetch(url, { signal: AbortSignal.timeout(5000) })).json())(header, token);
 
 // Provider metadata + its JWKS, per issuer. A failed discovery is retried on the next login.
 const discovered = new Map();
@@ -53,7 +54,7 @@ export function discover(issuer) {
       if (!r.ok) throw new Error(`discovery answered HTTP ${r.status}`);
       const meta = await r.json();
       if (meta.issuer !== issuer) throw new Error(`discovery names issuer ${meta.issuer}, not ${issuer}`);
-      return { ...meta, jwks: isMock() ? mockJwks(meta.jwks_uri) : jose.createRemoteJWKSet(new URL(meta.jwks_uri)) };
+      return { ...meta, jwks: fetchedJwks(meta.jwks_uri) };
     })();
     p.catch(() => discovered.delete(issuer));
     discovered.set(issuer, p);
