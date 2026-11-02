@@ -199,3 +199,33 @@ test('missingMessage lists only what is missing and never a value', () => {
   assert.match(m, /ACME_EXCHANGE_CLIENT_SECRET {3}\(missing\)/);
   assert.ok(!/ACME_PF_URL {3}\(missing\)/.test(m));
 });
+
+test('a block that names this machine\'s own PingFederate is refused before anything is merged or deleted', async () => {
+  const bad = (url) => { try { parseAcmeSettings(BLOCK.replace(ACME_URL, url)); } catch (e) { return e.message; } return ''; };
+  for (const url of ['https://127.0.0.1:4732', 'https://localhost:9031', 'https://127.1.2.3', 'https://0.0.0.0:4732']) assert.match(bad(url), /names this machine/, url);
+  assert.equal(bad('https://pf-acme.example.invalid:9031'), '', 'another host on the same port is fine');
+  const t = fixture();
+  t.writeBlock(BLOCK.replace(ACME_URL, PF_RUNTIME_URL));
+  const before = t.sharedText();
+  assert.equal((await t.run(['--mode=pf-pf', `--acme-settings=${t.block}`])).code, 2);
+  assert.equal(t.sharedText(), before, 'nothing merged');
+  assert.equal(fs.existsSync(t.block), true, 'the block file is kept');
+  assert.deepEqual(t.calls, []);
+});
+
+test('a block file over 4 KiB is refused without being read whole, and many problems are summarised', async () => {
+  const t = fixture();
+  t.writeBlock('x\n'.repeat(3000));
+  assert.equal((await t.run(['--mode=pf-pf', `--acme-settings=${t.block}`])).code, 2);
+  assert.match(t.err.join('\n'), /is 6000 bytes: a settings block is three short lines/);
+  assert.equal(fs.existsSync(t.block), true);
+  try { parseAcmeSettings('x\n'.repeat(500)); assert.fail('should throw'); } catch (e) {
+    assert.match(e.message, /\.\.\.and \d+ more/);
+    assert.ok(e.message.split('\n').length < 20);
+  }
+});
+
+test('a client secret with "#" is refused: the settings file loader would cut it at the "#"', () => {
+  assert.throws(() => parseAcmeSettings(BLOCK.replace(ACME_SECRET, 'ab#cd')), /contains "#"/);
+  try { parseAcmeSettings(BLOCK.replace(ACME_SECRET, 'ab#cd')); } catch (e) { assert.ok(!e.message.includes('ab#cd')); }
+});
