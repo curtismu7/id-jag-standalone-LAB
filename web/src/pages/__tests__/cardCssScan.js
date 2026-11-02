@@ -120,7 +120,7 @@ const decls = (body, ...props) => splitDecls(body).filter(([p]) => props.include
 const STRUCTURAL = "(?:first-child|last-child|only-child|first-of-type|last-of-type|only-of-type|empty|nth-child\\([^)]*\\)|nth-last-child\\([^)]*\\)|nth-of-type\\([^)]*\\)|nth-last-of-type\\([^)]*\\))";
 const NOT_STRUCTURAL = new RegExp(`:not\\(\\s*:${STRUCTURAL}\\s*\\)`, "gi");
 const STRUCTURAL_RE = new RegExp(`:${STRUCTURAL}(?![\\w-])`, "gi");
-const DYNAMIC = /::[\w-]+(\([^)]*\))?|:(before|after|first-line|first-letter|hover|focus|focus-visible|focus-within|active|visited|link|any-link|fullscreen|target|disabled|enabled|checked|placeholder-shown|-webkit-[\w-]+|-moz-[\w-]+)(?![\w-])/gi;
+const DYNAMIC = /::[\w-]+(\([^)]*\))?|:(hover|focus|focus-visible|focus-within|active|visited|link|any-link|fullscreen|target|disabled|enabled|checked|placeholder-shown|-webkit-[\w-]+|-moz-[\w-]+)(?![\w-])/gi;
 const KNOWN_PSEUDO = ["root", "not", "is", "where", "has", "scope"];
 // a pseudo-class this scan does not know (`:lang(en)`, `:dir(ltr)`, `:host`): the DOM engine here cannot be trusted on it, so it is dropped (read as always true)
 const UNKNOWN_PSEUDO = new RegExp(`(?<!:):(?!(?:${KNOWN_PSEUDO.join("|")})(?![\\w-]))[a-z][\\w-]*(?:\\((?:[^()]|\\([^()]*\\))*\\))?`, "gi");
@@ -345,9 +345,10 @@ export function scanCardCss(cssText, card, kinds = [""]) {
       for (const [n, v] of attrs) byName.set(n, [...new Set([...(byName.get(n) ?? []), v])]);
       let combos = [[]];
       for (const [n, vs] of byName) combos = combos.flatMap((c) => vs.map((v) => [...c, [n, v]])).slice(0, 16);
-      if (attrs.length || classes.length || ids.length) {
+      const onAncestors = attrs.length || classes.length || ids.length;
+      if (onAncestors || last.attrs.length) {
         for (const combo of combos) {
-          withTokens(above, combo, classes, ids, () => scan());
+          if (onAncestors) withTokens(above, combo, classes, ids, () => scan());
           // an attribute written on the last compound (`li[data-kind=a]`) can be set on the card's own elements
           if (!res.html && !res.body && !res.other && last.attrs.length) withTokens([card, ...card.querySelectorAll("*")], last.attrs, [], [], () => scan());
         }

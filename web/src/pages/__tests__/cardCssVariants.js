@@ -108,6 +108,8 @@ export const ATTACKS = [
   ["m28 .ijx %", `.ijx .cs{font-size:30%}`],
   ["m29 keyword", `.ijx .cs{font-size:xx-small}`],
   ["m30 font shorthand", `.ijx li{font:italic .4rem serif}`],
+  ["m31 attribute on the last compound", `.ijx li[data-kind="a"]{font-size:.4rem}`],
+  ["m32 bare attribute on a card part", `.ijx .cs[data-x]{font-size:.4rem}`],
 ];
 
 export const HARMLESS = [
@@ -137,4 +139,6 @@ export const HARMLESS = [
   ["ok23 data-present big", `:root[data-present="1"]{font-size:150%}`],
   ["ok24 html.dark fine", `html.dark .ijx .cs{font-size:1rem}`],
   ["ok25 body.presenter fine", `body.presenter .ijx .ct{font-size:20px}`],
+  ["ok26 class that exists in the page but not above the card", `.ijx .legend li{font-size:.4rem}`],
+  ["ok27 root 125%, body .6em is 12px", `html{font-size:125%}\nbody{font-size:.6em}`],
 ];

@@ -167,6 +167,18 @@ describe("diagram text stays readable at every zoom the page allows", () => {
     expect(scan(':root[data-present="1"]{font-size:150%}').rootPx).toBe(16);
   });
 
+  it("a scan puts the page back as it found it: no attribute, class or id it set on an ancestor is left behind", () => {
+    const before = () => { const out = []; for (let e = card; e; e = e.parentElement) out.push(`${e.tagName}|${e.id}|${e.className}|${e.getAttributeNames().sort().map((n) => `${n}=${e.getAttribute(n)}`).join(";")}`); return out.join("\n"); };
+    const snapshot = before();
+    expect(bad('.zzroot[data-zz-attr="1"] .zzmid#zzid .ijx .cs{font-size:.4rem}\nhtml.zz-dark{font-size:1rem}\n:root[data-zz-theme="x"]{font-size:16px}')).toHaveLength(1);
+    expect(before()).toBe(snapshot);
+  });
+
+  it("a class the page carries somewhere is not assumed on an ancestor, one it never carries is (so `.legend li` is left alone, `.dark li` is not)", () => {
+    expect(bad(".ijx .legend li{font-size:.4rem}")).toEqual([]);
+    expect(bad(".zz-dark .ijx li{font-size:.4rem}").length).toBeGreaterThan(0);
+  });
+
   describe("parseRules", () => {
     it("flattens native nesting: & , a bare selector, > and @media inside a rule", () => {
       const rules = parseRules(".a{color:red; & b{font-size:1px} c{x:y} > d{z:w} @media (x){ e{p:q} font-size:2px } }");
