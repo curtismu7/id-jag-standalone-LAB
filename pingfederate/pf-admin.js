@@ -4,14 +4,19 @@
 //   - a cluster (default): a kubectl port-forward on --port, password from the pingfederate-admin secret in --ns.
 //   - direct (`npm run setup`, mode pf-local): PF_ADMIN_URL, PF_ADMIN_USER and PF_ADMIN_PASSWORD in the environment, and
 //     PF_ADMIN_INSECURE_TLS=true for the local self-signed certificate. --ns and --port are then not needed.
-// PF_SETTINGS_FILE (set by `npm run setup`) names the file writeEnv() updates; default is the repo-root .env.
+// writeEnv() updates PF_SETTINGS_FILE (set by `npm run setup`), else the ONE shared settings file (STANDALONE_ENV, else
+// ~/Development/.env). Never the repo-root .env: a rerun from another folder must not leave a secret in a second place.
+// --context=<kube context> names the cluster for the kubectl calls (a cluster run should always pass it).
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const https = require('https');
 const { execFileSync } = require('child_process');
 
-const ENV_FILE = process.env.PF_SETTINGS_FILE || path.join(__dirname, '../.env');
-try { process.loadEnvFile(ENV_FILE); } catch { /* no .env: env and args only */ }
+const ENV_FILE = process.env.PF_SETTINGS_FILE || process.env.STANDALONE_ENV || path.join(os.homedir(), 'Development', '.env');
+for (const f of [ENV_FILE, path.join(__dirname, '../.env')]) { // the repo-root .env is read for existing users, never written
+  try { process.loadEnvFile(f); } catch { /* missing: env and args only */ }
+}
 
 const args = Object.fromEntries(process.argv.slice(2).map((a) => {
   const [k, ...v] = a.replace(/^--/, '').split('=');
@@ -28,7 +33,7 @@ function setting(option, envName, what) {
 
 function secret(name) {
   if (process.env[name]) return process.env[name];
-  console.error(`set ${name} (env or the repo-root .env)`);
+  console.error(`set ${name} (env or the shared settings file)`);
   process.exit(2);
 }
 
@@ -44,7 +49,7 @@ function adminApi(ns, port) {
   } else {
     base = `https://localhost:${port}/pf-admin-api/v1`;
     user = 'administrator';
-    pw = Buffer.from(execFileSync('kubectl', ['-n', ns, 'get', 'secret', 'pingfederate-admin', '-o', 'jsonpath={.data.password}']).toString(), 'base64').toString();
+    pw = Buffer.from(execFileSync('kubectl', [...(args.context && args.context !== true ? ['--context', args.context] : []), '-n', ns, 'get', 'secret', 'pingfederate-admin', '-o', 'jsonpath={.data.password}']).toString(), 'base64').toString();
     agent = new https.Agent({ rejectUnauthorized: false }); // port-forwarded admin API, self-signed
   }
   return (method, p, body) => new Promise((resolve, reject) => {

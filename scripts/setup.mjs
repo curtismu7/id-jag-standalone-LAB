@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // npm run setup -- [--yes] [--mode=mock|pf-as|pf-pf|byo|pf-local] [--idp=local] [--users=a@x,b@y] [--pf-url=...] [--pf-client-id=...]
-//   [--pf-admin-url=...] [--acme-client-id=...] [--run=npm|docker] [--force]
+//   [--pf-admin-url=...] [--run=npm|docker] [--force]
 //   pf-local only: [--app-origin=http://localhost:4720]
-// Secrets are read without echo, or from the environment (PF_EXCHANGE_CLIENT_SECRET, PF_ADMIN_PASSWORD,
-// ACME_EXCHANGE_CLIENT_SECRET), never from flags.
+//   pf-pf only: [--acme-settings=<file>]  the owner's three-key block (mode 600); merged into the shared settings file, then deleted
+// Secrets are read without echo, or from the environment (PF_EXCHANGE_CLIENT_SECRET, PF_ADMIN_PASSWORD), never from flags.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
