@@ -102,7 +102,7 @@ It publishes to 127.0.0.1 only: 4720 (playground), 4721 (resource-as) and 4722 (
 npm test
 ```
 
-On Node 26 a good run is 1476 tests: web 529, server 793, resource-as 69, mcp-sample 22 and scripts 63. `check-css.sh` (in the AI-DEMO-Standalone repo) and `npm run check:forbidden` should also pass. Under heavy machine load a timing-based test can time out; rerun that file alone to confirm.
+On Node 26 a good run is 1579 tests: web 532, server 810, resource-as 74, mcp-sample 24 and scripts 139. `check-css.sh` (in the AI-DEMO-Standalone repo) and `npm run check:forbidden` should also pass. Under heavy machine load a timing-based test can time out; rerun that file alone to confirm.
 
 ## Troubleshooting
 
@@ -138,7 +138,7 @@ npm run doctor          # rerun any time before a demo
 Mock mode needs no prompts and no network: `npm run setup -- --yes --mode=mock`. For a real mode, `npm run setup`
 asks for the PingFederate URL, the exchange client and (optionally) the admin URL, or take them from flags and the
 environment: `npm run setup -- --yes --mode=pf-as --pf-url=https://pf.example.com --pf-client-id=... --pf-admin-url=...`
-(secrets are read without echo, or from `PF_EXCHANGE_CLIENT_SECRET`, `PF_ADMIN_PASSWORD`, `ACME_EXCHANGE_CLIENT_SECRET`).
+(secrets are read without echo, or from `PF_EXCHANGE_CLIENT_SECRET`, `PF_ADMIN_PASSWORD`). `--mode=pf-pf` is different: see [Acme PingFederate for `pf-pf`](#acme-pingfederate-for-pf-pf).
 `--run=docker` checks the Docker context is `orbstack` and prints the compose command instead. `--force` replaces an
 existing `.env` after saving it as `.env.bak.<n>`. Setup generates `SESSION_SECRET`, `REGISTRATION_KEY` and
 `ID_JAG_REGISTRY_TOKEN` and never prints them. The extra mode `--mode=pf-local` is described in [PingFederate for ID-JAG](#pingfederate-for-id-jag); it writes the shared settings file instead of the repo `.env`. PingFederate signs users in itself ("local PingFederate users", pi.flow);
@@ -171,7 +171,7 @@ npm run setup -- --mode=pf-local --users=you@pingone.com
   6. It writes the shared settings file, `~/Development/.env` (mode 600, or the file named by `STANDALONE_ENV`), adding keys and never replacing ones that are already there (`PF_URL`, the local backends, generated secrets, `APP_ORIGIN` = `http://localhost:4720` or `--app-origin`, `ADMIN_EMAILS` = your first `--users` address), and runs `npm run doctor -- --mode=pf-as`. It only ever contacts `https://127.0.0.1:4731` and `:4732`.
 - **Rerun it any time.** A second run finds the install, keeps every object and setting, and changes nothing (`--users` is needed only the first time).
 - **Run it** after setup: `npm start -w resource-as`, `npm start -w mcp-sample` (both read the shared settings file and the repo `.env`; resource-as reads the trust list from this app at `APP_ORIGIN`), then `npm run build && npm start` and open `APP_ORIGIN`. Choose PingFederate → resource AS, sign in with a kit user, then Issue, Redeem and Call.
-- **Still yours (owner-run):** the Acme PingFederate for `pf-pf` (a shared SE PingFederate; the kit never writes to it) and the real-tenant sign-in modes. The `PF_CA_FILE` certificate is self-signed and for this machine only.
+- **Still yours (owner-run):** the Acme side of `pf-pf` (a shared SE PingFederate; the kit never writes to it, see [below](#acme-pingfederate-for-pf-pf)) and the real-tenant sign-in modes. The `PF_CA_FILE` certificate is self-signed and for this machine only.
 - **Docker and the local PingFederate.** The issuer is `https://127.0.0.1:4732`, which a container cannot reach (inside it, 127.0.0.1 is the container). `deploy/docker-compose.local-pf.yml` adds a small socat sidecar per service that shares the service's network namespace and forwards its `127.0.0.1:4732` to the Mac (`host.docker.internal`, which OrbStack resolves in every container), mounts the certificate, and passes the shared settings file: `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local-pf.yml up --build -d`. The relay mechanism was verified from a container against the real PingFederate (TLS verified with the exported certificate, issuer identical); the full stack through this file was not run (UNVERIFIED). The base compose file alone keeps running in mock mode.
 
 If port 4731 or 4732 is taken by something that is not PingFederate:
@@ -180,13 +180,28 @@ If port 4731 or 4732 is taken by something that is not PingFederate:
 3. If it is something else, stop it. The local PingFederate ports are fixed at 4731 and 4732 for the standalone apps.
 4. Do not use 8080, 5173, 3000, 4000, 4400, 4510, 4600-4601, 18080, 19080 or 19090.
 
+### Acme PingFederate for `pf-pf`
+
+`pf-pf` needs the outside "Acme" PingFederate, a shared SE server, to issue the ID-JAG, and your local PingFederate (from `--mode=pf-local`) to redeem it.
+The Acme owner does the Acme side once ([owner runbook](docs/acme-owner-runbook.md): additive, dry-run first, guarded) and then sends you two things in two channels:
+
+1. A **three-key settings block** (`ACME_PF_URL`, `ACME_EXCHANGE_CLIENT_ID`, `ACME_EXCHANGE_CLIENT_SECRET`) as a file. Run `chmod 600 <file>`, then
+   `npm run setup -- --mode=pf-pf --acme-settings=<file>`. Setup refuses a file that others can read or that has any other key (it names the key, never a value), merges the
+   three keys into `~/Development/.env`, deletes the file, and sets up your local PingFederate as the redeemer (`pingfederate/configure-pf-redeemer.js`: a backup,
+   an IdP connection for Acme, a token manager selected by `PF_RESOURCE` = `http://localhost:9090/mcp`, the JWT bearer client `id-jag-redeemer`, then a container
+   restart because PingFederate caches Acme's keys forever). It does not contact Acme. Without the flag it prints what is missing and who provides it.
+2. The **`acme-user` password**, separately. You type it into the sign-in modal; nothing stores it.
+
+`npm run doctor -- --mode=pf-pf` then checks Acme's discovery and JWKS and that a pi.flow sign-in starts. `tools/outside-agent.js` needs the demo's `acme-agent`
+credential, which is never handed out.
+
 ### Modes
 
 | Mode | Issues the ID-JAG | Redeems it | Status |
 | --- | --- | --- | --- |
 | **Mock** | Sample data in the browser | Sample data | Works; sends nothing at all |
 | **PingFederate → resource AS** (`pf-as`) | PingFederate (`PF_URL`) after a sign-in there | `resource-as`; step 4 calls `mcp-sample` | Works once `PF_EXCHANGE_*`, `RESOURCE_AS_*`, `ID_JAG_RESOURCE`, `MCP_URL`, `ID_JAG_REGISTRY_TOKEN` are set |
-| **Acme PingFederate → PingFederate** (`pf-pf`) | The outside "Acme" PingFederate (`ACME_PF_URL`) | PingFederate (`PF_URL`) via an IdP connection | Works once `pingfederate/configure-acme-signin.js` has run on Acme and the redeemer client is in `.env` (see [setup guide](docs/setup-guides.md#acme-pingfederate--pingfederate)); `mcp-sample` refuses PingFederate's token (it trusts `resource-as` only) |
+| **Acme PingFederate → PingFederate** (`pf-pf`) | The outside "Acme" PingFederate (`ACME_PF_URL`) | PingFederate (`PF_URL`) via an IdP connection | Works once the Acme owner has set up Acme and sent you the settings block, and `npm run setup -- --mode=pf-pf --acme-settings=<file>` has set up your local PingFederate as the redeemer (see [below](#acme-pingfederate-for-pf-pf)); `mcp-sample` refuses PingFederate's token (it trusts `resource-as` only) |
 | **Your IdP → our resource AS** (`byo`) | Any IdP on the Trusted IdPs list; you paste the ID-JAG, or get one from xaa.dev's IdenX | `resource-as`, or PingFederate | Inspect works; redeem needs the target's secret |
 
 | **Gateway redeems the ID-JAG (mock only)** (`gateway-redeem`) | The company IdP (mock), by exchanging the caller's token for the gateway (leg 1) | The target app's own issuer (mock), by the gateway (leg 2); the target API (mock) accepts the result | Mock only. Ping release claim (2026-11-02), UNVERIFIED on our tenant |
@@ -286,7 +301,7 @@ them in the shell that starts it.
 | `PF_REDEEMER_CLIENT_ID` / `_SECRET` | `id-jag-redeemer` / unset | JWT bearer client at `PF_URL` |
 | `PF_RESOURCE` | unset | `resource` sent when redeeming at PingFederate |
 | `ACME_PF_URL` | `https://pf-acme.example.invalid` | Outside "Acme" issuer (`pf-pf`) |
-| `ACME_EXCHANGE_CLIENT_ID` / `_SECRET` | unset | Sign-in + token exchange client at Acme; `pingfederate/configure-acme-signin.js` creates `id-jag-kit-acme` and writes both |
+| `ACME_EXCHANGE_CLIENT_ID` / `_SECRET` | unset | Sign-in + token exchange client at Acme (`id-jag-kit-acme`); the Acme owner sends both with `ACME_PF_URL` as the settings block |
 | `RESOURCE_AS_ISSUER` | unset | Our resource AS issuer = ID-JAG `aud` |
 | `RESOURCE_AS_TOKEN_ENDPOINT` | `${RESOURCE_AS_ISSUER}/token` | Where ID-JAGs are redeemed (may be an internal address) |
 | `RESOURCE_AS_CLIENT_ID` / `_SECRET` | `id-jag-playground` / unset | Our client at the resource AS; `resource-as` registers it from the same two |
