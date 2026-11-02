@@ -5,12 +5,13 @@ const clone = (v) => JSON.parse(JSON.stringify(v));
 const COLLECTIONS = [
   '/oauth/accessTokenManagers', '/oauth/clients', '/idp/tokenProcessors', '/oauth/tokenExchange/processor/policies', '/idp/spConnections',
   '/keyPairs/signing', '/keyPairs/sslServer', '/passwordCredentialValidators', '/idp/adapters', '/authenticationSelectors',
+  '/sp/idpConnections', '/oauth/idpAdapterMappings',
 ];
 
 export function fakePf(seed = {}) {
   const store = new Map(Object.entries(clone(seed)));
   const calls = [];
-  const idOf = (b) => b.id ?? b.clientId;
+  const idOf = (b) => b.id ?? b.clientId ?? b.name;
   const collectionOf = (p) => COLLECTIONS.find((c) => p === c || p.startsWith(`${c}/`));
   const api = async (method, p, body) => {
     calls.push({ method, path: p, body: body === undefined ? undefined : clone(body) });

@@ -10,6 +10,7 @@ import InteropPanel from "./InteropPanel";
 import GatewayRedeemPanel from "./GatewayRedeemPanel";
 import { mcpcCommand, vscodeMcpJson, vscodeSettings } from "../utils/realClients";
 import terms from "../data/terms.json";
+import { useAppMode } from "../mode/ModeContext";
 import StoryPanel from "../story/StoryPanel";
 import "./IdJagPlaygroundPage.css";
 
@@ -189,7 +190,7 @@ const scopesOf = (claims) => (Array.isArray(claims?.scope) ? claims.scope : Stri
   .filter((s) => s && !OIDC_ONLY.has(s));
 
 /** Plain guidance for the OAuth and MCP errors people actually hit here. */
-function explain(e, resource, saml) {
+export function explain(e, resource, saml, appMock = false) {
   if (!e) return null;
   const text = [e.error, e.error_description, e.pfError, e.pfErrorDescription, e.message].filter(Boolean).join(" ");
   if (/invalid_origin/i.test(text)) return "The server only accepts actions from APP_ORIGIN. Open the playground at that address, or set APP_ORIGIN to this page's origin and restart the server.";
@@ -200,6 +201,9 @@ function explain(e, resource, saml) {
   }
   if (/issuer is not trusted/i.test(text)) {
     return "resource-as does not trust this ID-JAG's issuer. It learns its trust list from this server's registry: set ID_JAG_REGISTRY_TOKEN for both, and for an outside IdP add it on the Trusted IdPs panel. Its cache lasts 30 s.";
+  }
+  if (/invalid_client/i.test(text) && appMock) {
+    return "The mock authorization server did not accept the client. Mock mode has no RESOURCE_AS_CLIENT_ID or RESOURCE_AS_CLIENT_SECRET to set: it knows its own mock client and the idp-<id> client of each approved Trusted IdP (whose secret was shown once, when it was approved). For an ID-JAG from your own IdP, leave \"Our client at the resource AS\" blank on its Trusted IdP entry so the mock's own client redeems, or switch the header to Live and use real client settings.";
   }
   if (/invalid_client/i.test(text)) return "The authorization server did not accept our client: RESOURCE_AS_CLIENT_ID and RESOURCE_AS_CLIENT_SECRET (or the PingFederate redeemer's) must match what it has registered.";
   if (/invalid_target/i.test(text)) {
@@ -215,7 +219,7 @@ function explain(e, resource, saml) {
 }
 
 function ErrorNote({ e, resource, saml }) {
-  const hint = explain(e, resource, saml);
+  const hint = explain(e, resource, saml, useAppMode()?.mode === "mock");
   return (
     <div className="ijp-banner ijp-banner--error" role="alert">
       <strong>{e.error || "Error"}</strong> {e.message || e.error_description || ""}{e.pfErrorDescription ? ` (${e.pfErrorDescription})` : ""}
@@ -570,6 +574,7 @@ export default function IdJagPlaygroundPage() {
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const isMock = mode === "mock";
+  const appMock = useAppMode()?.mode === "mock"; // the app's Mock/Live setting; isMock is this page's browser-only sample data
   const isByo = mode === "byo";
   const isGateway = mode === "gateway-redeem"; // its own panel replaces the six steps (GatewayRedeemPanel)
   // SAML is real only in pf-as when the server can sign assertions; mock always has it. Anywhere else the run is OIDC.
@@ -1015,8 +1020,8 @@ export default function IdJagPlaygroundPage() {
             <StepTabs title={text.redeemTitle} request={redeemed.request} response={redeemed.response} decoded={redeemed.token}
               labels={{ response: `Response (HTTP ${redeemed.status})` }} />
           )}
-          {redeemed && redeemed.status !== 200 && explain(redeemed.response, config?.request?.resource) && (
-            <p className="ijp-fix" role="note">{explain(redeemed.response, config?.request?.resource)}</p>
+          {redeemed && redeemed.status !== 200 && explain(redeemed.response, config?.request?.resource, false, appMock) && (
+            <p className="ijp-fix" role="note">{explain(redeemed.response, config?.request?.resource, false, appMock)}</p>
           )}
           {redeemed?.status === 200 && (isMock || asRecord?.available) && <AsRecord rec={isMock ? MOCK_AS_RECORD : asRecord} sample={isMock} />}
           {(ownAs || isMock) && (

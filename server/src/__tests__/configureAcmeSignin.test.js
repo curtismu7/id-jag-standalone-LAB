@@ -1,11 +1,11 @@
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
-const { ID, adapterBody, clientBody, REDIRECT } = createRequire(import.meta.url)('../../../pingfederate/configure-acme-signin.js');
+const { ID, adapterBody, clientBody, redirectUris } = createRequire(import.meta.url)('../../../pingfederate/configure-acme-signin.js');
 
 describe('configure-acme-signin helpers', () => {
   it('never targets the demo\'s acme-agent, and prefixes what it creates', () => {
-    expect(ID).toEqual({ adapter: 'idJagKitAcmeForm', client: 'id-jag-kit-acme' });
+    expect(ID).toEqual({ adapter: 'idJagKitAcmeForm', client: 'id-jag-kit-acme', policy: 'idJagKitPolicy' });
   });
 
   it('the adapter uses the descriptor defaults plus acmeUsers as its only credential validator', () => {
@@ -16,12 +16,13 @@ describe('configure-acme-signin helpers', () => {
   });
 
   it('the client is authorization code + pi.flow, restricted to offline_access, with the playground callback', () => {
-    const c = clientBody('s3cret');
+    const uris = redirectUris({ appOrigin: undefined });
+    const c = clientBody('s3cret', uris);
     expect(c).toEqual(expect.objectContaining({ clientId: 'id-jag-kit-acme', allowAuthenticationApiInit: true, restrictScopes: true, restrictedScopes: ['offline_access'] }));
     expect(c.grantTypes).toEqual(['AUTHORIZATION_CODE', 'REFRESH_TOKEN', 'TOKEN_EXCHANGE']);
-    expect(c.redirectUris).toEqual([REDIRECT]);
-    expect(REDIRECT).toMatch(/\/api\/id-jag-playground\/issuer\/callback$/);
+    expect(c.redirectUris).toEqual(['http://localhost:4720/api/id-jag-playground/issuer/callback', 'http://127.0.0.1:4720/api/id-jag-playground/issuer/callback']);
+    expect(c.tokenExchangeProcessorPolicyRef).toEqual({ id: 'idJagKitPolicy' }); // never the demo's acmeIdJagPolicy
     expect(c.clientAuth.secret).toBe('s3cret');
-    expect(clientBody(null).clientAuth).toBeUndefined(); // an existing client keeps its secret
+    expect(clientBody(null, uris).clientAuth).toBeUndefined(); // an existing client keeps its secret
   });
 });

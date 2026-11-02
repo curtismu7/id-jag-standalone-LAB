@@ -185,6 +185,44 @@ describe('runDoctor', () => {
     const rep = await doctor.runDoctor({ mode: 'pf-pf', fetchImpl: net_(), netImpl: freePort });
     expect(get(rep, 'acme-discovery').status).toBe('fail');
   });
+  it('pf-pf checks the Acme JWKS (one RSA key with x5t) and that Acme starts a pi.flow sign-in, in live mode', async () => {
+    const PFPF = { ...GOOD, ACME_PF_URL: 'https://acme.test', ACME_EXCHANGE_CLIENT_ID: 'id-jag-kit-acme', ACME_EXCHANGE_CLIENT_SECRET: 'sentinel-acme-secret', PF_REDEEMER_CLIENT_SECRET: 'sentinel-redeemer', PF_RESOURCE: 'http://mcp.test/mcp' };
+    setEnv(PFPF);
+    const acme = (jwks, flow) => vi.fn(async (url) => {
+      const u = String(url);
+      if (u === 'https://acme.test/.well-known/openid-configuration') return ok({ issuer: 'https://acme.test' });
+      if (u === 'https://acme.test/pf/JWKS') return ok(jwks);
+      if (u.startsWith('https://acme.test/as/authorization.oauth2?')) return ok(flow);
+      return net_()(url);
+    });
+    const good = acme({ keys: [{ kty: 'RSA', n: 'a', e: 'AQAB', x5t: 't' }] }, { id: 'abc123', status: 'USERNAME_PASSWORD_REQUIRED' });
+    const rep = await doctor.runDoctor({ mode: 'pf-pf', fetchImpl: good, netImpl: freePort });
+    expect(get(rep, 'acme-discovery').status).toBe('pass');
+    expect(get(rep, 'acme-jwks').status).toBe('pass');
+    expect(get(rep, 'acme-signin').status).toBe('pass');
+    const start = new URL(good.mock.calls.map(([u]) => String(u)).find((u) => u.includes('/as/authorization.oauth2')));
+    expect(start.searchParams.get('response_mode')).toBe('pi.flow');
+    expect(start.searchParams.get('client_id')).toBe('id-jag-kit-acme');
+    expect(start.searchParams.get('redirect_uri')).toMatch(/\/api\/id-jag-playground\/issuer\/callback$/);
+
+    const two = await doctor.runDoctor({ mode: 'pf-pf', fetchImpl: acme({ keys: [{ kty: 'RSA', n: 'a', e: 'AQAB', x5t: 't' }, { kty: 'RSA', n: 'b', e: 'AQAB', x5t: 'u' }] }, { status: 'USERNAME_PASSWORD_REQUIRED' }), netImpl: freePort });
+    expect(get(two, 'acme-jwks').status).toBe('warn');
+    expect(get(two, 'acme-jwks').fix).toContain('Acme owner');
+    const refused = await doctor.runDoctor({ mode: 'pf-pf', fetchImpl: acme({ keys: [{ kty: 'RSA', n: 'a', e: 'AQAB', x5t: 't' }] }, { code: 'INVALID_REQUEST' }), netImpl: freePort });
+    expect(get(refused, 'acme-signin').status).toBe('fail');
+    expect(get(refused, 'acme-signin').fix).toContain('configure-acme-signin.js');
+    expect(JSON.stringify(rep)).not.toContain('sentinel-acme-secret');
+  });
+  it('pf-pf with settings missing tells the user who supplies the Acme values', async () => {
+    setEnv({ ...GOOD });
+    const rep = await doctor.runDoctor({ mode: 'pf-pf', fetchImpl: net_(), netImpl: freePort });
+    const c = get(rep, 'env-required');
+    expect(c.status).toBe('fail');
+    expect(c.fix).toContain('owner of the shared Acme PingFederate');
+    expect(c.fix).toContain('--acme-settings=<file>');
+    const signin = get(rep, 'acme-signin');
+    expect(signin.status).toBe('fail');
+  });
   it('a deliberately broken setup names a fix for each problem', async () => {
     setEnv({ ...GOOD, PF_URL: 'https://pf.test' });
     delete process.env.REGISTRATION_KEY;
