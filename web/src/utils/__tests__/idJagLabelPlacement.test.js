@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES, stepParts } from "../idJagPlaygroundDiagrams";
 import { routeEdges } from "../idJagPlaygroundRouting";
+import { READABLE_MIN_ZOOM } from "../../pages/IdJagPlaygroundDiagramPage";
 import { BADGE, badgeSpots, labelRect, pillSizes, placeLabels, stripLabel } from "../idJagLabelPlacement";
 
 const P = (x, y) => ({ x, y });
@@ -28,6 +30,15 @@ describe("pillSizes and stripLabel", () => {
 });
 
 describe("badgeSpots", () => {
+  it("with mids, the middle of every run is offered too (a short run holds its badge in the centre)", () => {
+    const pts = [P(0, 0), P(23, 0)];
+    const plain = badgeSpots(pts, { clear: 0, bend: 0, step: 10 }).map((s) => s.x);
+    const withMids = badgeSpots(pts, { clear: 0, bend: 0, step: 10, mids: true }).map((s) => s.x);
+    expect(plain).not.toContain(11.5);
+    expect(withMids).toContain(11.5);
+    expect(withMids.filter((x) => x !== 11.5)).toEqual(plain);
+    expect(badgeSpots(pts, { clear: 11, bend: 11, step: 10, mids: true }).map((s) => s.x)).toEqual([11.5]); // the same clearances still apply to it
+  });
   it("offers spots only well away from both ends and from bends", () => {
     const pts = [P(0, 0), P(14, 0), P(14, 200), P(300, 200)];
     const spots = badgeSpots(pts);
@@ -92,8 +103,189 @@ describe("placeLabels", () => {
     expect(Math.hypot(out.x - free.x, out.y - free.y)).toBeGreaterThan(20);
   });
 
-  it("places nothing for a fallback (straight line) route", () => {
-    expect(placeLabels({ e: { ok: false, pts: [P(0, 0), P(5, 5)] } }, { a: boxA }, [{ id: "e", label: "x", steps: [1] }])).toEqual({});
+  it("places the badge of an arrow with no route on its plain line, clear of the boxes", () => {
+    // boxes 60px apart with a third box between them: the router finds no way, routeEdges hands back the plain line, and a lit label still shows its badge only
+    const a = { x: 0, y: 0, w: 100, h: 100 }, b = { x: 400, y: 0, w: 100, h: 100 }, mid = { x: 150, y: -50, w: 200, h: 200 };
+    const wall = { x: 330, y: -2000, w: 69, h: 4000 }; // abuts b's left side: nothing can arrive at b's left handle
+    const rects = { a, b, mid, wall };
+    const { routes } = routeEdges(rects, [{ id: "e", from: "a", fh: "R2", to: "b", th: "L2" }]);
+    expect(routes.e.ok).toBe(false);
+    expect(routes.e.pts.length).toBeGreaterThanOrEqual(2);
+    const out = placeLabels(routes, rects, [{ id: "e", label: "x", steps: [1] }], { lit: new Set(["e"]) }).e;
+    expect(out).toBeDefined();
+    const r = labelRect({ x: out.x, y: out.y }, "r", "c", null);
+    expect(hit(r, mid), "the badge is not on the box between them").toBe(false);
+  });
+
+  // An arrow with no route never takes room for its words: its badge is placed as if the arrow were not lit. The pin is a crowded pair, where a lit
+  // arrow that did take room would push the other one's words and badge about (a lone label has room anyway, so it could not tell).
+  describe("an arrow with no route never claims room for words", () => {
+    const left = { x: 0, y: 0, w: 100, h: 100 }, right = { x: 800, y: 0, w: 100, h: 100 };
+    const rects = { left, right };
+    const text = "POST /token with the subject token and the requested token type";
+    const edges = [{ id: "A", label: text }, { id: "B", label: text }];
+    const line = (y) => [P(100, y), P(800, y)];
+    const run = (a, litA) => placeLabels({ A: { ok: a, pts: line(30) }, B: { ok: true, pts: line(46) } }, rects, edges, { zoom: 1, tx: 0, ty: 0, view: { w: 1000, h: 300 }, lit: new Set(litA ? ["A", "B"] : ["B"]) });
+    it("the pair places the same whether the unrouted arrow is lit or not", () => {
+      expect(run(false, true)).toEqual(run(false, false));
+    });
+    it("control: the same pair with A routed does change when A is lit (the crowding is real), so the test above can tell", () => {
+      expect(run(true, true)).not.toEqual(run(true, false));
+    });
+  });
+
+  // A box dragged to end 22 to 40px from a neighbour leaves the arrow between them a short run. The badge is a 24px circle: from 24px up it sits in the
+  // gap touching neither box; below that nothing fits, and the centre of the gap (the least reach into either box) is chosen.
+  describe("a short run between two boxes", () => {
+    const reach = (c, r) => Math.max(0, BADGE / 2 - Math.hypot(Math.max(r.x - c.x, 0, c.x - r.x - r.w), Math.max(r.y - c.y, 0, c.y - r.y - r.h)));
+    const cases = [];
+    for (let gap = 22; gap <= 40; gap += 1) for (const off of [0, 40, 90, -60, 7]) for (const zoom of [0.9, 1.2]) for (const across of [true, false]) cases.push([gap, off, zoom, across]);
+    it("the badge never touches either box from a 24px gap up, and dips at most 1.5px into one in a 22 to 24px gap", () => {
+      const worst = [];
+      let tight = 0;
+      for (const [gap, off, zoom, across] of cases) {
+        // `across`: the boxes side by side (arrow runs left to right), else one above the other (arrow runs downwards)
+        const a = { x: 0, y: 0, w: 300, h: 150 }, b = across ? { x: 300 + gap / zoom, y: off, w: 300, h: 150 } : { x: off, y: 150 + gap / zoom, w: 300, h: 150 };
+        const edges = [{ id: "e", from: "a", fh: across ? "R2" : "B2", to: "b", th: across ? "L2" : "T2", label: "x" }];
+        const { routes } = routeEdges({ a, b }, edges);
+        const out = placeLabels(routes, { a, b }, edges, { zoom, tx: 30, ty: 30, view: { w: 1100, h: 800 } }).e;
+        const c = { x: out.x * zoom + 30, y: out.y * zoom + 30 };
+        const screen = [a, b].map((r) => ({ x: r.x * zoom + 30, y: r.y * zoom + 30, w: r.w * zoom, h: r.h * zoom }));
+        const dip = Math.max(...screen.map((r) => reach(c, r)));
+        if (gap < BADGE) tight += 1;
+        if (dip > (gap >= BADGE ? 0.01 : 1.5)) worst.push({ gap, off, zoom, across, dip: +dip.toFixed(2) });
+      }
+      expect(tight, "the sweep includes gaps too narrow for the badge").toBeGreaterThan(10);
+      expect(worst).toEqual([]);
+    }, 60000);
+  });
+
+  // The finer placement (spots at the middle of every run, a cost that follows how far the badge reaches into a box) is for ONE case only: a badge alone
+  // whose coarse spot sits on the air kept around a box. Everywhere else the badge is where origin/main put it. The values below are origin/main's own output
+  // (a pair of 300x150 boxes `gap` flow px apart, the arrow from the right side of the first to the left side of the second, zoom `zoom`).
+  describe("the finer placement is used only when the coarse one leaves the badge on a box's air", () => {
+    const pair = (gap, zoom, lit, text, off = 0) => {
+      const a = { x: 0, y: 0, w: 300, h: 150 }, b = { x: 300 + gap, y: off, w: 300, h: 150 };
+      const edges = [{ id: "e", from: "a", fh: "R2", to: "b", th: "L2", label: text }];
+      const { routes } = routeEdges({ a, b }, edges);
+      return placeLabels(routes, { a, b }, edges, { zoom, tx: 30, ty: 30, lit: new Set(lit ? ["e"] : []) }).e;
+    };
+    const LONG = "POST /token with the subject token and the requested token type";
+    it("a 36.8px gap holds the badge clear of both boxes' air already: it stays on the 10px grid, not at the middle of a run", () => {
+      expect(pair(23, 1.6, false, "x").x).toBeCloseTo(312.5, 6); // the finer pass would offer the middle of the run and land on 311.5
+    });
+    it("a 76.8px gap: the same, and the hover words keep a clear place (ok)", () => {
+      const o = pair(48, 1.6, false, "x");
+      expect(o.x).toBeCloseTo(320.25, 6);
+      expect(o.ok).toBe(true);
+    });
+    it("a lit arrow with long words in a wide gap keeps its words where they were", () => {
+      const o = pair(158, 0.9, true, LONG, 40);
+      expect(o.x).toBeCloseTo(316.6667, 4);
+      expect(o.ok).toBe(true);
+      expect(o.w).toBe(136);
+    });
+    it("a 27.6px gap (narrow: the finer pass runs) measures the reach against the real boxes, not the boxes with their 3px of air", () => {
+      const o = pair(23, 1.2, false, "x");
+      expect(o.x).toBeCloseTo(312.5, 6); // against the air-extended boxes the same pass lands on 311.5
+      expect(o.side).toBe("r");
+    });
+    // The tool buttons and the zoom controls drawn over the canvas are obstacles (`avoid`), not boxes. A badge whose coarse spot touches the air around one has
+    // nothing to be centred in, so it must not take the finer pass: that pass had moved such badges (one to 6px above the canvas) where origin/main left them.
+    // Values: origin/main's output for a 50px gap at zoom 0.9 with a 60x40 button laid over the middle of the arrow.
+    it("a button over the arrow does not send its badge through the finer pass: it is where origin/main put it", () => {
+      const a = { x: 0, y: 0, w: 300, h: 150 }, b = { x: 350, y: 0, w: 300, h: 150 };
+      const edges = [{ id: "e", from: "a", fh: "R2", to: "b", th: "L2", label: "x" }];
+      const { routes } = routeEdges({ a, b }, edges);
+      const run = (avoid) => placeLabels(routes, { a, b }, edges, { zoom: 0.9, tx: 30, ty: 30, view: { w: 1100, h: 800 }, avoid }).e;
+      const withButton = run([{ x: 272.5, y: 67.5, w: 60, h: 40 }]);
+      expect(withButton.x).toBeCloseTo(325.1111, 3); // the finer pass lands on 343
+      expect(withButton.y).toBeCloseTo(75, 6);
+      const wide = run([{ x: 245.5, y: 77.5, w: 233, h: 40 }]); // a tools-bar wide button
+      expect(wide.x).toBeCloseTo(325.1111, 3); // the finer pass lands on 325 exactly
+    });
+    it("a button keeps its plain rule inside the finer pass: nothing is put under it, even where the boxes leave only the middle of the corridor", () => {
+      // an arrow in a 20px corridor between two boxes (every spot touches their air, so the finer pass runs), with a button over the middle of it
+      const P = (x, y) => ({ x, y });
+      const rects = { a: { x: -300, y: -75, w: 300, h: 150 }, b: { x: 300, y: -75, w: 300, h: 150 }, above: { x: 0, y: -110, w: 300, h: 100 }, below: { x: 0, y: 10, w: 300, h: 100 } };
+      const routes = { e: { ok: true, pts: [P(0, 0), P(300, 0)] } };
+      const edges = [{ id: "e", label: "x" }];
+      expect(placeLabels(routes, rects, edges, {}).e.x, "no button: the middle of the arrow").toBeCloseTo(150, 6);
+      const button = { x: 110, y: -6, w: 80, h: 36 };
+      const o = placeLabels(routes, rects, edges, { avoid: [button] }).e;
+      expect(o.x).toBeCloseTo(95, 6); // without the button's own rule in that pass the badge stays under it, at 150
+      expect(o.x + BADGE / 2 + 3, "clear of the button's left side").toBeLessThanOrEqual(button.x);
+    });
+    it("the five shipped diagrams, every step, two zooms, two canvases: every badge and words box is exactly where origin/main put it", () => {
+      const rows = [];
+      for (const mode of PLAYGROUND_DIAGRAM_MODES) {
+        const d = PLAYGROUND_DIAGRAMS[mode];
+        const rects = Object.fromEntries(d.nodes.map((n) => [n.id, { x: n.x, y: n.y, w: 300, h: 150 }]));
+        const { routes } = routeEdges(rects, d.edges);
+        for (const step of [0, ...new Set(d.edges.flatMap((e) => e.steps))].sort((x, y) => x - y)) for (const zoom of [0.9, 1.25]) for (const view of [{ w: 1022, h: 842 }, { w: 343, h: 486 }]) {
+          const out = placeLabels(routes, rects, d.edges, { zoom, tx: 30, ty: 30, view, lit: new Set(stepParts(d, step).edges) });
+          for (const e of d.edges) rows.push([mode, step, zoom, view.w, e.id, +out[e.id].x.toFixed(4), +out[e.id].y.toFixed(4), out[e.id].side, out[e.id].valign, out[e.id].ok]);
+        }
+      }
+      expect(rows.length).toBe(1272);
+      expect(createHash("sha256").update(JSON.stringify(rows)).digest("hex")).toBe("42b4c9f9f53439a397f45d5421f2c9189fc02e9804d3cf182ca51375d8a1b5c2");
+    }, 60000);
+  });
+
+  // Each of these pins one boundary of the finer pass or of the tiers, at a scene found by searching for one where moving that boundary changes the result.
+  // The values are what the code gives; the comment on each says which change of the code they catch.
+  describe("boundaries of the placement, pinned where moving them changes the answer", () => {
+    // a 300px-wide box above or beside another one (`h1`, `h2` high), the arrow from the first to the second, `gap` screen px apart at `zoom`
+    const scene = ({ gap, zoom, off, h1, h2, across, tx, ty, lit = [], labels = ["x"], view = { w: 1100, h: 800 } }) => {
+      const a = { x: 0, y: 0, w: 300, h: h1 }, b = across ? { x: 300 + gap / zoom, y: off, w: 300, h: h2 } : { x: off, y: h1 + gap / zoom, w: 300, h: h2 };
+      const edges = labels.map((label, i) => ({ id: `e${i}`, from: "a", fh: across ? "R2" : "B2", to: "b", th: across ? "L2" : "T2", label }));
+      const { routes } = routeEdges({ a, b }, edges);
+      return placeLabels(routes, { a, b }, edges, { zoom, tx, ty, view, lit: new Set(lit) }).e0;
+    };
+    const POST = "POST /token with the subject token";
+    it("a lit arrow never takes the finer pass: it stays where the coarse pass put it, and its words are still not placed (ok false)", () => {
+      const o = scene({ zoom: 0.9, gap: 31.537264155223966, off: 0, h1: 98.2, h2: 150, across: false, tx: -49.61915448750369, ty: 30.232327231904492, lit: ["e0"], labels: [POST] });
+      expect(o.ok).toBe(false); // the finer pass on a lit arrow says true
+      expect(o.x).toBeCloseTo(150, 4);
+      expect(o.y).toBeCloseTo(115.7207, 3);
+    });
+    it("the finer pass starts when the coarse badge touches a box's 3px of air, not only the box itself", () => {
+      const o = scene({ zoom: 0.9, gap: 28.44480829825625, off: 40.303858948173, h1: 150, h2: 150, across: true, tx: 100.44098693644628, ty: 30.018797678872943 });
+      expect(o.x).toBeCloseTo(316.6667, 3); // gating on the box without its air leaves the coarse badge at 314, 96.1
+      expect(o.y).toBeCloseTo(75, 3);
+    });
+    it("the reach into a box is the straight-line distance from the badge centre (a corner counts by its diagonal), not the larger of the two axes", () => {
+      const o = scene({ zoom: 1.1, gap: 24.071652254089713, off: 0.2359816338866949, h1: 98.2, h2: 184.5, across: true, tx: 100.19461508956738, ty: 90.30987899727188, labels: ["GET /jwks"] });
+      expect(o.x).toBeCloseTo(310.9417, 3);
+      expect(o.y).toBeCloseTo(100.6678, 3); // the larger-axis distance puts it at 70.79
+    });
+    it("a spot whose cost is a little over 250 (air of a box within 15px) is still not good enough: the placer looks at the next tier", () => {
+      const o = scene({ zoom: 1.1, gap: 29.974552242085338, off: 0, h1: 98.2, h2: 150, across: true, tx: 100.6311595919542, ty: 30.324085544794798, lit: ["e0"], labels: [POST] });
+      expect(o.x).toBeCloseTo(313.6364, 3); // a cost limit of 260 accepts 314
+      expect(o.y).toBeCloseTo(49.1, 3);
+    });
+    it("the finer pass does not leave a badge out of sight of the canvas to dodge a box: a spot wholly outside the canvas costs as much as one cut by its edge", () => {
+      const o = scene({ zoom: 1.5665236868918875, gap: 14.41796437650919, off: 40.15772477630526, h1: 150, h2: 184.5, across: false, tx: 100.20503757777624, ty: -19.03322937223129, view: { w: 343, h: 486 } });
+      expect(o.x).toBeCloseTo(146.8082, 3); // a spot outside the canvas costing nothing sends it to 170.08, off the right edge
+      expect(o.y).toBeCloseTo(154.6019, 3);
+    });
+    it("the middle of every run is offered in the loosest tier only, not in every tier (in a crowd of boxes the earlier tier's middle would end the search too soon)", () => {
+      const P = (x, y) => ({ x, y });
+      const routes = { e: { ok: true, pts: [P(0, 0), P(0, -51.023), P(-149.55, -51.023), P(-149.55, 13.002), P(-37.479, 13.002)] } };
+      const rects = { b0: { x: -94.503, y: -124.238, w: 134.845, h: 84.68 }, b1: { x: -155.073, y: -79.021, w: 117.935, h: 90.371 }, b2: { x: -27.811, y: -118.593, w: 128.127, h: 125.773 } };
+      const o = placeLabels(routes, rects, [{ id: "e", label: "x" }], { zoom: 1.676, tx: 0, ty: 0 }).e;
+      expect(o.x).toBeCloseTo(-71.9844, 3); // mids in every tier: -66.02
+      expect(o.y).toBeCloseTo(18.3719, 3);
+    });
+    it("the first tier keeps 26px from both ends of the arrow: a spot 25.5px from the end belongs to the next tier, which also holds a better one", () => {
+      const P = (x, y) => ({ x, y });
+      const L = 55.5; // between the boxes; the vertical arrow f crosses 38px in, which makes the spot at 30 dearer than the one at 20
+      const rects = { a: { x: -300, y: -75, w: 300, h: 150 }, b: { x: L, y: -75, w: 300, h: 150 }, c: { x: -100, y: -400, w: 300, h: 300 }, d: { x: -100, y: 100, w: 300, h: 300 } };
+      const routes = { e: { ok: true, pts: [P(0, 0), P(L, 0)] }, f: { ok: true, pts: [P(38, -100), P(38, 100)] } };
+      const out = placeLabels(routes, rects, [{ id: "e", label: "x" }, { id: "f", label: "y" }], {});
+      expect(out.e.x).toBeCloseTo(20, 6); // a first tier at 25px puts it at 30
+      expect(out.e.y).toBeCloseTo(0, 6);
+    });
   });
 
   it("is deterministic", () => {
@@ -137,4 +329,63 @@ describe("the four diagrams, every step, at three zooms", () => {
     }
     expect(kept / lit).toBeGreaterThan(0.5);
   });
+});
+
+// ---- after a box is dragged ---------------------------------------------------------------------------------------------
+// A box dragged (by hand, or carried further by the canvas panning while it is held) can leave an arrow with no way round the boxes. Its badge
+// must still not end up on a box. The checks run what the page runs: routeEdges, then placeLabels in the screen view, at the zoom floor.
+describe("after a box is dragged, no badge or shown words sit on a box", () => {
+  const Z = READABLE_MIN_ZOOM, VIEW = { w: 343, h: 486 }; // the 375px phone canvas, the tightest
+  const AVOID = [{ x: VIEW.w - 243, y: 10, w: 233, h: 40 }, { x: 15, y: VIEW.h - 135, w: 26, h: 120 }]; // the tool buttons and the zoom controls
+  const DRAGS = [[40, 30], [-40, -30], [100, 60], [-100, 60], [300, 200], [-300, 200], [300, -200], [-300, -200], [500, 0], [0, 400]]; // screen px
+  const heightOf = (n) => 90 + 14 * (n.lines?.length ?? 2);
+  // the share of a label's own area that lies on a box: diagram-overlap.js flags a label over 25%
+  const onBox = (r, b) => { const w = Math.min(r.x + r.w, b.x + b.w) - Math.max(r.x, b.x), h = Math.min(r.y + r.h, b.y + b.h) - Math.max(r.y, b.y); return w > 0 && h > 0 ? (w * h) / (r.w * r.h) : 0; };
+
+  // Is there any point on the arrow's line where a badge sits clear of every box? (An arrow that runs along the seam between two boxes has none: nothing to place.)
+  const hasClearSpot = (pts, boxes) => pts.slice(1).some((q, i) => {
+    const a = pts[i], len = Math.hypot(q.x - a.x, q.y - a.y);
+    for (let t = 0; t <= len; t += 3) {
+      const c = { x: a.x + ((q.x - a.x) * t) / (len || 1), y: a.y + ((q.y - a.y) * t) / (len || 1)};
+      const r = { x: c.x - BADGE / 2 - 3, y: c.y - BADGE / 2 - 3, w: BADGE + 6, h: BADGE + 6 };
+      if (!boxes.some((b) => hit(r, b))) return true;
+    }
+    return false;
+  });
+
+  it.each(PLAYGROUND_DIAGRAM_MODES.filter((m) => m !== "gateway-redeem"))("%s: every arrow keeps a badge clear of every box after any one box is dragged, at three places on the canvas", (mode) => {
+    const d = PLAYGROUND_DIAGRAMS[mode];
+    const bad = [];
+    let checked = 0, unrouted = 0, judged = 0;
+    for (const moved of d.nodes) for (const [sx, sy] of DRAGS) {
+      const rects = Object.fromEntries(d.nodes.map((n) => [n.id, { x: n.x + (n.id === moved.id ? sx / Z : 0), y: n.y + (n.id === moved.id ? sy / Z : 0), w: 300, h: heightOf(n) }]));
+      const m = rects[moved.id];
+      // a box dropped ON another has no clear place for any badge between them: not a case the placement can solve
+      if (Object.entries(rects).some(([k, r]) => k !== moved.id && r.x < m.x + m.w + 6 && r.x + r.w + 6 > m.x && r.y < m.y + m.h + 6 && r.y + r.h + 6 > m.y)) continue;
+      const { routes } = routeEdges(rects, d.edges);
+      for (const [fx, fy] of [[10, 60], [VIEW.w / 2 - 135, VIEW.h / 2 - 50], [VIEW.w - 280, VIEW.h - 120]]) { // where the dragged box shows on the canvas
+        const tx = fx - m.x * Z, ty = fy - m.y * Z;
+        const lit = new Set(stepParts(d, (checked % 5) + 1).edges); // a different step's arrows show their words each time
+        const out = placeLabels(routes, rects, d.edges, { zoom: Z, tx, ty, view: VIEW, avoid: AVOID, lit });
+        const boxes = Object.values(rects).map((r) => ({ x: r.x * Z + tx, y: r.y * Z + ty, w: r.w * Z, h: r.h * Z }));
+        checked += 1;
+        for (const e of d.edges) {
+          const p = out[e.id];
+          if (!p) { bad.push(`${moved.id} ${sx},${sy} ${e.id}: no place`); continue; }
+          const c = { x: p.x * Z + tx, y: p.y * Z + ty };
+          const badge = labelRect(c, "r", "c", null);
+          const words = lit.has(e.id) && routes[e.id].ok && p.ok ? labelRect(c, p.side, p.valign, p) : null; // shown words must clear the boxes too
+          if (words && boxes.some((b) => onBox(words, b) > 0.25)) bad.push(`${moved.id} ${sx},${sy} @${fx},${fy} ${e.id}: words on a box`);
+          if (!hasClearSpot(routes[e.id].pts.map((q) => ({ x: q.x * Z + tx, y: q.y * Z + ty })), boxes)) continue;
+          judged += 1;
+          if (!routes[e.id].ok) unrouted += 1;
+          if (boxes.some((b) => onBox(badge, b) > 0.25)) bad.push(`${moved.id} ${sx},${sy} @${fx},${fy} ${e.id}: badge on a box${routes[e.id].ok ? "" : " (no route)"}`);
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
+    expect(judged).toBeGreaterThan(checked * 5);
+    expect(unrouted, "the drags include ones that leave an arrow with no route, or this test pins nothing about them").toBeGreaterThan(0);
+    expect(bad).toEqual([]);
+  }, 120000);
 });

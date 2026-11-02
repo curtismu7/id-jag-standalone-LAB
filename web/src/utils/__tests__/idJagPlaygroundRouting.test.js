@@ -1,5 +1,5 @@
 import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES } from "../idJagPlaygroundDiagrams";
-import { handleDir, handlePoint, routeEdges, separateRoutes } from "../idJagPlaygroundRouting";
+import { handleDir, handlePoint, plainRoute, routeEdges, separateRoutes } from "../idJagPlaygroundRouting";
 
 const box = { x: 100, y: 200, w: 300, h: 80 };
 
@@ -40,6 +40,72 @@ describe("routeEdges", () => {
     expect(r.routes.e.pts).toHaveLength(2);
     expect(r.fallbacks).toBe(1);
     expect(r.routes.x).toBeUndefined();
+  });
+});
+
+describe("an arrow with no route is drawn as a plain orthogonal line from handle to handle", () => {
+  const P = (x, y) => ({ x, y });
+  const orthogonal = (pts) => pts.slice(1).every((q, i) => q.x === pts[i].x || q.y === pts[i].y);
+  it("plainRoute is a straight run, an L or a Z, starting and ending on the handles", () => {
+    for (const [a, b, ad, bd] of [[P(0, 0), P(100, 0), "r", "l"], [P(0, 0), P(100, 40), "r", "l"], [P(0, 0), P(100, 40), "b", "t"], [P(0, 0), P(100, 40), "r", "t"], [P(0, 0), P(100, 40), "b", "l"], [P(100, 40), P(0, 0), "l", "r"]]) {
+      const pts = plainRoute(a, b, ad, bd);
+      expect(pts[0]).toEqual(a);
+      expect(pts.at(-1)).toEqual(b);
+      expect(orthogonal(pts), `${ad}${bd} ${JSON.stringify(pts)}`).toBe(true);
+    }
+  });
+  it("plainRoute draws the exact line: where the corner of an L and the middle of a Z are", () => {
+    const a = P(0, 0), b = P(100, 40);
+    expect(plainRoute(a, b, "r", "l"), "Z between two vertical sides: the vertical run is halfway across").toEqual([P(0, 0), P(50, 0), P(50, 40), P(100, 40)]);
+    expect(plainRoute(a, b, "b", "t"), "Z between two horizontal sides: the horizontal run is halfway down").toEqual([P(0, 0), P(0, 20), P(100, 20), P(100, 40)]);
+    expect(plainRoute(a, b, "r", "t"), "L leaving sideways, arriving from above: the corner is above the target").toEqual([P(0, 0), P(100, 0), P(100, 40)]);
+    expect(plainRoute(a, b, "b", "l"), "L leaving downwards, arriving sideways: the corner is beside the target").toEqual([P(0, 0), P(0, 40), P(100, 40)]);
+    expect(plainRoute(P(0, 0), P(100, 0), "r", "l"), "level handles: one straight run").toEqual([P(0, 0), P(100, 0)]);
+    expect(plainRoute(P(0, 0), P(0, 50), "b", "t"), "aligned handles: one straight run").toEqual([P(0, 0), P(0, 50)]);
+    expect(plainRoute(P(100, 40), P(0, 0), "l", "r"), "from the lower right").toEqual([P(100, 40), P(50, 40), P(50, 0), P(0, 0)]);
+    expect(plainRoute(P(100, 40), P(0, 0), "t", "b")).toEqual([P(100, 40), P(100, 20), P(0, 20), P(0, 0)]);
+  });
+  it("plainRoute leaves the first handle along its side's axis and arrives along the second's, for every pair of sides and every direction of travel", () => {
+    const horiz = (d) => d === "l" || d === "r";
+    for (const ad of ["l", "r", "t", "b"]) for (const bd of ["l", "r", "t", "b"]) for (const [dx, dy] of [[100, 40], [-100, 40], [100, -40], [-100, -40], [30, 200], [-30, -200]]) {
+      const a = P(10, 10), b = P(10 + dx, 10 + dy);
+      const pts = plainRoute(a, b, ad, bd);
+      const first = { dx: pts[1].x - pts[0].x, dy: pts[1].y - pts[0].y }, last = { dx: pts.at(-1).x - pts.at(-2).x, dy: pts.at(-1).y - pts.at(-2).y };
+      const why = `${ad}->${bd} by ${dx},${dy}: ${JSON.stringify(pts)}`;
+      expect(horiz(ad) ? first.dy === 0 && first.dx !== 0 : first.dx === 0 && first.dy !== 0, `leaves ${why}`).toBe(true);
+      expect(horiz(bd) ? last.dy === 0 && last.dx !== 0 : last.dx === 0 && last.dy !== 0, `arrives ${why}`).toBe(true);
+      expect(orthogonal(pts), why).toBe(true);
+    }
+  });
+  it("routeEdges hands back that line, not a diagonal, when it finds no way round (ok stays false and it is counted)", () => {
+    const rects = { a: { x: 0, y: 0, w: 100, h: 100 }, b: { x: 400, y: 60, w: 100, h: 100 }, wall: { x: 330, y: -2000, w: 69, h: 4000 } };
+    const { routes, fallbacks } = routeEdges(rects, [{ id: "e", from: "a", fh: "R2", to: "b", th: "L2" }]);
+    expect(routes.e.ok).toBe(false);
+    expect(fallbacks).toBe(1);
+    expect(routes.e.pts[0]).toEqual(handlePoint(rects.a, "R2"));
+    expect(routes.e.pts.at(-1)).toEqual(handlePoint(rects.b, "L2"));
+    expect(orthogonal(routes.e.pts), JSON.stringify(routes.e.pts)).toBe(true);
+  });
+});
+
+describe("routeEdges gives plainRoute the sides in the right order when it finds no way round", () => {
+  // The first case above leaves from a right side and arrives at a left side (both horizontal), so swapping the two sides passed to plainRoute changes nothing there.
+  // These leave and arrive on different axes, which is where the order shows: the line must leave a along its side's axis and arrive at b along its side's axis.
+  const a = { x: 0, y: 0, w: 100, h: 100 }, b = { x: 400, y: 260, w: 100, h: 100 };
+  const cap = { x: 300, y: 150, w: 300, h: 109 }; // lies over b, 1px above it: nothing can reach b's top
+  const wall = { x: 300, y: -2000, w: 99, h: 4000 }; // abuts b's left side
+  const run = (fh, th, extra) => routeEdges({ a, b, ...extra }, [{ id: "e", from: "a", fh, to: "b", th }]).routes.e;
+  it("right side to top side: leaves sideways, arrives going down", () => {
+    const r = run("R2", "T2", { cap });
+    expect(r.ok).toBe(false);
+    expect(r.pts).toEqual(plainRoute(handlePoint(a, "R2"), handlePoint(b, "T2"), "r", "t"));
+    expect(r.pts).toEqual([{ x: 100, y: 50 }, { x: 450, y: 50 }, { x: 450, y: 260 }]);
+  });
+  it("bottom side to left side: leaves downwards, arrives going right", () => {
+    const r = run("B2", "L2", { wall });
+    expect(r.ok).toBe(false);
+    expect(r.pts).toEqual(plainRoute(handlePoint(a, "B2"), handlePoint(b, "L2"), "b", "l"));
+    expect(r.pts).toEqual([{ x: 50, y: 100 }, { x: 50, y: 310 }, { x: 400, y: 310 }]);
   });
 });
 

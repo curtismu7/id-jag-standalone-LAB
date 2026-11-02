@@ -46,7 +46,7 @@
         "Fixtures for issue, inspect, redeem, call, the protected page and negative tests",
         "Sample trusted IdP: Partner Okta (sample)"
       ],
-      "x": 520,
+      "x": 480,
       "y": 300
     },
     {
@@ -58,7 +58,7 @@
         "Sample ID-JAG typed oauth-id-jag+jwt",
         "Exchange client agent-exchange-client"
       ],
-      "x": 1040,
+      "x": 960,
       "y": 0
     },
     {
@@ -69,7 +69,7 @@
         "mcp-as.example.com/token",
         "Sample redemption for client agent-mcp-client"
       ],
-      "x": 1040,
+      "x": 960,
       "y": 600
     },
     {
@@ -80,7 +80,7 @@
         "mcp.example.com/mcp",
         "Sample tools: search_records, get_record, create_note"
       ],
-      "x": 1560,
+      "x": 1440,
       "y": 300
     },
     {
@@ -92,7 +92,7 @@
         "Same bearer validation as the MCP tools",
         "Says which check failed when it refuses"
       ],
-      "x": 520,
+      "x": 480,
       "y": 640
     }
   ],
