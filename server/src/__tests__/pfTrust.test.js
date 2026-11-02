@@ -7,6 +7,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { caFor, fetchWithCa, trustedFetch } from '../pfTrust.js';
 import { createNetguard } from '../netguard.js';
+import { outboundFetch } from '../outbound.js';
 
 const PF = 'https://127.0.0.1:4732';
 const ENV = { PF_URL: PF, PF_CA_FILE: '/ca.pem' };
@@ -20,6 +21,7 @@ describe('caFor', () => {
     expect(caFor('https://localhost:4732/', ENV, read)).toBeUndefined();
     expect(caFor('https://pf.example.invalid/', ENV, read)).toBeUndefined();
     expect(caFor('http://127.0.0.1:4732/', ENV, read)).toBeUndefined();
+    expect(caFor('http://127.0.0.1:4732/', { ...ENV, PF_URL: 'http://127.0.0.1:4732' }, read)).toBeUndefined(); // a CA is for TLS: never for plain http, even if PF_URL says http
     expect(caFor('not a url', ENV, read)).toBeUndefined();
   });
   it('is off without PF_CA_FILE or PF_URL, and when the file cannot be read', () => {
@@ -91,6 +93,11 @@ describe('fetchWithCa over a real TLS socket', () => {
     const other = fs.readFileSync(path.join(dir, 'k.pem')); // not a certificate: nothing verifies
     await expect(fetchWithCa(`${url}/`, {}, other)).rejects.toBeDefined();
     await expect(fetchWithCa(`${url}/`, { signal: AbortSignal.abort() }, ca())).rejects.toBeDefined();
+  });
+  it('the app\'s own door (outboundFetch, the real netguard) reaches PF_URL through the CA', async () => {
+    vi.stubEnv('PF_URL', url);
+    vi.stubEnv('PF_CA_FILE', path.join(dir, 'c.pem'));
+    try { expect((await outboundFetch(`${url}/pf/JWKS`)).status).toBe(200); } finally { vi.unstubAllEnvs(); }
   });
   it('trustedFetch applies the CA to PF_URL\'s origin only: the same server under another origin is not trusted', async () => {
     const port = new URL(url).port;

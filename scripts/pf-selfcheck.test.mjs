@@ -50,6 +50,7 @@ test('fails when /pf/JWKS has two distinct RSA keys, none, or no x5t', async () 
   assert.equal((await run(jwks([key('A', { x5t: 't' }), key('B', { x5t: 'u' })]))).ok, false, 'two distinct keys');
   assert.equal((await run(jwks([]))).ok, false, 'no keys');
   assert.equal((await run(jwks([key('A', { kid: 'k' })]))).ok, false, 'a key with no x5t');
+  assert.equal((await run(jwks([key('A', { x5t: 't' }), key('B')]))).ok, false, 'two distinct keys, only one with x5t');
   assert.equal((await run({ ...good, '/pf/JWKS': { status: 500, body: null } })).ok, false);
   assert.equal((await run({ ...good, '/pf/JWKS': Object.assign(new Error('x'), { code: 'ECONNRESET' }) })).ok, false);
 });
