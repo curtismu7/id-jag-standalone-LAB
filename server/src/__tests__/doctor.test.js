@@ -35,6 +35,7 @@ const ok = (data, status = 200) => ({ status, json: async () => data });
 // A fake network: discovery documents by URL, everything else 200.
 const net_ = (issuer = 'https://pf.test') => vi.fn(async (url) => {
   if (String(url) === 'https://pf.test/.well-known/openid-configuration') return ok({ issuer });
+  if (String(url).endsWith('/pf/JWKS')) return ok({ keys: [{ kty: 'RSA', n: 'a', e: 'AQAB', x5t: 't' }] });
   return ok({});
 });
 const freePort = { createServer: () => { const h = {}; return { once: (e, f) => { h[e] = f; }, listen: () => setTimeout(() => h.listening?.(), 0), close: (cb) => cb() }; } };
@@ -113,6 +114,27 @@ describe('individual checks', () => {
     expect(down.status).toBe('fail');
     expect(down.message).toContain('ENOTFOUND');
   });
+  it('discovery: a local issuer that differs gets advice that points at the PingFederate, not at PF_URL', async () => {
+    const bad = await doctor.checkDiscovery('d', 'PF_URL', 'https://127.0.0.1:4732', async () => ok({ issuer: 'https://localhost:9031' }));
+    expect(bad.status).toBe('fail');
+    expect(bad.message).toContain('https://localhost:9031');
+    expect(bad.fix).not.toContain('Set PF_URL to https://localhost:9031');
+    expect(bad.fix).toContain('Do not change PF_URL');
+    expect(bad.fix).toContain('setup -- --mode=pf-local');
+    const remote = await doctor.checkDiscovery('d', 'PF_URL', 'https://pf.test', net_('https://pf.test/'));
+    expect(remote.fix).toContain('Set PF_URL to exactly the issuer');
+  });
+  it('issuer JWKS (pf-as): one RSA key with x5t passes; none with x5t fails; two distinct warns; unreadable fails', async () => {
+    const jwks = (keys, status = 200) => async () => ok({ keys }, status);
+    const one = { kty: 'RSA', n: 'a', e: 'AQAB', x5t: 't' };
+    expect((await doctor.checkIssuerJwks('j', 'https://pf.test', jwks([one, { ...one, kid: 'k2' }]))).status).toBe('pass');
+    const none = await doctor.checkIssuerJwks('j', 'https://pf.test', jwks([{ kty: 'RSA', n: 'a', e: 'AQAB' }]));
+    expect(none).toMatchObject({ status: 'fail', message: expect.stringContaining('no RSA key with x5t') });
+    expect((await doctor.checkIssuerJwks('j', 'https://pf.test', jwks([one, { ...one, n: 'b', x5t: 'u' }]))).status).toBe('warn');
+    expect((await doctor.checkIssuerJwks('j', 'https://pf.test', jwks([], 500))).message).toContain('HTTP 500');
+    const down = await doctor.checkIssuerJwks('j', 'https://pf.test', async () => { throw Object.assign(new Error('x'), { cause: { code: 'CERT_HAS_EXPIRED' } }); });
+    expect(down).toMatchObject({ status: 'fail', message: expect.stringContaining('CERT_HAS_EXPIRED') });
+  });
   it('pf admin: skipped when unset; password missing, unreachable, 401, no validator, and good', async () => {
     expect(await checkPfAdmin({})).toEqual([]);
     const env = { PF_ADMIN_URL: 'https://pf:9999', PF_ADMIN_PASSWORD: 'p', PF_EXCHANGE_CLIENT_ID: 'kit' };
@@ -148,6 +170,15 @@ describe('runDoctor', () => {
     const rep = await doctor.runDoctor({ mode: 'pf-as', fetchImpl: net_(), netImpl: freePort, envFile: __filename, fsImpl: { ...fs, existsSync: () => true, accessSync: () => {} } });
     expect(rep.checks.filter((c) => c.status === 'fail')).toEqual([]);
     expect(rep.ok).toBe(true);
+  });
+  it('pf-as checks the issuer\'s JWKS (live mode only), and pf-pf does not', async () => {
+    setEnv(GOOD);
+    const noX5t = async (url) => (String(url).endsWith('/pf/JWKS') ? ok({ keys: [{ kty: 'RSA', n: 'a', e: 'AQAB' }] }) : net_()(url));
+    const rep = await doctor.runDoctor({ mode: 'pf-as', fetchImpl: noX5t, netImpl: freePort, envFile: __filename, fsImpl: { ...fs, existsSync: () => true, accessSync: () => {} } });
+    expect(get(rep, 'pf-jwks').status).toBe('fail');
+    expect(rep.ok).toBe(false);
+    setEnv({ ...GOOD, ACME_PF_URL: 'https://acme.test' });
+    expect(get(await doctor.runDoctor({ mode: 'pf-pf', fetchImpl: noX5t, netImpl: freePort }), 'pf-jwks')).toBeUndefined();
   });
   it('pf-pf also checks the Acme issuer', async () => {
     setEnv({ ...GOOD, ACME_PF_URL: 'https://acme.test' });

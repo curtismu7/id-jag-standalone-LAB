@@ -26,7 +26,7 @@ import { getIssuerSubjectToken } from './issuerSession.js';
 import { mountInterop } from './interop.js';
 import { outboundFetch } from './outbound.js';
 import * as trustedIdps from './trustedIdps.js';
-import { SPEC, decodeJwt, inspect, scopeList, trimSlash } from './tokenChecks.js';
+import { SPEC, decodeJwt, inspect, issuerKeyCheck, scopeList, trimSlash } from './tokenChecks.js';
 import { piFlowHandlers } from './auth/piFlow.js';
 import { allowedDomains, checkEmail } from './auth/emailRules.js';
 import gatewayRedeemRoutes from './gatewayRedeemRoutes.js';
@@ -579,6 +579,12 @@ async function preflight(req, step) {
       add('jwks', `${s.idp.name} signing keys`, 'warn',
         `${rsa.length} distinct RSA keys (${withX5t} with x5t): the PingFederate redeemer may pick the wrong key and answer "Invalid JWT token".`,
         'Publish a single-key JWKS at the issuer, then make the redeeming PingFederate re-fetch it: re-save its IdP connection for this issuer, or restart it.');
+    } else if (mode === 'pf-as' && !isMock() && issuerKeyCheck(jwks).status !== 'pass') { // the mock PingFederate signs with an EC key
+      const v = issuerKeyCheck(jwks);
+      add('jwks', `${s.idp.name} signing keys`, v.status,
+        v.status === 'fail' ? `${rsa.length} distinct RSA key(s), none with x5t: PingFederate signs ID-JAGs with an x5t header and no kid, so resource-as cannot pick the key.`
+          : `${rsa.length} distinct RSA keys (${withX5t} with x5t): PingFederate's own JWT-bearer consumer may pick the wrong one and answer "Invalid JWT token".`,
+        'Rerun npm run setup -- --mode=pf-local, or publish the ID-JAG signing key through a JWT access token manager and set a static JWKS that holds only that key.');
     } else {
       add('jwks', `${s.idp.name} signing keys`, 'pass', `${jwks.length} key(s), ${rsa.length} distinct RSA.`);
     }

@@ -58,7 +58,7 @@ export async function checkDockerContext(exec) {
   return `Docker context is "${ctx}", not "orbstack". This kit runs on OrbStack, not Docker Desktop. Switch with: docker context use orbstack`;
 }
 
-export async function runSetup({ argv = [], env = {}, root, home = env.HOME, io, fs, exec, rand = (n) => crypto.randomBytes(n).toString('hex') }) {
+export async function runSetup({ argv = [], env = {}, root, home = env.HOME, io, fs, exec, rand = (n) => crypto.randomBytes(n).toString('hex'), check }) {
   const flags = parseArgs(argv);
   const yes = flags.yes === true;
   const envFile = path.join(root, '.env');
@@ -66,7 +66,7 @@ export async function runSetup({ argv = [], env = {}, root, home = env.HOME, io,
 
   const mode = flags.mode ?? (yes ? 'mock' : await io.ask(`Mode to configure (${SETUP_MODES.join(', ')})`, 'mock'));
   if (!SETUP_MODES.includes(mode)) { io.err(`unknown mode ${mode}; use one of ${SETUP_MODES.join(', ')}`); return { code: 2 }; }
-  if (mode === 'pf-local') return runPfLocal({ flags, yes, env, root, home, io, fs, exec, rand });
+  if (mode === 'pf-local') return runPfLocal({ flags, yes, env, root, home, io, fs, exec, rand, check });
 
   if (fs.existsSync(envFile) && flags.force !== true) {
     io.err('.env already exists; not touching it. Rerun with --force to replace it (the old one is saved as .env.bak.<n>).');

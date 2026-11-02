@@ -28,6 +28,14 @@ module may call `fetch`; use `outboundFetch`). Settings are read through `runtim
 settings. Mock tokens carry `mock: true`; EC keys use `createECDH` + `createPrivateKey`. Mock sign-in is guarded (`mockSignin.js`).
 The server suite runs with `MODE=live` (vitest config); `mock*.test.js` choose mock themselves.
 
+## Local PingFederate (pf-local)
+
+`npm run setup -- --mode=pf-local --users=<email>` installs or finds a PingFederate (container `id-jag-kit-pf`, or an existing `pingfederate-lab`; admin 4731, engine 4732, never 9031/9999 which belong to other projects) and makes it a working
+pf-as issuer: sign-in objects, base URL = `PF_URL` (`https://127.0.0.1:4732`), a runtime certificate for 127.0.0.1 (`PF_CA_FILE`, trusted for that origin only by `server/src/pfTrust.js`, resource-as and the setup self-check), the ID-JAG signing key
+published as the only JWKS key (`x5t`), the exchange policy and the `idJagKitResourceAsSp` connection. It ends with a self-check (`scripts/pf-selfcheck.mjs`) that fails unless issuer, JWKS and TLS are right. Scripts: `pingfederate/configure-*.js` (direct mode,
+loopback admin only). Test them against `scripts/fake-pf.mjs`; the live PingFederate is the kit's own and is backed up (`GET /bulk/export`) before the first write. PingFederate 13.1.3 needs no restart after the base URL or certificate change.
+Owner-run, never by an agent: anything at the shared Acme PingFederate. Docker + local PingFederate: `deploy/docker-compose.local-pf.yml` (socat sidecars; see the README).
+
 ## Diagrams, stories, talk track
 
 - Diagrams are diagram-studio/1 data files in `diagrams/` (one per playground mode: `mock`, `pf-as`, `pf-pf`, `byo`, `gateway-redeem`), loaded by name

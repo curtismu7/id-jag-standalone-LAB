@@ -85,3 +85,27 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ DATA_DIR: dir, TRUSTED_IDPS_FILE })).toThrow(/jwksUrl/);
   });
 });
+
+describe('the kit\'s own trust list and PingFederate certificate', () => {
+  it('reads the trust list from the kit\'s own registry at APP_ORIGIN when nothing else names it', () => {
+    const dir = tmp();
+    expect(loadConfig({ DATA_DIR: dir }).registry.url).toBe('http://localhost:4720/api/id-jag-playground/trusted-idps/registry');
+    expect(loadConfig({ DATA_DIR: dir, APP_ORIGIN: 'http://localhost:4724/', ID_JAG_REGISTRY_TOKEN: 't' }).registry)
+      .toEqual({ url: 'http://localhost:4724/api/id-jag-playground/trusted-idps/registry', token: 't', caFile: undefined });
+  });
+  it('an explicit TRUSTED_IDPS_REGISTRY_URL wins, and a TRUSTED_IDPS_FILE alone means no registry', () => {
+    const dir = tmp();
+    expect(loadConfig({ DATA_DIR: dir, TRUSTED_IDPS_REGISTRY_URL: 'https://r.example/x', APP_ORIGIN: 'http://localhost:1' }).registry.url).toBe('https://r.example/x');
+    const file = writeJson(dir, 'idps.json', [{ issuer: 'https://pf.example', jwksUrl: 'https://pf.example/jwks' }]);
+    expect(loadConfig({ DATA_DIR: dir, TRUSTED_IDPS_FILE: file }).registry).toBeUndefined();
+  });
+  it('PF_CA_FILE becomes a CA for PF_URL\'s origin only; unset, or unreadable (a container with the host\'s path), it is off', () => {
+    const dir = tmp();
+    const ca = path.join(dir, 'ca.pem');
+    fs.writeFileSync(ca, 'PEM');
+    expect(loadConfig({ DATA_DIR: dir, PF_URL: 'https://127.0.0.1:4732', PF_CA_FILE: ca }).pfCa).toEqual({ origin: 'https://127.0.0.1:4732', ca: Buffer.from('PEM') });
+    expect(loadConfig({ DATA_DIR: dir, PF_URL: 'https://127.0.0.1:4732' }).pfCa).toBeUndefined();
+    expect(loadConfig({ DATA_DIR: dir, PF_CA_FILE: ca }).pfCa).toBeUndefined();
+    expect(loadConfig({ DATA_DIR: dir, PF_URL: 'https://127.0.0.1:4732', PF_CA_FILE: '/Users/someone/pf-ca.pem' }).pfCa).toBeUndefined();
+  });
+});

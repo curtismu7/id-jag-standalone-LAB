@@ -13,7 +13,8 @@
  *   - a policy contract (subject, email, email_verified, name, groups) and its persistent-grant mapping
  *   - an access token manager and OIDC policy only this client may use, so the ID token carries those claims
  *   - the client: authorization code + refresh + token exchange, PKCE, redirect URIs ${APP_ORIGIN}/auth/callback and
- *     ${APP_ORIGIN}/api/id-jag-playground/issuer/callback (a rerun with another --app-origin adds that origin's pair)
+ *     ${APP_ORIGIN}/api/id-jag-playground/issuer/callback (a rerun with another --app-origin adds that origin's pair; a local
+ *     origin also registers its localhost / 127.0.0.1 twin and port 4720; existing URIs are kept)
  *   - a new FIRST authentication policy: "is it this client?" yes → PingOne, no → CONTINUE to the policies that were
  *     already there, which are not changed.
  * With --local (used by `npm run setup`, mode pf-local) there is no PingOne: everything above is created except the IdP
@@ -121,7 +122,7 @@ const ensure = (...a) => pf.ensure(api, ...a);
     }
   }
 
-  const redirects = [`${APP_ORIGIN}/auth/callback`, `${APP_ORIGIN}/api/id-jag-playground/issuer/callback`];
+  const redirects = pf.signinRedirects(APP_ORIGIN);
   const client = await api('GET', `/oauth/clients/${encodeURIComponent(CLIENT)}`);
   if (client.status === 200) {
     const missing = redirects.filter((u) => !client.body.redirectUris.includes(u));
