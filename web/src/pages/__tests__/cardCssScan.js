@@ -159,12 +159,6 @@ function tokensOf(text) {
 }
 
 // ---- lengths --------------------------------------------------------------------------------------------------------------------------------------
-/** The pixel size of a CSS length given the root size: px and rem only. */
-export function toPx(value, rootPx = 16) {
-  const m = /^([\d.]+)(rem|px)$/.exec(value.trim());
-  return m ? Number(m[1]) * (m[2] === "px" ? 1 : rootPx) : null;
-}
-
 /** Every string `value` can stand for once its var(--x, fallback) are replaced by each value --x is declared with (at most 64 strings; [] when a var has none). */
 function expandVars(value, vars) {
   let out = [value];
