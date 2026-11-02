@@ -13,7 +13,9 @@
  * ask Acme for an ID-JAG addressed to anything the demo uses (acmeToPingFed, acmeToResourceAs).
  * Never touched: acmeToPingFed, acmeToResourceAs, acmeIdJagPolicy, acmeAtm, acme-agent, acmeRefreshToken, the signing key,
  * the static JWKS, the default exchange policy, or any other object. It refuses to run when PF_RESOURCE or the local issuer
- * is already used by a connection that is not the kit's.
+ * is already used by a connection that is not the kit's (any connection but idJagKitAcmeToLocalPf itself counts).
+ * It never WRITES to anything but those three ids. It READS the connection list (ids, entity ids, resource URIs), plus one
+ * connection singly when the list omits that connection's token exchange settings.
  *
  *   kubectl --context <ctx> -n <ns> port-forward svc/pingfederate-admin 29999:9999 &
  *   unset PF_ADMIN_URL
@@ -60,6 +62,7 @@ function guarded(api, { dry = false, log = console.log } = {}) {
 }
 
 const isKit = (id) => typeof id === 'string' && id.startsWith('idJagKit');
+const isOwn = (id) => id === ID.connection; // the one connection this script owns: a look-alike with the same prefix is not ours
 const items = (r) => (Array.isArray(r.body?.items) ? r.body.items : []);
 
 /** Throws when the local issuer or the resource is something other than the kit's connection already uses. */
@@ -123,7 +126,7 @@ function connectionMatches(stored, o) {
 async function connections(api) {
   const out = [];
   for (const c of items(await api('GET', '/idp/spConnections'))) {
-    if (c.oauthTokenExchangeSettings === undefined && !isKit(c.id)) {
+    if (c.oauthTokenExchangeSettings === undefined && !isOwn(c.id)) {
       const one = await api('GET', `/idp/spConnections/${encodeURIComponent(c.id)}`); // a read, never a write
       out.push(one.status === 200 ? one.body : c);
     } else out.push(c);
@@ -142,6 +145,11 @@ async function inventory(rawApi, log = console.log) {
   for (const [what, path] of [['exchange policy', '/oauth/tokenExchange/processor/policies'], ['token processor', '/idp/tokenProcessors'], ['signing key', '/keyPairs/signing']]) {
     for (const x of items(await api('GET', path))) lines.push(`${what} ${x.id}${isKit(x.id) ? '  (kit)' : ''}`);
   }
+  // The three Acme-wide settings configure-acme-signin.js may switch on: shown so a before and an after diff can see them.
+  const dflt = await api('GET', '/authenticationPolicies/default');
+  lines.push(`default authentication sources [${(dflt.body?.defaultAuthenticationSources || []).map((x) => x.sourceRef?.id).sort().join(', ')}]`);
+  lines.push(`IdP authentication policies enabled=${Boolean((await api('GET', '/authenticationPolicies/settings')).body?.enableIdpAuthnSelection)}`);
+  lines.push(`Authentication API enabled=${Boolean((await api('GET', '/authenticationApi/settings')).body?.apiEnabled)}`);
   const client = await api('GET', `/oauth/clients/${KIT_CLIENT}`);
   lines.push(`kit sign-in client ${KIT_CLIENT}: ${client.status === 200 ? `present, exchange policy ${client.body.tokenExchangeProcessorPolicyRef?.id ?? '(none)'}` : 'absent'}`);
   lines.sort();
@@ -170,7 +178,7 @@ async function run(rawApi, o, { dry = false, remove = false, acmeIssuer } = {}) 
   const keys = await api('GET', '/keyPairs/signing');
   if (!items(keys).some((k) => k.id === SIGNING_KEY)) throw new Error(`Acme has no signing key ${SIGNING_KEY}: nothing to sign the ID-JAG with. Run configure-acme-idp.js's key step first (the demo normally already has it)`);
   for (const c of await connections(api)) {
-    if (isKit(c.id)) continue;
+    if (isOwn(c.id)) continue;
     if (c.entityId === o.pf) throw new Error(`the local issuer is already the entity id of connection ${c.id}, which is not the kit's: refusing to add a second connection with it`);
     if ((c.oauthTokenExchangeSettings?.resourceUris || []).includes(o.resource)) throw new Error(`the resource ${o.resource} is already used by connection ${c.id}, which is not the kit's: pick another --pf-resource`);
   }
@@ -201,7 +209,8 @@ if (require.main === module) {
     if (wrong) { console.error(`[acme-kit] ${wrong}`); process.exit(2); }
     console.log('[acme-kit] the admin API is the expected Acme PingFederate.');
     if (args.inventory) { await inventory(api); return; }
-    const o = {
+    // --remove needs none of these: it deletes the three ids above.
+    const o = args.remove ? null : {
       pf: pf.setting('pf', 'PF_URL', 'the local PingFederate issuer (the ID-JAG aud)'),
       resource: pf.setting('pf-resource', 'PF_RESOURCE', 'the resource the local PingFederate redeems for'),
       client: String(args['pf-client'] || process.env.PF_REDEEMER_CLIENT_ID || 'id-jag-redeemer'),
@@ -209,5 +218,5 @@ if (require.main === module) {
     const dry = Boolean(args['dry-run']);
     await run(api, o, { dry, remove: Boolean(args.remove), acmeIssuer: args['expect-issuer'] });
     pf.done('acme-kit', `[acme-kit] ${dry ? 'dry run only, nothing was changed' : args.remove ? 'removed' : 'done'}.`);
-  })().catch((e) => { console.error(`[acme-kit] ${e.message}`); process.exit(1); });
+  })().catch((e) => { console.error(`[acme-kit] ${e.message || e.code}`); process.exit(1); });
 }

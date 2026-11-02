@@ -1,12 +1,13 @@
 // The OWNER-RUN scripts for the shared Acme PingFederate (configure-acme-kit-connection.js, configure-acme-signin.js) and
 // their guards, tested ONLY against a fake admin API that records every request. No test here reaches a real PingFederate.
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import https from 'node:https';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import { fakePf } from './fake-pf.mjs';
 
 // pf-admin.js reads its settings file at load: point it at a scratch file BEFORE it is required, so no test ever touches the real one.
@@ -67,7 +68,7 @@ test('kit connection: creates only the processor, the policy and the connection,
   assert.equal(snapshotShared(f), before, 'the demo\'s objects are byte for byte what they were');
 });
 
-test('kit connection: NO request, read or write, ever names a demo object; only the three kit ids are written', async () => {
+test('kit connection: no request names a demo object when the list carries the settings; only the three kit ids are written', async () => {
   const f = fakePf(acmeSeed());
   await quiet(() => kit.inventory(f.api, () => {}));
   await quiet(() => kit.run(f.api, O, { dry: true }));
@@ -237,14 +238,49 @@ test('signin: the new client\'s secret goes to the settings file (not shown); a 
 });
 
 // ---- the guards ----
+// The spawned scripts get a kubectl that only records its arguments and answers the admin-password lookup: if a guard ever
+// regressed, no real kubectl, cluster or kubeconfig is reached. STUB_LOG says what the stub was asked.
+const stub = fs.mkdtempSync(path.join(os.tmpdir(), 'kubectl-stub-'));
+fs.writeFileSync(path.join(stub, 'kubectl'), '#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$STUB_LOG"\ncase "$*" in *"get secret pingfederate-admin"*) printf eA== ;; *) exit 1 ;; esac\n', { mode: 0o755 });
+const stubEnv = (home) => ({ PATH: `${stub}:/usr/bin:/bin`, HOME: home, KUBECONFIG: path.join(home, 'no-kubeconfig'), STUB_LOG: path.join(home, 'kubectl.log') });
 const script = (name, env, ...argv) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'acme-guard-'));
   const settings = path.join(home, 'settings.env');
   fs.writeFileSync(settings, env.__FILE ?? '');
   const { __FILE, ...rest } = env;
-  return spawnSync(process.execPath, [new URL(`../pingfederate/${name}`, import.meta.url).pathname, ...argv], { encoding: 'utf8', timeout: 20000,
-    env: { PATH: process.env.PATH, HOME: home, STANDALONE_ENV: settings, ...rest } });
+  const r = spawnSync(process.execPath, [new URL(`../pingfederate/${name}`, import.meta.url).pathname, ...argv], { encoding: 'utf8', timeout: 20000,
+    env: { ...stubEnv(home), STANDALONE_ENV: settings, ...rest } });
+  return { ...r, kubectl: fs.existsSync(stubEnv(home).STUB_LOG) ? fs.readFileSync(stubEnv(home).STUB_LOG, 'utf8') : '' };
 };
+
+// A fake Acme admin API over https on a loopback port (the scripts reach https://localhost:<--port>), for end to end CLI runs.
+const certDir = fs.mkdtempSync(path.join(os.tmpdir(), 'acme-cert-'));
+const servers = [];
+after(() => servers.forEach((srv) => { srv.closeAllConnections(); srv.close(); }));
+async function serveAdmin(f) {
+  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=localhost', '-keyout', path.join(certDir, 'k.pem'), '-out', path.join(certDir, 'c.pem')], { stdio: 'ignore' });
+  const srv = https.createServer({ key: fs.readFileSync(path.join(certDir, 'k.pem')), cert: fs.readFileSync(path.join(certDir, 'c.pem')) }, (req, res) => {
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', async () => {
+      const r = await f.api(req.method, req.url.replace('/pf-admin-api/v1', ''), body ? JSON.parse(body) : undefined);
+      res.writeHead(r.status, { 'content-type': 'application/json' });
+      res.end(r.body === null || r.body === undefined ? '' : JSON.stringify(r.body));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  servers.push(srv);
+  return srv.address().port;
+}
+const cli = (name, port, ...argv) => new Promise((resolve) => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'acme-cli-'));
+  const settings = path.join(home, 'settings.env'); fs.writeFileSync(settings, '');
+  const p = spawn(process.execPath, [new URL(`../pingfederate/${name}`, import.meta.url).pathname, '--acme', `--expect-issuer=${ACME}`, '--ns=n', `--port=${port}`, ...argv],
+    { env: { ...stubEnv(home), STANDALONE_ENV: settings, PF_SETTINGS_FILE: settings } });
+  let out = ''; let err = '';
+  p.stdout.on('data', (c) => { out += c; }); p.stderr.on('data', (c) => { err += c; });
+  p.on('close', (code) => resolve({ code, out, err, kubectl: fs.existsSync(stubEnv(home).STUB_LOG) ? fs.readFileSync(stubEnv(home).STUB_LOG, 'utf8') : '' }));
+});
 
 test('guards: no --acme, no --expect-issuer, or PF_ADMIN_URL anywhere stops both scripts before any request', () => {
   for (const name of ['configure-acme-kit-connection.js', 'configure-acme-signin.js']) {
@@ -259,7 +295,10 @@ test('guards: no --acme, no --expect-issuer, or PF_ADMIN_URL anywhere stops both
     assert.match(direct.stderr, /PF_ADMIN_URL is set/);
     const inFile = script(name, { __FILE: 'PF_ADMIN_URL=https://127.0.0.1:4731\n' }, '--acme', `--expect-issuer=${ACME}`, '--ns=x');
     assert.equal(inFile.status, 2, 'PF_ADMIN_URL in the settings file counts too');
-    for (const r of [bare, noIssuer, direct, inFile]) assert.ok(!r.stderr.includes(ACME) && !r.stdout.includes(ACME), 'the issuer is never echoed');
+    for (const r of [bare, noIssuer, direct, inFile]) {
+      assert.ok(!r.stderr.includes(ACME) && !r.stdout.includes(ACME), 'the issuer is never echoed');
+      assert.equal(r.kubectl, '', 'a refused run never reaches kubectl');
+    }
   }
 });
 
@@ -290,4 +329,75 @@ test('settings writes default to the shared settings file, never to a repo-root 
   const own = path.join(home, 'own.env');
   const r2 = spawnSync(process.execPath, ['-e', code, new URL('../pingfederate/pf-admin.js', import.meta.url).pathname], { encoding: 'utf8', env: { PATH: process.env.PATH, HOME: home, PF_SETTINGS_FILE: own } });
   assert.equal(r2.stdout.trim(), own, 'an explicit PF_SETTINGS_FILE still wins');
+});
+
+// ---- end to end through the CLI (stub kubectl, fake https admin API) ----
+test('cli: --remove needs no --pf, --pf-resource or PF_URL, and refuses while the sign-in client still uses the policy', async () => {
+  const f = fakePf(acmeSeed());
+  await quiet(() => kit.run(f.api, O, {}));
+  f.store.set('/oauth/clients/id-jag-kit-acme', { clientId: 'id-jag-kit-acme', tokenExchangeProcessorPolicyRef: { id: 'idJagKitPolicy' } });
+  const port = await serveAdmin(f);
+  f.calls.length = 0;
+  const refused = await cli('configure-acme-kit-connection.js', port, '--remove');
+  assert.equal(refused.code, 1, refused.err);
+  assert.match(refused.err, /configure-acme-signin\.js --remove first/);
+  assert.equal(f.calls.filter((c) => c.method === 'DELETE').length, 0);
+  f.store.delete('/oauth/clients/id-jag-kit-acme');
+  const done = await cli('configure-acme-kit-connection.js', port, '--remove');
+  assert.equal(done.code, 0, done.err);
+  assert.equal(f.store.has('/idp/spConnections/idJagKitAcmeToLocalPf'), false);
+  for (const r of [refused, done]) assert.match(r.kubectl, /^(-n n get secret pingfederate-admin -o jsonpath=\S+\n)+$/, 'kubectl was only asked for the admin password');
+});
+
+test('kit connection: only the exact kit connection id is exempt from the conflict check, not the idJagKit prefix', async () => {
+  const seed = acmeSeed();
+  seed['/idp/spConnections/idJagKitOther'] = { id: 'idJagKitOther', entityId: LOCAL, oauthTokenExchangeSettings: { resourceUris: [RES], idJagEnabled: true } };
+  const f = fakePf(seed);
+  await assert.rejects(() => quiet(() => kit.run(f.api, O, {})), /already the entity id of connection idJagKitOther/);
+  assert.deepEqual(f.writes(), []);
+});
+
+test('kit connection: the inventory shows the three Acme-wide settings the sign-in script may switch on', async () => {
+  const f = fakePf(acmeSeed());
+  const lines = await quiet(() => kit.inventory(f.api, () => {}));
+  assert.ok(lines.includes('IdP authentication policies enabled=true'));
+  assert.ok(lines.includes('Authentication API enabled=true'));
+  assert.ok(lines.includes('default authentication sources []'));
+  assert.deepEqual(f.writes(), []);
+});
+
+// ---- the sign-in script's guard and client ----
+test('signin: its write list allows its own objects and the three settings, and nothing else', async () => {
+  for (const [m, p, body] of [
+    ['POST', '/idp/adapters', { id: 'idJagKitAcmeForm' }], ['POST', '/oauth/idpAdapterMappings', { id: 'idJagKitAcmeForm' }], ['POST', '/oauth/clients', { clientId: 'id-jag-kit-acme' }],
+    ['PUT', '/oauth/clients/id-jag-kit-acme', { clientId: 'id-jag-kit-acme' }], ['DELETE', '/idp/adapters/idJagKitAcmeForm'], ['DELETE', '/oauth/clients/id-jag-kit-acme'],
+    ['PUT', '/authenticationPolicies/default', {}], ['PUT', '/authenticationPolicies/settings', {}], ['PUT', '/authenticationApi/settings', {}],
+  ]) assert.equal(signin.writeProblem(m, p, body), null, `${m} ${p}`);
+  for (const [m, p, body] of [
+    ['PUT', '/oauth/clients/acme-agent', { clientId: 'acme-agent' }], ['POST', '/oauth/clients', { clientId: 'acme-agent' }], ['DELETE', '/idp/adapters/acmeForm'],
+    ['PUT', '/idp/spConnections/acmeToPingFed', { id: 'acmeToPingFed' }], ['PUT', '/oauth/tokenExchange/processor/settings', {}], ['PUT', '/serverSettings', {}],
+    ['POST', '/oauth/idpAdapterMappings', { id: 'acmeForm' }], ['DELETE', '/authenticationPolicies/default'],
+  ]) assert.match(signin.writeProblem(m, p, body), /refusing/, `${m} ${p}`);
+  const f = fakePf(acmeSeed());
+  await assert.rejects(() => signin.guarded(f.api)('PUT', '/oauth/clients/acme-agent', { clientId: 'acme-agent' }), /refusing PUT/);
+  assert.deepEqual(f.calls, []);
+});
+
+test('signin: a whole run through the guard writes only its own objects and the three settings, and leaves the demo alone', async () => {
+  const f = fakePf(acmeSeed());
+  await quiet(() => kit.run(f.api, O, {}));
+  f.calls.length = 0;
+  f.store.set('/authenticationPolicies/settings', { enableIdpAuthnSelection: false });
+  f.store.set('/authenticationApi/settings', { apiEnabled: false });
+  await quiet(() => signin.run(signin.guarded(f.api), {}));
+  const targets = f.writes().map((c) => `${c.method} ${c.path}`);
+  assert.deepEqual(targets.sort(), ['POST /idp/adapters', 'POST /oauth/clients', 'POST /oauth/idpAdapterMappings', 'PUT /authenticationApi/settings', 'PUT /authenticationPolicies/default', 'PUT /authenticationPolicies/settings'].sort());
+});
+
+test('signin: the client only ever asks for offline_access (scope restriction on)', () => {
+  const body = signin.clientBody('s', signin.redirectUris({ appOrigin: undefined }));
+  assert.equal(body.restrictScopes, true);
+  assert.deepEqual(body.restrictedScopes, ['offline_access']);
+  assert.equal(body.tokenExchangeProcessorPolicyRef.id, 'idJagKitPolicy');
+  assert.deepEqual(body.grantTypes, ['AUTHORIZATION_CODE', 'REFRESH_TOKEN', 'TOKEN_EXCHANGE']);
 });

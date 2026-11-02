@@ -20,7 +20,8 @@
  * Maps the adapter to a persistent-grant user (USER_KEY, USER_NAME = the username) and turns on IdP authentication policies
  * (enableIdpAuthnSelection) when off. Turns on Acme's Authentication API (apiEnabled; pi.flow only: restrictAccessToRedirectlessMode stays on) when it is off.
  * Sets Acme's default authentication source to the adapter ONLY when none is set (it is left alone otherwise, and the
- * script says so). The client secret goes to the shared settings file (ACME_EXCHANGE_CLIENT_ID / _SECRET), is never printed, and is kept on re-runs.
+ * script says so). --remove clears that source again when it is the adapter, but leaves the two switches above on. Every write is checked
+ * against a list (this script's own ids and those three settings) before it is sent. The client secret goes to the shared settings file (ACME_EXCHANGE_CLIENT_ID / _SECRET), is never printed, and is kept on re-runs.
  */
 const crypto = require('crypto');
 const pf = require('./pf-admin');
@@ -35,6 +36,33 @@ const CALLBACK = '/api/id-jag-playground/issuer/callback';
 function redirectUris({ appOrigin = process.env.APP_ORIGIN, dev = false } = {}) {
   const origins = ['http://localhost:4720', ...(appOrigin ? [String(appOrigin).replace(/\/$/, '')] : []), ...(dev ? ['http://localhost:4723'] : [])];
   return [...new Set(origins.flatMap((o) => pf.signinRedirects(o)).filter((u) => u.endsWith(CALLBACK)))];
+}
+
+// The only writes this script may send: [collection, id of the one object it owns there], plus three Acme-wide singletons it may
+// switch on (the default authentication source, IdP authentication policies, the Authentication API).
+const OWN = [['/idp/adapters', ID.adapter], ['/oauth/idpAdapterMappings', ID.adapter], ['/oauth/clients', ID.client]];
+const SINGLETONS = ['/authenticationPolicies/default', '/authenticationPolicies/settings', '/authenticationApi/settings'];
+
+/** Why a request must not be sent, or null. Reads are always fine; a write must be to one of OWN or a singleton PUT. */
+function writeProblem(method, p, body) {
+  if (method === 'GET') return null;
+  if (method === 'PUT' && SINGLETONS.includes(p)) return null;
+  for (const [collection, id] of OWN) {
+    if (method === 'POST' && p === collection && (body?.id === id || body?.clientId === id)) return null;
+    if (method === 'PUT' && p === `${collection}/${id}` && (body?.id === id || body?.clientId === id)) return null;
+    if (method === 'DELETE' && p === `${collection}/${id}`) return null;
+  }
+  return `refusing ${method} ${p}: not one of this script's own objects (${OWN.map(([, id]) => id).join(', ')}) or its three settings`;
+}
+
+/** The admin API with the write list enforced, and (dry run) every write turned into a printed plan line. */
+function guarded(api, { dry = false, log = console.log } = {}) {
+  return async (method, p, body) => {
+    const bad = writeProblem(method, p, body);
+    if (bad) throw new Error(bad);
+    if (dry && method !== 'GET') { log(`  plan ${method} ${p}`); return { status: 200, body }; }
+    return api(method, p, body);
+  };
 }
 
 /** The adapter body: the descriptor's defaults, one credential validator (acmeUsers). */
@@ -114,7 +142,7 @@ async function run(api, { uris = redirectUris(), newSecret = false, remove = fal
   }
 }
 
-module.exports = { ID, adapterBody, clientBody, redirectUris, run };
+module.exports = { ID, adapterBody, clientBody, redirectUris, run, writeProblem, guarded };
 
 if (require.main === module) {
   (async () => {
@@ -125,8 +153,8 @@ if (require.main === module) {
     const wrong = await acmeVerify(raw, args);
     if (wrong) { console.error(`[acme-signin] ${wrong}`); process.exit(2); }
     const dry = Boolean(args['dry-run']);
-    const api = dry ? async (m, p, b) => { if (m === 'GET') return raw(m, p, b); console.log(`  plan ${m} ${p}`); return { status: 200, body: b }; } : raw;
+    const api = guarded(raw, { dry });
     await run(api, { uris: redirectUris({ dev: Boolean(args.dev) }), newSecret: Boolean(args['new-secret']), remove: Boolean(args.remove), dry });
     pf.done('acme-signin', `[acme-signin] ${dry ? 'dry run only, nothing was changed' : 'done'}.`);
-  })().catch((e) => { console.error(`[acme-signin] ${e.message} (is the Acme admin port-forward up?)`); process.exit(1); });
+  })().catch((e) => { console.error(`[acme-signin] ${e.message || e.code} (is the Acme admin port-forward up?)`); process.exit(1); });
 }
