@@ -4,7 +4,8 @@ import { createElement } from "react";
 import { act, render } from "@testing-library/react";
 import IdJagPlaygroundDiagramPage, { READABLE_MIN_ZOOM } from "../IdJagPlaygroundDiagramPage";
 import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES, playgroundDiagramPath } from "../../utils/idJagPlaygroundDiagrams";
-import { parseRules, scanCardCss, tooSmall } from "./cardCssScan";
+import { normalizeSelector, parseRules, scanCardCss, tooSmall } from "./cardCssScan";
+import { ATTACKS, HARMLESS } from "./cardCssVariants";
 
 // ReactFlow itself is real; the wrapper records the zoom limits the page asks it for, counts its fit-view calls, and lets a test
 // say whether React Flow reports the boxes as measured.
@@ -138,6 +139,72 @@ describe("diagram text stays readable at every zoom the page allows", () => {
       "/* .ijx .cs{font-size:.4rem} */",
     ]) expect(bad(extra), extra).toEqual([]);
     expect(parseRules("@keyframes k{from{font-size:1px}to{font-size:2px}}.a{color:red}")).toEqual([{ selector: ".a", body: "color:red" }]);
+  });
+
+  // The ways to hide a small size or a shrink from a scan that only looks at the page as it is rendered right now (table in cardCssVariants.js).
+  it.each(ATTACKS)("fails when card text is made small by: %s", (_, extra) => {
+    expect(bad(extra).length, extra).toBeGreaterThan(0);
+  });
+  it.each(HARMLESS)("does not fail: %s", (_, extra) => {
+    expect(bad(extra), extra).toEqual([]);
+  });
+
+  it("every card state is tried: a rule for a selected or dragged node, or a lit, dimmed or selected card, is read (the page's own markup carries none of those)", () => {
+    for (const extra of [".ijx .react-flow__node.selected .cs{font-size:.4rem}", ".ijx .react-flow__node.dragging li{font-size:.4rem}", ".ijx .card.on.sel li{font-size:.4rem}", ".ijx .card.dim .ct{font-size:.4rem}", ".ijx .card.k-red .cs{font-size:.4rem}"]) expect(bad(extra).length, extra).toBeGreaterThan(0);
+  });
+
+  it("every declaration of a rule is read, not only the first of each property", () => {
+    expect(bad(".ijx .cs{font-size:12px;font-size:.4rem}")).toHaveLength(1);
+    expect(bad(".ijx .cs{font-size:.4rem;font-size:12px}")).toHaveLength(1);
+    expect(bad(".ijx .cs{zoom:1;zoom:.5}")).toHaveLength(1);
+    expect(bad(".ijx .cs{transform:none;transform:scale(.5)}")).toHaveLength(1);
+  });
+
+  it("the root's size follows the state it is set in: the presenter scale in the stylesheets is read, and a smaller one fails", () => {
+    expect(scan().rootPx).toBe(16);
+    expect(scan(":root{--present-scale:.4}").rootPx).toBeCloseTo(6.4, 6);
+    expect(scan(':root[data-present="1"]{font-size:50%}').rootPx).toBe(8);
+    expect(scan(':root[data-present="1"]{font-size:150%}').rootPx).toBe(16);
+  });
+
+  describe("parseRules", () => {
+    it("flattens native nesting: & , a bare selector, > and @media inside a rule", () => {
+      const rules = parseRules(".a{color:red; & b{font-size:1px} c{x:y} > d{z:w} @media (x){ e{p:q} font-size:2px } }");
+      expect(rules).toEqual([
+        { selector: ".a", body: "color:red;font-size:2px" },
+        { selector: ".a b", body: "font-size:1px" },
+        { selector: ".a c", body: "x:y" },
+        { selector: ".a > d", body: "z:w" },
+        { selector: ".a e", body: "p:q" },
+      ]);
+    });
+    it("a & in the middle and a list of parents", () => {
+      expect(parseRules(".a,.b{ .x &{k:v} &.on{k:v2} }").map((r) => r.selector)).toEqual([".a,.b", ".x .a,.x .b", ".a.on,.b.on"]);
+    });
+    it("skips at-rule statements and does not let them swallow the next rule", () => {
+      expect(parseRules("@layer base, components;@custom-media --n (max-width:30em);@tailwind base;@import url(a.css) layer(x);@charset \"utf-8\";.a{k:v}")).toEqual([{ selector: ".a", body: "k:v" }]);
+    });
+    it("a brace or a semicolon inside a string or parentheses does not end a rule", () => {
+      expect(parseRules('.a::after{content:"};{"}.b{background:url(data:image/png;base64,AAA)}').map((r) => r.selector)).toEqual([".a::after", ".b"]);
+    });
+    it("rules inside @layer, @container and @scope are read; @keyframes and @font-face are not", () => {
+      expect(parseRules("@layer x{.a{k:v}}@container (min-width:1px){.b{k:v}}@scope (.s){.c{k:v}}@keyframes k{to{k:v}}@font-face{src:url(x)}").map((r) => r.selector)).toEqual([".a", ".b", ".c"]);
+    });
+  });
+
+  describe("normalizeSelector", () => {
+    it("decodes escapes, lower-cases type selectors only, drops hover / pseudo-elements / structural and unknown pseudo-classes", () => {
+      expect(normalizeSelector(".ijx .\\63 s").query).toBe(".ijx .cs");
+      expect(normalizeSelector(".ijx .card LI").query).toBe(".ijx .card li");
+      expect(normalizeSelector('[data-id="PF Two"] .Card').query).toBe('[data-id="PF Two"] .Card');
+      expect(normalizeSelector("li:nth-child(2n+1):hover::before").query).toBe("li");
+      expect(normalizeSelector(".a:not(:first-child) .b").query).toBe(".a .b");
+      expect(normalizeSelector(".a:lang(en) .b").query).toBe(".a .b");
+      expect(normalizeSelector(".a:before").query).toBe(".a");
+      expect(normalizeSelector(".a >").query).toBe(".a >*");
+      expect(normalizeSelector(":root[data-present=\"1\"] body").query).toBe(':root[data-present="1"] body');
+      expect(normalizeSelector(":is(.a,.b):not(.c)").query).toBe(":is(.a,.b):not(.c)");
+    });
   });
 
   it.each(PLAYGROUND_DIAGRAM_MODES)("%s: ReactFlow is given that floor as its minimum zoom", (mode) => {

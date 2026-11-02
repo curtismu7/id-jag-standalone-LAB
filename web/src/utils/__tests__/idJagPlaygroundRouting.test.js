@@ -88,6 +88,27 @@ describe("an arrow with no route is drawn as a plain orthogonal line from handle
   });
 });
 
+describe("routeEdges gives plainRoute the sides in the right order when it finds no way round", () => {
+  // The first case above leaves from a right side and arrives at a left side (both horizontal), so swapping the two sides passed to plainRoute changes nothing there.
+  // These leave and arrive on different axes, which is where the order shows: the line must leave a along its side's axis and arrive at b along its side's axis.
+  const a = { x: 0, y: 0, w: 100, h: 100 }, b = { x: 400, y: 260, w: 100, h: 100 };
+  const cap = { x: 300, y: 150, w: 300, h: 109 }; // lies over b, 1px above it: nothing can reach b's top
+  const wall = { x: 300, y: -2000, w: 99, h: 4000 }; // abuts b's left side
+  const run = (fh, th, extra) => routeEdges({ a, b, ...extra }, [{ id: "e", from: "a", fh, to: "b", th }]).routes.e;
+  it("right side to top side: leaves sideways, arrives going down", () => {
+    const r = run("R2", "T2", { cap });
+    expect(r.ok).toBe(false);
+    expect(r.pts).toEqual(plainRoute(handlePoint(a, "R2"), handlePoint(b, "T2"), "r", "t"));
+    expect(r.pts).toEqual([{ x: 100, y: 50 }, { x: 450, y: 50 }, { x: 450, y: 260 }]);
+  });
+  it("bottom side to left side: leaves downwards, arrives going right", () => {
+    const r = run("B2", "L2", { wall });
+    expect(r.ok).toBe(false);
+    expect(r.pts).toEqual(plainRoute(handlePoint(a, "B2"), handlePoint(b, "L2"), "b", "l"));
+    expect(r.pts).toEqual([{ x: 50, y: 100 }, { x: 50, y: 310 }, { x: 400, y: 310 }]);
+  });
+});
+
 describe("the four diagrams route", () => {
   it.each(PLAYGROUND_DIAGRAM_MODES)("%s: every edge is routed from its declared handle sides with no fallback", (mode) => {
     const d = PLAYGROUND_DIAGRAMS[mode];
