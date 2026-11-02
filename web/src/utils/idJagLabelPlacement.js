@@ -128,8 +128,8 @@ export function placeLabels(routes, rects, edges, opts = {}) {
   const { zoom = 1, tx = 0, ty = 0, view = null, lit = new Set(), measure, avoid = [] } = opts;
   const S = (p) => ({ x: p.x * zoom + tx, y: p.y * zoom + ty });
   const ext = (r) => ({ x0: r.x - AIR, y0: r.y - AIR, x1: r.x + r.w + AIR, y1: r.y + r.h + AIR });
-  const real = [...Object.values(rects).map((r) => ({ x: r.x * zoom + tx, y: r.y * zoom + ty, w: r.w * zoom, h: r.h * zoom })), ...avoid];
-  const boxes = real.map(ext);
+  const real = Object.values(rects).map((r) => ({ x: r.x * zoom + tx, y: r.y * zoom + ty, w: r.w * zoom, h: r.h * zoom })); // the boxes; `avoid` (buttons) are obstacles but never take the fine pass
+  const solid = real.map(ext), buttons = avoid.map(ext), boxes = [...solid, ...buttons];
   const ids = edges.filter((e) => routes[e.id]?.pts.length >= 2).map((e) => e.id); // an arrow with no route round the boxes has its plain line (routeEdges), so its badge is placed too
   const byId = Object.fromEntries(edges.map((e) => [e.id, e]));
   const screen = Object.fromEntries(ids.map((id) => [id, routes[id].pts.map(S)]));
@@ -156,6 +156,7 @@ export function placeLabels(routes, rects, edges, opts = {}) {
       // `fine`, a badge alone: it is a circle. How far it reaches into a box counts (squared, so two small dips beat one deep one): where the gap between two
       // boxes is too narrow for it (24px) the centre of the gap wins over a spot that sits further into one box. Reaching only into the air kept around a box
       // costs less than any touch, but still enough (over CLEAN) that a looser tier is looked at.
+      for (const bx of buttons) if (overlap(rect, bx)) { c += 1000; if (c >= limit) return c; } // a button keeps its plain rule: nothing under it
       for (const r of real) {
         const d = Math.hypot(Math.max(r.x - p.x, 0, p.x - r.x - r.w), Math.max(r.y - p.y, 0, p.y - r.y - r.h));
         if (d < BADGE / 2) c += 700 + 300 * (BADGE / 2 - d) ** 2;
@@ -165,7 +166,7 @@ export function placeLabels(routes, rects, edges, opts = {}) {
     }
     if (view) {
       const inside = rect.x >= 0 && rect.y >= 0 && rect.x + rect.w <= view.w && rect.y + rect.h <= view.h;
-      if (!inside) { c += rect.x < view.w && rect.x + rect.w > 0 && rect.y < view.h && rect.y + rect.h > 0 ? (isLit ? 500 : 350) : (isLit ? HARD : 0); if (c >= limit) return c; } // cut by the canvas edge / words out of sight
+      if (!inside) { c += rect.x < view.w && rect.x + rect.w > 0 && rect.y < view.h && rect.y + rect.h > 0 ? (isLit ? 500 : 350) : (isLit ? HARD : fine ? 350 : 0); if (c >= limit) return c; } // cut by the canvas edge / words out of sight
     }
     for (const k of ids) {
       const o = placed[k];
@@ -225,7 +226,7 @@ export function placeLabels(routes, rects, edges, opts = {}) {
   // badge is placed exactly as before.
   const choose = (id, placed) => {
     const first = pass(id, placed, tiersOf[id], false);
-    if (showing.has(id) || !boxes.some((bx) => overlap(badgeRect(first.p), bx))) return first;
+    if (showing.has(id) || !solid.some((bx) => overlap(badgeRect(first.p), bx))) return first;
     fineTiers[id] ??= withDist(id, spotTiers(screen[id], true));
     return pass(id, placed, fineTiers[id], true);
   };

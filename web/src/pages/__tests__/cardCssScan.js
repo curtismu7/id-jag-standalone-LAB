@@ -14,6 +14,11 @@
 //     max(), clamp() and var() of custom properties declared in the CSS are evaluated), a `zoom`, a scale in `transform`, the `scale` property, a
 //     `text-size-adjust`, and the same things inside any @keyframes the rule names in `animation`.
 // What it does NOT do: see CLAUDE.md, "Not covered".
+//
+// `appStylesheets(webDir)` collects the text to scan: every .css under src, every .css a script under src imports (`import "../x.css"`, `import("...")`),
+// every .css one of those @imports, and what index.html links or writes in <style>, as long as the file is inside webDir and not under node_modules.
+import fs from "node:fs";
+import path from "node:path";
 
 const NOT_RULES = /^@(-webkit-|-moz-)?(keyframes|font-face|property|counter-style|page|namespace|font-feature-values|font-palette-values|view-transition|position-try)\b/i;
 
@@ -92,21 +97,26 @@ export function parseRules(cssText) {
   return parse(css, null).rules;
 }
 
-/** name -> body text of every @keyframes. */
+/** A CSS name or property written with escapes (`font\\2d size`, `s\\68`) as the browser reads it. */
+const unescapeCss = (s) => s.replace(/\\([0-9a-fA-F]{1,6})\s?|\\([^\n])/g, (_, hex, ch) => (hex ? String.fromCodePoint(parseInt(hex, 16)) : ch));
+/** An animation name as the browser reads it: quotes removed, escapes decoded. */
+const nameOf = (s) => unescapeCss(s.trim().replace(/^(["'])(.*)\1$/, "$2"));
+
+/** name -> body text of every @keyframes. The name may be quoted or written with escapes. */
 function parseKeyframes(cssText) {
   const css = cssText.replace(/\/\*[\s\S]*?\*\//g, ""), out = new Map();
-  for (const m of css.matchAll(/@(?:-webkit-|-moz-)?keyframes\s+("?)([\w-]+)\1\s*\{/gi)) out.set(m[2], css.slice(m.index + m[0].length, matchBrace(css, m.index + m[0].length - 1) - 1));
+  for (const m of css.matchAll(/@(?:-webkit-|-moz-)?keyframes\s+([^{}]+?)\s*\{/gi)) out.set(nameOf(m[1]), css.slice(m.index + m[0].length, matchBrace(css, m.index + m[0].length - 1) - 1));
   return out;
 }
 
-/** Declarations of a rule body as [property, value] (property lower-cased, !important removed). */
+/** Declarations of a rule body as [property, value] (property decoded and lower-cased, !important removed). */
 function splitDecls(body) {
   const out = [];
   let i = 0;
   for (;;) {
     const j = findTop(body, i, ";");
     const t = body.slice(i, j < 0 ? body.length : j), c = t.indexOf(":");
-    if (c > 0) out.push([t.slice(0, c).trim().toLowerCase(), t.slice(c + 1).replace(/!\s*important/i, "").trim()]);
+    if (c > 0) out.push([unescapeCss(t.slice(0, c).trim()).toLowerCase(), t.slice(c + 1).replace(/!\s*important/i, "").trim()]);
     if (j < 0) break;
     i = j + 1;
   }
@@ -253,7 +263,7 @@ const effectsIn = (body) => ({
   scales: [...decls(body, "scale"), ...decls(body, "transform").filter((v) => /scale|matrix/i.test(v))],
   adjusts: decls(body, "text-size-adjust", "-webkit-text-size-adjust", "-moz-text-size-adjust", "font-size-adjust"),
 });
-const animationNames = (body) => decls(body, "animation", "-webkit-animation", "animation-name", "-webkit-animation-name").flatMap((v) => v.split(/[\s,]+/));
+const animationNames = (body) => decls(body, "animation", "-webkit-animation", "animation-name", "-webkit-animation-name").flatMap((v) => v.split(/[\s,]+/)).map(nameOf);
 
 // ---- states ---------------------------------------------------------------------------------------------------------------------------------------
 const STATE_CLASS = /^(selected|dragging|dim|on|sel|k-[\w-]+)$/; // set by the loop below, never assumed on an ancestor
@@ -380,4 +390,50 @@ export function scanCardCss(cssText, card, kinds = [""]) {
 /** The findings that make text under `minPx` on screen at `zoom`: a size too small or one this scan cannot read, and every zoom / scale / text-size-adjust that is not the identity. */
 export function tooSmall({ findings }, zoom, minPx = 10) {
   return findings.filter((f) => f.type !== "font-size" || f.px === null || f.px * zoom < minPx);
+}
+
+// ---- which stylesheets there are ------------------------------------------------------------------------------------------------------------------
+const SCRIPT = /\.(?:[cm]?[jt]sx?)$/;
+const CSS_IN_SCRIPT = /(?:\bimport\s*(?:[^'"()]*?\bfrom\s*)?|\bimport\s*\(\s*|\brequire\s*\(\s*|\bnew\s+URL\s*\(\s*)["']([^"']+?\.css)(?:\?[^"']*)?["']/g;
+const CSS_IMPORT = /@import\s+(?:url\(\s*)?["']?([^"')\s;]+)/gi;
+
+/**
+ * { files, css }: the stylesheets of the app in `webDir` and their text. files are relative to webDir ("<style> in index.html" for inline ones).
+ * Not read: stylesheets under node_modules (React Flow's, @fontsource's) and anything outside webDir.
+ */
+export function appStylesheets(webDir) {
+  const root = fs.realpathSync(path.resolve(webDir)), texts = new Map();
+  const inside = (f) => { const rel = path.relative(root, f); return !!rel && !rel.startsWith("..") && !path.isAbsolute(rel) && !rel.split(path.sep).includes("node_modules"); };
+  const add = (file) => {
+    let f;
+    try { f = fs.realpathSync(file); } catch { return; }
+    if (texts.has(f) || !inside(f) || !fs.statSync(f).isFile()) return;
+    const text = fs.readFileSync(f, "utf8");
+    texts.set(f, text);
+    for (const m of text.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(CSS_IMPORT)) add(m[1].startsWith("/") ? path.join(root, m[1]) : path.resolve(path.dirname(f), m[1]));
+  };
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const f = path.join(dir, e.name);
+      if (e.isDirectory()) { if (e.name !== "node_modules") walk(f); } else if (e.name.endsWith(".css")) add(f);
+      else if (SCRIPT.test(e.name)) {
+        for (const m of fs.readFileSync(f, "utf8").matchAll(CSS_IN_SCRIPT)) {
+          if (m[1].startsWith(".")) add(path.resolve(dir, m[1])); else if (m[1].startsWith("/")) add(path.join(root, m[1])); // a bare name is a package: node_modules
+        }
+      }
+    }
+  };
+  if (fs.existsSync(path.join(root, "src"))) walk(path.join(root, "src"));
+  const inline = [];
+  const indexHtml = path.join(root, "index.html");
+  if (fs.existsSync(indexHtml)) {
+    const html = fs.readFileSync(indexHtml, "utf8");
+    for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
+      const href = /\brel\s*=\s*["']?stylesheet/i.test(m[0]) && /\bhref\s*=\s*["']([^"']+)["']/i.exec(m[0]);
+      if (href) { const h = href[1].split(/[?#]/)[0]; add(h.startsWith("/") ? path.join(root, h) : path.resolve(root, h)); add(path.join(root, "public", h)); }
+    }
+    for (const m of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) inline.push(m[1]);
+  }
+  const entries = [...texts].map(([f, t]) => [path.relative(root, f), t]).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  return { files: [...entries.map(([f]) => f), ...(inline.length ? ["<style> in index.html"] : [])], css: [...entries.map(([, t]) => t), ...inline].join("\n") };
 }

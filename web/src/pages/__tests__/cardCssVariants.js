@@ -110,6 +110,23 @@ export const ATTACKS = [
   ["m30 font shorthand", `.ijx li{font:italic .4rem serif}`],
   ["m31 attribute on the last compound", `.ijx li[data-kind="a"]{font-size:.4rem}`],
   ["m32 bare attribute on a card part", `.ijx .cs[data-x]{font-size:.4rem}`],
+  // (g) round 5: the ways the first four rounds still missed, or no test pinned
+  ["g1 property name with an escape", `.ijx .cs{font\\2d size:6px}`],
+  ["g2 property name with a char escape", `.ijx .cs{f\\ont-size:6px}`],
+  ["g3 quoted keyframes name and animation-name", `@keyframes "sh"{to{font-size:6px}}\n.ijx .cs{animation-name:"sh"}`],
+  ["g4 quoted keyframes name in animation shorthand", `@keyframes 'sh'{to{font-size:6px}}\n.ijx .cs{animation:'sh' 2s forwards}`],
+  ["g5 keyframes name with an escape", `@keyframes s\\68{to{font-size:6px}}\n.ijx .cs{animation-name:sh}`],
+  ["g6 second animation name followed", `@keyframes sh{to{font-size:6px}}\n.ijx .cs{animation:other 1s, sh 2s forwards}`],
+  ["g7 second animation-name followed", `@keyframes sh{to{zoom:.5}}\n.ijx .cs{animation-name:other, sh}`],
+  ["g8 upper-case property name", `.ijx .cs{FONT-SIZE:6px}`],
+  ["g9 upper-case zoom", `.ijx .card{ZOOM:.5}`],
+  ["g10 var chain two deep", `:root{--a:var(--b);--b:.3rem}\n.ijx .cs{font-size:var(--a)}`],
+  ["g11 var chain three deep with a fallback", `:root{--a:var(--b,1rem);--b:var(--c);--c:.3rem}\n.ijx .cs{font-size:var(--a)}`],
+  ["g12 font-size-adjust", `.ijx .cs{font-size-adjust:.2}`],
+  ["g13 clamp with the middle above the top", `.ijx .cs{font-size:clamp(1px,20px,5px)}`],
+  ["g14 clamp with the middle below the bottom", `.ijx .cs{font-size:clamp(5px,1px,20px)}`],
+  ["g15 selector the DOM engine cannot parse", `.ijx >> .cs{font-size:.4rem}`],
+  ["g16 nested rule with & twice", `.ijx .cs{ .nothing &, & { font-size:.4rem } }`],
 ];
 
 export const HARMLESS = [
@@ -141,4 +158,12 @@ export const HARMLESS = [
   ["ok25 body.presenter fine", `body.presenter .ijx .ct{font-size:20px}`],
   ["ok26 class that exists in the page but not above the card", `.ijx .legend li{font-size:.4rem}`],
   ["ok27 root 125%, body .6em is 12px", `html{font-size:125%}\nbody{font-size:.6em}`],
+  ["ok28 !important on a safe size", `.ijx .cs{font-size:12px !important}`],
+  ["ok29 !important on a safe size, no space", `.ijx .cs{font-size:1rem!important}`],
+  ["ok30 quoted keyframes that only grow", `@keyframes "gr"{to{font-size:2rem}}\n.ijx .cs{animation-name:"gr"}`],
+  ["ok31 second animation that is harmless", `@keyframes sh{to{font-size:6px}}\n.ijx .elabel{animation:other 1s, sh 2s}`],
+  ["ok32 escaped property that is big", `.ijx .cs{font\\2d size:20px}`],
+  ["ok33 var chain two deep, big", `:root{--a:var(--b);--b:2rem}\n.ijx .cs{font-size:var(--a)}`],
+  ["ok34 clamp whose middle is inside", `.ijx .cs{font-size:clamp(12px,14px,20px)}`],
+  ["ok35 font-size-adjust none", `.ijx .cs{font-size-adjust:none}`],
 ];

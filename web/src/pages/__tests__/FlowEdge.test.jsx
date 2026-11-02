@@ -93,6 +93,15 @@ describe("FlowEdge draws an arrow the router found no way round for as its plain
     expect(d).toBe(smooth[0]);
   });
 
+  it("a straight plain route of exactly two points is drawn and labelled like any other", () => {
+    const pts = [SRC, { x: 400, y: 100 }];
+    const { d, at } = draw({ route: { ok: false, pts }, place: undefined });
+    expect(d).toBe(pathFromPoints(pts));
+    expect(d).not.toBe(smooth[0]);
+    expect(at).toEqual(labelPoint(pts));
+    expect(at).toEqual({ x: 250, y: 100 });
+  });
+
   it("a routed arrow draws its route", () => {
     const pts = [SRC, { x: 100, y: 200 }, { x: 400, y: 200 }, TGT];
     const { d, at } = draw({ route: { ok: true, pts }, place: undefined });

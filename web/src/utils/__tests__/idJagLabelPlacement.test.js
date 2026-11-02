@@ -190,6 +190,32 @@ describe("placeLabels", () => {
       expect(o.x).toBeCloseTo(312.5, 6); // against the air-extended boxes the same pass lands on 311.5
       expect(o.side).toBe("r");
     });
+    // The tool buttons and the zoom controls drawn over the canvas are obstacles (`avoid`), not boxes. A badge whose coarse spot touches the air around one has
+    // nothing to be centred in, so it must not take the finer pass: that pass had moved such badges (one to 6px above the canvas) where origin/main left them.
+    // Values: origin/main's output for a 50px gap at zoom 0.9 with a 60x40 button laid over the middle of the arrow.
+    it("a button over the arrow does not send its badge through the finer pass: it is where origin/main put it", () => {
+      const a = { x: 0, y: 0, w: 300, h: 150 }, b = { x: 350, y: 0, w: 300, h: 150 };
+      const edges = [{ id: "e", from: "a", fh: "R2", to: "b", th: "L2", label: "x" }];
+      const { routes } = routeEdges({ a, b }, edges);
+      const run = (avoid) => placeLabels(routes, { a, b }, edges, { zoom: 0.9, tx: 30, ty: 30, view: { w: 1100, h: 800 }, avoid }).e;
+      const withButton = run([{ x: 272.5, y: 67.5, w: 60, h: 40 }]);
+      expect(withButton.x).toBeCloseTo(325.1111, 3); // the finer pass lands on 343
+      expect(withButton.y).toBeCloseTo(75, 6);
+      const wide = run([{ x: 245.5, y: 77.5, w: 233, h: 40 }]); // a tools-bar wide button
+      expect(wide.x).toBeCloseTo(325.1111, 3); // the finer pass lands on 325 exactly
+    });
+    it("a button keeps its plain rule inside the finer pass: nothing is put under it, even where the boxes leave only the middle of the corridor", () => {
+      // an arrow in a 20px corridor between two boxes (every spot touches their air, so the finer pass runs), with a button over the middle of it
+      const P = (x, y) => ({ x, y });
+      const rects = { a: { x: -300, y: -75, w: 300, h: 150 }, b: { x: 300, y: -75, w: 300, h: 150 }, above: { x: 0, y: -110, w: 300, h: 100 }, below: { x: 0, y: 10, w: 300, h: 100 } };
+      const routes = { e: { ok: true, pts: [P(0, 0), P(300, 0)] } };
+      const edges = [{ id: "e", label: "x" }];
+      expect(placeLabels(routes, rects, edges, {}).e.x, "no button: the middle of the arrow").toBeCloseTo(150, 6);
+      const button = { x: 110, y: -6, w: 80, h: 36 };
+      const o = placeLabels(routes, rects, edges, { avoid: [button] }).e;
+      expect(o.x).toBeCloseTo(95, 6); // without the button's own rule in that pass the badge stays under it, at 150
+      expect(o.x + BADGE / 2 + 3, "clear of the button's left side").toBeLessThanOrEqual(button.x);
+    });
     it("the five shipped diagrams, every step, two zooms, two canvases: every badge and words box is exactly where origin/main put it", () => {
       const rows = [];
       for (const mode of PLAYGROUND_DIAGRAM_MODES) {
@@ -204,6 +230,62 @@ describe("placeLabels", () => {
       expect(rows.length).toBe(1272);
       expect(createHash("sha256").update(JSON.stringify(rows)).digest("hex")).toBe("42b4c9f9f53439a397f45d5421f2c9189fc02e9804d3cf182ca51375d8a1b5c2");
     }, 60000);
+  });
+
+  // Each of these pins one boundary of the finer pass or of the tiers, at a scene found by searching for one where moving that boundary changes the result.
+  // The values are what the code gives; the comment on each says which change of the code they catch.
+  describe("boundaries of the placement, pinned where moving them changes the answer", () => {
+    // a 300px-wide box above or beside another one (`h1`, `h2` high), the arrow from the first to the second, `gap` screen px apart at `zoom`
+    const scene = ({ gap, zoom, off, h1, h2, across, tx, ty, lit = [], labels = ["x"], view = { w: 1100, h: 800 } }) => {
+      const a = { x: 0, y: 0, w: 300, h: h1 }, b = across ? { x: 300 + gap / zoom, y: off, w: 300, h: h2 } : { x: off, y: h1 + gap / zoom, w: 300, h: h2 };
+      const edges = labels.map((label, i) => ({ id: `e${i}`, from: "a", fh: across ? "R2" : "B2", to: "b", th: across ? "L2" : "T2", label }));
+      const { routes } = routeEdges({ a, b }, edges);
+      return placeLabels(routes, { a, b }, edges, { zoom, tx, ty, view, lit: new Set(lit) }).e0;
+    };
+    const POST = "POST /token with the subject token";
+    it("a lit arrow never takes the finer pass: it stays where the coarse pass put it, and its words are still not placed (ok false)", () => {
+      const o = scene({ zoom: 0.9, gap: 31.537264155223966, off: 0, h1: 98.2, h2: 150, across: false, tx: -49.61915448750369, ty: 30.232327231904492, lit: ["e0"], labels: [POST] });
+      expect(o.ok).toBe(false); // the finer pass on a lit arrow says true
+      expect(o.x).toBeCloseTo(150, 4);
+      expect(o.y).toBeCloseTo(115.7207, 3);
+    });
+    it("the finer pass starts when the coarse badge touches a box's 3px of air, not only the box itself", () => {
+      const o = scene({ zoom: 0.9, gap: 28.44480829825625, off: 40.303858948173, h1: 150, h2: 150, across: true, tx: 100.44098693644628, ty: 30.018797678872943 });
+      expect(o.x).toBeCloseTo(316.6667, 3); // gating on the box without its air leaves the coarse badge at 314, 96.1
+      expect(o.y).toBeCloseTo(75, 3);
+    });
+    it("the reach into a box is the straight-line distance from the badge centre (a corner counts by its diagonal), not the larger of the two axes", () => {
+      const o = scene({ zoom: 1.1, gap: 24.071652254089713, off: 0.2359816338866949, h1: 98.2, h2: 184.5, across: true, tx: 100.19461508956738, ty: 90.30987899727188, labels: ["GET /jwks"] });
+      expect(o.x).toBeCloseTo(310.9417, 3);
+      expect(o.y).toBeCloseTo(100.6678, 3); // the larger-axis distance puts it at 70.79
+    });
+    it("a spot whose cost is a little over 250 (air of a box within 15px) is still not good enough: the placer looks at the next tier", () => {
+      const o = scene({ zoom: 1.1, gap: 29.974552242085338, off: 0, h1: 98.2, h2: 150, across: true, tx: 100.6311595919542, ty: 30.324085544794798, lit: ["e0"], labels: [POST] });
+      expect(o.x).toBeCloseTo(313.6364, 3); // a cost limit of 260 accepts 314
+      expect(o.y).toBeCloseTo(49.1, 3);
+    });
+    it("the finer pass does not leave a badge out of sight of the canvas to dodge a box: a spot wholly outside the canvas costs as much as one cut by its edge", () => {
+      const o = scene({ zoom: 1.5665236868918875, gap: 14.41796437650919, off: 40.15772477630526, h1: 150, h2: 184.5, across: false, tx: 100.20503757777624, ty: -19.03322937223129, view: { w: 343, h: 486 } });
+      expect(o.x).toBeCloseTo(146.8082, 3); // a spot outside the canvas costing nothing sends it to 170.08, off the right edge
+      expect(o.y).toBeCloseTo(154.6019, 3);
+    });
+    it("the middle of every run is offered in the loosest tier only, not in every tier (in a crowd of boxes the earlier tier's middle would end the search too soon)", () => {
+      const P = (x, y) => ({ x, y });
+      const routes = { e: { ok: true, pts: [P(0, 0), P(0, -51.023), P(-149.55, -51.023), P(-149.55, 13.002), P(-37.479, 13.002)] } };
+      const rects = { b0: { x: -94.503, y: -124.238, w: 134.845, h: 84.68 }, b1: { x: -155.073, y: -79.021, w: 117.935, h: 90.371 }, b2: { x: -27.811, y: -118.593, w: 128.127, h: 125.773 } };
+      const o = placeLabels(routes, rects, [{ id: "e", label: "x" }], { zoom: 1.676, tx: 0, ty: 0 }).e;
+      expect(o.x).toBeCloseTo(-71.9844, 3); // mids in every tier: -66.02
+      expect(o.y).toBeCloseTo(18.3719, 3);
+    });
+    it("the first tier keeps 26px from both ends of the arrow: a spot 25.5px from the end belongs to the next tier, which also holds a better one", () => {
+      const P = (x, y) => ({ x, y });
+      const L = 55.5; // between the boxes; the vertical arrow f crosses 38px in, which makes the spot at 30 dearer than the one at 20
+      const rects = { a: { x: -300, y: -75, w: 300, h: 150 }, b: { x: L, y: -75, w: 300, h: 150 }, c: { x: -100, y: -400, w: 300, h: 300 }, d: { x: -100, y: 100, w: 300, h: 300 } };
+      const routes = { e: { ok: true, pts: [P(0, 0), P(L, 0)] }, f: { ok: true, pts: [P(38, -100), P(38, 100)] } };
+      const out = placeLabels(routes, rects, [{ id: "e", label: "x" }, { id: "f", label: "y" }], {});
+      expect(out.e.x).toBeCloseTo(20, 6); // a first tier at 25px puts it at 30
+      expect(out.e.y).toBeCloseTo(0, 6);
+    });
   });
 
   it("is deterministic", () => {
