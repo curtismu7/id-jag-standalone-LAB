@@ -1,50 +1,81 @@
 # Overlay: run the stack in Docker against the local PingFederate that `npm run setup -- --mode=pf-local` set up on this Mac
 # (issuer https://127.0.0.1:4732). Run setup first, then:
-#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local-pf.yml up --build -d
+#   docker compose --env-file "${STANDALONE_ENV:-$HOME/Development/.env}" -f deploy/docker-compose.yml -f deploy/docker-compose.local-pf.yml up --build -d
+#
+# Addresses. Setup registered the resource AS issuer http://localhost:9080 and the MCP resource http://localhost:9090/mcp on the
+# local PingFederate (the ID-JAG audience and resource), so this overlay uses those, and publishes resource-as on 9080 and mcp-sample
+# on 9090 instead of the base file's 4721 and 4722. The browser reaches them there; the containers reach each other by service name.
+# The playground stays on HOST_PORT (4720), which the sign-in client is registered for.
+#
+# Settings. The shared settings file is NOT injected into the containers. `--env-file` only lets compose read it, and each service
+# below passes the keys it needs, listed by name: nothing else in that file (other apps' keys) reaches a container.
 #
 # Why the sidecars: the issuer is https://127.0.0.1:4732 (it is the iss of every ID-JAG and the aud Acme writes), and inside a
 # container 127.0.0.1 is the container itself. Each sidecar shares its service's network namespace and listens on that
 # service's 127.0.0.1:4732, forwarding the bytes to the Mac (host.docker.internal, which OrbStack resolves in every container).
 # TLS is end to end, so the certificate for 127.0.0.1 verifies exactly as it does outside Docker, and the issuer string is
-# identical inside and outside. The browser still uses 127.0.0.1:4732 on the Mac.
-# The settings are the family's shared file (STANDALONE_ENV, else ~/Development/.env). Its PF_CA_FILE is a path on the Mac, so
-# the certificate is mounted at /certs/pf-ca.pem and PF_CA_FILE is set to that.
-x-shared-settings: &shared-settings
-  path: ${STANDALONE_ENV:-${HOME}/Development/.env}
-  required: false
+# identical inside and outside. The browser still uses 127.0.0.1:4732 on the Mac. PF_CA_FILE is a path on the Mac, so the
+# certificate is mounted at /certs/pf-ca.pem and PF_CA_FILE is set to that.
+x-addresses:
+  as-issuer: &as-issuer ${RESOURCE_AS_ISSUER:-http://localhost:${AS_HOST_PORT:-9080}}
+  mcp-resource: &mcp-resource ${ID_JAG_RESOURCE:-http://localhost:${MCP_HOST_PORT:-9090}/mcp}
 x-pf-ca: &pf-ca ${HOME}/.config/demo-kit/id-jag-kit/pf-ca.pem:/certs/pf-ca.pem:ro
+x-socat: &socat alpine/socat:1.8.0.3@sha256:beb4a68d9e4fe6b0f21ea774a0fde6c31f580dde6368939ed70100c5385b015e
 
 services:
   id-jag:
-    env_file:
-      - path: ../.env
-        required: false
-      - *shared-settings
     environment:
       PF_CA_FILE: /certs/pf-ca.pem
       MODE: ${MODE:-live}
+      RESOURCE_AS_ISSUER: *as-issuer
+      ID_JAG_RESOURCE: *mcp-resource
+      PF_URL: ${PF_URL:-https://127.0.0.1:4732}
+      PF_EXCHANGE_CLIENT_ID: ${PF_EXCHANGE_CLIENT_ID:-}
+      PF_EXCHANGE_CLIENT_SECRET: ${PF_EXCHANGE_CLIENT_SECRET:-}
+      PF_REDEEMER_CLIENT_ID: ${PF_REDEEMER_CLIENT_ID:-}
+      PF_REDEEMER_CLIENT_SECRET: ${PF_REDEEMER_CLIENT_SECRET:-}
+      PF_RESOURCE: ${PF_RESOURCE:-}
+      ACME_PF_URL: ${ACME_PF_URL:-}
+      ACME_EXCHANGE_CLIENT_ID: ${ACME_EXCHANGE_CLIENT_ID:-}
+      ACME_EXCHANGE_CLIENT_SECRET: ${ACME_EXCHANGE_CLIENT_SECRET:-}
+      RESOURCE_AS_CLIENT_ID: ${RESOURCE_AS_CLIENT_ID:-}
+      RESOURCE_AS_CLIENT_SECRET: ${RESOURCE_AS_CLIENT_SECRET:-}
+      ID_JAG_REGISTRY_TOKEN: ${ID_JAG_REGISTRY_TOKEN:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     volumes:
       - *pf-ca
 
   resource-as:
-    env_file:
-      - path: ../.env
-        required: false
-      - *shared-settings
+    ports: !override
+      - "127.0.0.1:${AS_HOST_PORT:-9080}:9080"
     environment:
       PF_CA_FILE: /certs/pf-ca.pem
+      ISSUER: *as-issuer
+      ACCEPTED_RESOURCES: *mcp-resource
+      PF_URL: ${PF_URL:-https://127.0.0.1:4732}
+      RESOURCE_AS_CLIENT_ID: ${RESOURCE_AS_CLIENT_ID:-}
+      RESOURCE_AS_CLIENT_SECRET: ${RESOURCE_AS_CLIENT_SECRET:-}
+      ID_JAG_REGISTRY_TOKEN: ${ID_JAG_REGISTRY_TOKEN:-}
     volumes:
       - *pf-ca
 
+  mcp-sample:
+    ports: !override
+      - "127.0.0.1:${MCP_HOST_PORT:-9090}:9090"
+    environment:
+      AS_ISSUER: *as-issuer
+      MCP_RESOURCE: *mcp-resource
+
   pf-relay-app:
-    image: alpine/socat:1.8.0.3
+    image: *socat
     network_mode: "service:id-jag"
     command: TCP-LISTEN:4732,bind=127.0.0.1,fork,reuseaddr TCP:host.docker.internal:4732
     restart: unless-stopped
     depends_on: [id-jag]
 
   pf-relay-as:
-    image: alpine/socat:1.8.0.3
+    image: *socat
     network_mode: "service:resource-as"
     command: TCP-LISTEN:4732,bind=127.0.0.1,fork,reuseaddr TCP:host.docker.internal:4732
     restart: unless-stopped
