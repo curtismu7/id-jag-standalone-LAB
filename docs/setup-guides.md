@@ -206,19 +206,37 @@ its own ID-JAGs, so the issuer is always a different server.
 
 ## Acme PingFederate → PingFederate
 
-The `pf-pf` mode: an outside company's PingFederate ("Acme") issues the ID-JAG, and our PingFederate redeems it.
-Acme is a second PingFederate that other deployments (the demo) also use, so the kit only ADDS `idJagKit` objects there.
+The `pf-pf` mode: an outside company's PingFederate ("Acme", the shared SE one) issues the ID-JAG, and **your own local PingFederate redeems it**
+(an IdP must not redeem its own ID-JAG). The two halves are set up by different people, because Acme is shared with the demo:
 
-1. Acme must already have the user store and exchange policy `configure-acme-idp.js` creates (`acmeUsers`, `acmeIdJagPolicy`) and
-   an SP connection that issues ID-JAGs to `PF_URL` (the demo's `acmeToPingFed` does). That connection fixes the resource
-   (`PF_RESOURCE`) and the client_id the ID-JAG carries, which must be the redeeming client at `PF_URL`.
-2. `kubectl -n <acme ns> port-forward svc/pingfederate-admin 29999:9999 &` then
-   `node pingfederate/configure-acme-signin.js --ns=<acme ns>`: an HTML form adapter on `acmeUsers`, the adapter mapping, Acme's
-   default authentication source (only if none is set), IdP authentication policies and the Authentication API (pi.flow only),
-   and the client `id-jag-kit-acme` (secret written to `.env`, never printed). `--remove` undoes the objects.
-3. Put the redeemer client in `.env`: `PF_REDEEMER_CLIENT_ID` / `_SECRET` (the client the ID-JAG names) and `PF_RESOURCE`.
-4. Sign in as an Acme user (the demo's `acme-user`). Acme defines no OIDC scopes, so the kit asks it for `offline_access` only.
-   `mcp-sample` trusts `resource-as` only, so in this mode the call step runs and is refused by design.
+**The Acme owner** (once; [acme-owner-runbook.md](acme-owner-runbook.md)) runs two additive scripts on Acme: `configure-acme-kit-connection.js`
+creates the SP connection `idJagKitAcmeToLocalPf` (audience `https://127.0.0.1:4732`, resource `http://localhost:9090/mcp`, client_id `id-jag-redeemer`),
+the exchange policy `idJagKitPolicy` and its processor, and `configure-acme-signin.js` creates the pi.flow sign-in objects and the client
+`id-jag-kit-acme`, pointed at that dedicated policy so it cannot ask for ID-JAGs for the demo's resources. Then the owner sends you:
+
+1. **A three-key settings block** through the approved secret channel (with an expiry): `ACME_PF_URL`, `ACME_EXCHANGE_CLIENT_ID`,
+   `ACME_EXCHANGE_CLIENT_SECRET`. Save it as a file and `chmod 600` it.
+2. **The `acme-user` password**, in a separate message. You type it into the sign-in modal. Nothing stores it.
+
+**You** (your machine):
+
+```sh
+npm run setup -- --mode=pf-local --users=you@pingone.com      # once: your local PingFederate, the redeemer
+npm run setup -- --mode=pf-pf --acme-settings=<block file>
+```
+
+The second command checks the file (regular file, mode 600, exactly those three keys, valid values), merges them into `~/Development/.env` (mode 600),
+deletes the file, and runs `pingfederate/configure-pf-redeemer.js` on your local PingFederate only: a configuration backup first, then an IdP connection
+`idJagKit-acme` (entity id = the Acme issuer, JWKS = `<ACME_PF_URL>/pf/JWKS`, mapped into a token manager), the token manager `idJagKitRedeemerAtm` selected by
+`PF_RESOURCE`, and the JWT bearer client `id-jag-redeemer` (EXTENSION grant, client secret authentication) whose generated secret goes to
+`PF_REDEEMER_CLIENT_SECRET`. PingFederate caches an issuer's JWKS forever, so the script restarts the container when the connection is new or changed.
+Without `--acme-settings` the command prints what is missing and who provides it. Rerun it any time.
+
+Then `npm run doctor -- --mode=pf-pf` checks Acme's discovery, that its `/pf/JWKS` has one RSA key with `x5t`, and that Acme starts a pi.flow sign-in for the kit
+client. Open the playground, choose "Acme PingFederate to PingFederate" and sign in as `acme-user`. Acme defines no OIDC scopes, so the kit asks it for
+`offline_access` only. `mcp-sample` trusts `resource-as` only, so the call step runs and is refused by design.
+
+`tools/outside-agent.js` needs the demo's `acme-agent` credential. That credential is never handed out; do not ask for it.
 
 ## Okta Cross App Access
 

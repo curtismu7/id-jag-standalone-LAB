@@ -36,6 +36,10 @@ published as the only JWKS key (`x5t`), the exchange policy and the `idJagKitRes
 loopback admin only). Test them against `scripts/fake-pf.mjs`; the live PingFederate is the kit's own and is backed up (`GET /bulk/export`) before the first write. PingFederate 13.1.3 needs no restart after the base URL or certificate change.
 Owner-run, never by an agent: anything at the shared Acme PingFederate. Docker + local PingFederate: `deploy/docker-compose.local-pf.yml` (socat sidecars; see the README).
 
+## pf-pf (Acme issues, the local PingFederate redeems)
+
+`npm run setup -- --mode=pf-pf --acme-settings=<file>`: the owner's three-key block (`ACME_PF_URL`, `ACME_EXCHANGE_CLIENT_ID`, `ACME_EXCHANGE_CLIENT_SECRET`; file mode 600; any other key is refused without echoing a value) is merged into the shared settings file, the file is deleted, and `pingfederate/configure-pf-redeemer.js` sets up the LOCAL PingFederate (backup first, IdP connection `idJagKit-acme`, token manager `idJagKitRedeemerAtm`, client `id-jag-redeemer`, container restart for the JWKS cache). Never print the Acme host or a secret. The Acme side is owner-run and additive (`configure-acme-kit-connection.js`, `configure-acme-signin.js`, guards in `acme-guard.js`, [runbook](docs/acme-owner-runbook.md)); agents test those against `scripts/fake-pf.mjs` only and never run them. Do not run `configure-acme-idp.js` against the shared Acme. `tools/outside-agent.js` uses the demo's `acme-agent` credential: owner only.
+
 ## Diagrams, stories, talk track
 
 - Diagrams are diagram-studio/1 data files in `diagrams/` (one per playground mode: `mock`, `pf-as`, `pf-pf`, `byo`, `gateway-redeem`), loaded by name
