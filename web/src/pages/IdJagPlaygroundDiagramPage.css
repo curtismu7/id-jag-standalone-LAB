@@ -31,7 +31,8 @@
 .ijx .sim{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
 .ijx .sim button{border:1px solid var(--th-border);background:var(--th-bg);color:var(--th-text);border-radius:8px;padding:5px 10px;font:inherit;font-size:.75rem;cursor:pointer}
 .ijx .sim button.pri{background:var(--red);border-color:var(--red);color:var(--on-accent);font-weight:600}
-.ijx .sim button:disabled{opacity:.4;cursor:default}.ijx .hint{font-size:.75rem;color:var(--th-text-muted)}
+/* pointer-events none: Chrome sends no mouseup to a disabled control, so a box released over one (Next on the last step, Back on the overview) never got its mouseup and stayed stuck to the pointer. React Flow does the same for its own disabled zoom buttons. */
+.ijx .sim button:disabled{opacity:.4;cursor:default;pointer-events:none}.ijx .hint{font-size:.75rem;color:var(--th-text-muted)}
 .ijx .pkt{fill:var(--red);stroke:var(--surface);stroke-width:2}
 /* Phone and tablet: the diagram sits on top and stays in view (sticky) while the panel scrolls under it. */
 @media (max-width:900px){.ijx{height:auto}.ijx-app{grid-template-columns:minmax(0,1fr);grid-template-rows:60vh auto;height:auto}.ijx .split{display:none}

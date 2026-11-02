@@ -60,7 +60,7 @@ Be honest here: access tokens that were already minted stay valid until they exp
 
 ## Step 9: Show the diagram
 
-Click **View PingFederate → resource AS diagram**. It opens in a new tab. Press **Simulate** and watch the numbered arrows light step by step. Drag a box, then press **Reset**: the boxes go back and the overview returns. Change **Speed** to Slow for a talk.
+Click **View PingFederate → resource AS diagram**. It opens in a new tab. Press **Simulate** and watch the numbered arrows light step by step. Drag a box, then press **Reset**: the boxes go back and the Overview step returns (at the lowest zoom, which shows part of the map on most screens; drag the background to pan). Change **Speed** to Slow for a talk.
 
 Say: "This diagram is drawn from shared diagram data, the same format other demos in this family use. The blue dashed lines are where trust comes from: a keys fetch or a registry read."
 

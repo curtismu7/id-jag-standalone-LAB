@@ -47,7 +47,7 @@
         "Holds every token server-side: refresh token, ID-JAG, access token",
         "Runs a pre-flight check before each button"
       ],
-      "x": 520,
+      "x": 480,
       "y": 300
     },
     {
@@ -60,7 +60,7 @@
         "Token exchange policy + SP connection with ID-JAG on",
         "Signs typ oauth-id-jag+jwt · keys at /pf/JWKS (x5t)"
       ],
-      "x": 1040,
+      "x": 960,
       "y": 0
     },
     {
@@ -73,7 +73,7 @@
         "Checks typ, signature, aud = its issuer, client_id, jti single-use",
         "Mints its own at+jwt, aud = the MCP resource"
       ],
-      "x": 1040,
+      "x": 960,
       "y": 600
     },
     {
@@ -85,7 +85,7 @@
         "Verifies the token against resource-as /jwks: typ, iss, aud, exp",
         "tools/list shows only what the scope allows"
       ],
-      "x": 1560,
+      "x": 1440,
       "y": 300
     },
     {
@@ -97,7 +97,7 @@
         "Same bearer validation as the MCP tools",
         "Says which check failed when it refuses"
       ],
-      "x": 520,
+      "x": 480,
       "y": 640
     },
     {
@@ -109,7 +109,7 @@
         "Lists PF_URL once pf-as is configured, plus admin-approved outside IdPs",
         "Read with Bearer ID_JAG_REGISTRY_TOKEN; no secrets in an entry"
       ],
-      "x": 520,
+      "x": 480,
       "y": 1000
     }
   ],
