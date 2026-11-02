@@ -67,13 +67,27 @@ function adminApi(ns, port) {
   });
 }
 
-/** The scripts that set up the kit's own PingFederate (base URL, certificate, ID-JAG issuer) may only reach a loopback admin API. */
+/**
+ * The scripts that set up the kit's own PingFederate (base URL, certificate, ID-JAG issuer, redeemer) may only reach ITS admin API:
+ * https on loopback at the kit's admin port (4731, or PF_ADMIN_PORT as pingfederate-setup.sh honours it). The admin ports of the other
+ * PingFederates on this machine are refused whatever the settings say, so a stale PF_ADMIN_URL in the shell cannot send a write there.
+ */
+const OTHER_PFS = new Set(['9031', '9032', '9999']);
 function requireLocalAdmin() {
-  let host = '';
-  try { host = new URL(process.env.PF_ADMIN_URL || '').hostname; } catch { /* unset or not a URL */ }
-  if (!['127.0.0.1', 'localhost'].includes(host)) {
-    console.error('this script configures the kit\'s own local PingFederate: set PF_ADMIN_URL (https://127.0.0.1:4731), or run npm run setup -- --mode=pf-local');
+  const port = process.env.PF_ADMIN_PORT || '4731';
+  let u = null;
+  try { u = new URL(process.env.PF_ADMIN_URL || ''); } catch { /* unset or not a URL */ }
+  if (!u || u.protocol !== 'https:' || !['127.0.0.1', 'localhost'].includes(u.hostname) || u.port !== port || OTHER_PFS.has(port)) {
+    console.error(`this script configures the kit's own local PingFederate: set PF_ADMIN_URL (https://127.0.0.1:${OTHER_PFS.has(port) ? 4731 : port}), or run npm run setup -- --mode=pf-local`);
     process.exit(2);
+  }
+}
+
+/** Throws unless this admin API belongs to the PingFederate whose issuer is `url` (its base URL): the second check after requireLocalAdmin. */
+async function requireIssuer(api, url) {
+  const r = await api('GET', '/serverSettings');
+  if (r.status !== 200 || r.body?.federationInfo?.baseUrl !== String(url).replace(/\/$/, '')) {
+    throw new Error(`the admin API at PF_ADMIN_URL is not the PingFederate whose base URL is ${url}: nothing was changed. Run npm run setup -- --mode=pf-local first, and check PF_ADMIN_URL`);
   }
 }
 
@@ -120,4 +134,4 @@ const same = (names) => names.map((n) => [n, n]);
 const done = (tag, okLine) => { console.log(failed ? `[${tag}] finished with failures` : okLine); process.exit(failed ? 1 : 0); };
 const fail = (tag, port) => (err) => { console.error(`[${tag}] ${err.message || err.code} (${process.env.PF_ADMIN_URL ? 'is PingFederate up?' : `is the admin port-forward on ${port} up?`})`); process.exit(1); };
 
-module.exports = { args, setting, secret, adminApi, report, ensure, writeEnv, acceptAll, from, same, done, fail, requireLocalAdmin, signinRedirects, hasFailed: () => failed, ENV_FILE };
+module.exports = { args, setting, secret, adminApi, report, ensure, writeEnv, acceptAll, from, same, done, fail, requireLocalAdmin, requireIssuer, signinRedirects, hasFailed: () => failed, ENV_FILE };

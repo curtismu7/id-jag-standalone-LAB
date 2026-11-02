@@ -156,5 +156,6 @@ if (require.main === module) {
     resourceAsClient: process.env.RESOURCE_AS_CLIENT_ID || 'id-jag-playground',
   };
   console.log(`[idjag-issuer] ${o.pfUrl} issues ID-JAGs for ${o.resourceAs} (${o.resource})`);
-  run(pf.adminApi('direct', 0), o).then(() => pf.done('idjag-issuer', '[idjag-issuer] done.')).catch(pf.fail('idjag-issuer', 0));
+  const api = pf.adminApi('direct', 0);
+  pf.requireIssuer(api, o.pfUrl).then(() => run(api, o)).then(() => pf.done('idjag-issuer', '[idjag-issuer] done.')).catch(pf.fail('idjag-issuer', 0));
 }
