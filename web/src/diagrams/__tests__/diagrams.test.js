@@ -118,6 +118,19 @@ describe("the playground model built from the data", () => {
     }
   });
 
+  // The two bounds above let one box drift as long as its nearest neighbour stays within them. The layout is what was measured (overview, drags, label
+  // placement), so it is pinned box by box: move one and this fails; update the numbers here only after the spacing and drag tests above pass.
+  const LAYOUT = {
+    byo: { agent: [0, 0], extidp: [960, 0], idenx: [240, -380], browser: [0, 340], server: [480, 340], ras: [960, 680], ourpf: [960, 1000], registry: [480, 1000], mcp: [1440, 340], profile: [480, 680] },
+    mock: { browser: [0, 300], mockapi: [480, 300], pf: [960, 0], as: [960, 600], mcp: [1440, 300], profile: [480, 640] },
+    "pf-as": { browser: [0, 300], server: [480, 300], pf: [960, 0], ras: [960, 600], mcp: [1440, 300], profile: [480, 640], registry: [480, 1000] },
+    "pf-pf": { browser: [0, 300], server: [480, 300], acme: [960, 0], ourpf: [960, 600], mcp: [1440, 300], profile: [480, 640] },
+    "gateway-redeem": { agent: [0, 340], gateway: [420, 340], exchange: [420, 0], targetidp: [420, 680], api: [840, 340] },
+  };
+  it.each(files)("%s: every box is where it was measured", (name) => {
+    expect(Object.fromEntries(PLAYGROUND_DIAGRAMS[name].nodes.map((n) => [n.id, [n.x, n.y]]))).toEqual(LAYOUT[name]);
+  });
+
   // A box dragged must not leave an arrow without a route (an unrouted arrow is drawn straight and its badge lands on a box).
   // The drags are the ones a hand makes on screen (100 right/left and 60 down, or 40 and 30), turned into diagram pixels by the zoom floor.
   it.each(files.filter((f) => f !== "gateway-redeem"))("%s: every arrow still routes after any one box is dragged 40/30 or 100/60 screen px each way at the zoom floor", (name) => {

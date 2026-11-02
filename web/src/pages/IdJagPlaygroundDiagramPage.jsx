@@ -97,10 +97,13 @@ export function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePositio
 }
 const nodeTypes = { card: Card };
 // No diagram zooms out below this, so no card text on screen is under 10px: a card's smallest text is 11.52px (.72rem), which is
-// 10.37px at 0.9 (10px is the floor; a test reads the CSS and pins both). At this zoom NO diagram fits its canvas at the overview, on a desktop
-// or a phone (measured): the map is wider or taller than the canvas, so the view shows part of it and the user pans (drag the background) or
-// zooms in. Fit and Reset both fit down to this zoom and no further. Boxes sit close together (130 to 190px apart) only so that the part you see
-// holds as many boxes as it can, and so a dragged box still has room for its arrows. Labels keep one size on screen and are placed in screen pixels.
+// 10.37px at 0.9 (10px is the floor; a test checks the stylesheets against a rendered card and pins both). At this zoom NO diagram fits its canvas at the
+// overview on a 1440x900 window (canvas 1022x842) or a phone (343x486 at 375x812, 343x399 at 375x667, 358x505 at 390x844): the four older maps are 1740px
+// wide (1566px on screen at 0.9) and gateway-redeem 1140px (1026px). On a 1920x1080 window (canvas 1502x1022) only gateway-redeem fits, at zoom 1 (measured
+// in a browser). So the view shows part of the map and the user pans (drag the background) or zooms in. Fit, Reset, a step view (?step=N) and Simulate all
+// fit down to this zoom and no further: a step whose lit boxes do not fit at 0.9 shows some of them cut by the canvas edge (README, Zoom floor). Boxes sit
+// close together (130 to 190px apart, computed with a 190px stand-in card height) only so that the part you see holds as many boxes as it can, and so a
+// dragged box still has room for its arrows. Labels keep one size on screen and are placed in screen pixels.
 export const READABLE_MIN_ZOOM = 0.9;
 const edgeTypes = { flow: FlowEdge };
 

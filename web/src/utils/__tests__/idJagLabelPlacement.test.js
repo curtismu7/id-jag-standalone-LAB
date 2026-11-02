@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES, stepParts } from "../idJagPlaygroundDiagrams";
 import { routeEdges } from "../idJagPlaygroundRouting";
 import { READABLE_MIN_ZOOM } from "../../pages/IdJagPlaygroundDiagramPage";
@@ -156,6 +157,52 @@ describe("placeLabels", () => {
       }
       expect(tight, "the sweep includes gaps too narrow for the badge").toBeGreaterThan(10);
       expect(worst).toEqual([]);
+    }, 60000);
+  });
+
+  // The finer placement (spots at the middle of every run, a cost that follows how far the badge reaches into a box) is for ONE case only: a badge alone
+  // whose coarse spot sits on the air kept around a box. Everywhere else the badge is where origin/main put it. The values below are origin/main's own output
+  // (a pair of 300x150 boxes `gap` flow px apart, the arrow from the right side of the first to the left side of the second, zoom `zoom`).
+  describe("the finer placement is used only when the coarse one leaves the badge on a box's air", () => {
+    const pair = (gap, zoom, lit, text, off = 0) => {
+      const a = { x: 0, y: 0, w: 300, h: 150 }, b = { x: 300 + gap, y: off, w: 300, h: 150 };
+      const edges = [{ id: "e", from: "a", fh: "R2", to: "b", th: "L2", label: text }];
+      const { routes } = routeEdges({ a, b }, edges);
+      return placeLabels(routes, { a, b }, edges, { zoom, tx: 30, ty: 30, lit: new Set(lit ? ["e"] : []) }).e;
+    };
+    const LONG = "POST /token with the subject token and the requested token type";
+    it("a 36.8px gap holds the badge clear of both boxes' air already: it stays on the 10px grid, not at the middle of a run", () => {
+      expect(pair(23, 1.6, false, "x").x).toBeCloseTo(312.5, 6); // the finer pass would offer the middle of the run and land on 311.5
+    });
+    it("a 76.8px gap: the same, and the hover words keep a clear place (ok)", () => {
+      const o = pair(48, 1.6, false, "x");
+      expect(o.x).toBeCloseTo(320.25, 6);
+      expect(o.ok).toBe(true);
+    });
+    it("a lit arrow with long words in a wide gap keeps its words where they were", () => {
+      const o = pair(158, 0.9, true, LONG, 40);
+      expect(o.x).toBeCloseTo(316.6667, 4);
+      expect(o.ok).toBe(true);
+      expect(o.w).toBe(136);
+    });
+    it("a 27.6px gap (narrow: the finer pass runs) measures the reach against the real boxes, not the boxes with their 3px of air", () => {
+      const o = pair(23, 1.2, false, "x");
+      expect(o.x).toBeCloseTo(312.5, 6); // against the air-extended boxes the same pass lands on 311.5
+      expect(o.side).toBe("r");
+    });
+    it("the five shipped diagrams, every step, two zooms, two canvases: every badge and words box is exactly where origin/main put it", () => {
+      const rows = [];
+      for (const mode of PLAYGROUND_DIAGRAM_MODES) {
+        const d = PLAYGROUND_DIAGRAMS[mode];
+        const rects = Object.fromEntries(d.nodes.map((n) => [n.id, { x: n.x, y: n.y, w: 300, h: 150 }]));
+        const { routes } = routeEdges(rects, d.edges);
+        for (const step of [0, ...new Set(d.edges.flatMap((e) => e.steps))].sort((x, y) => x - y)) for (const zoom of [0.9, 1.25]) for (const view of [{ w: 1022, h: 842 }, { w: 343, h: 486 }]) {
+          const out = placeLabels(routes, rects, d.edges, { zoom, tx: 30, ty: 30, view, lit: new Set(stepParts(d, step).edges) });
+          for (const e of d.edges) rows.push([mode, step, zoom, view.w, e.id, +out[e.id].x.toFixed(4), +out[e.id].y.toFixed(4), out[e.id].side, out[e.id].valign, out[e.id].ok]);
+        }
+      }
+      expect(rows.length).toBe(1272);
+      expect(createHash("sha256").update(JSON.stringify(rows)).digest("hex")).toBe("42b4c9f9f53439a397f45d5421f2c9189fc02e9804d3cf182ca51375d8a1b5c2");
     }, 60000);
   });
 

@@ -94,15 +94,15 @@ export function badgeSpots(pts, { clear = 26, bend = 14, step = 8, mids = false 
 }
 
 // Candidate spots in tiers: full clearance from the boxes and bends first, then less and less. The placer only
-// looks at a looser tier when the tiers before it leave the label covering something. The loosest tier also offers the middle of every run, so a short
-// run between two boxes (a box dragged to end 22 to 40px from another) gets its badge in the centre of the gap, not on the 10px grid.
+// looks at a looser tier when the tiers before it leave the label covering something. `fine` (see choose) also offers the middle of every run in the
+// loosest tier, so a short run between two boxes (a box dragged to end 22 to 40px from another) gets its badge in the centre of the gap, not on the 10px grid.
 const NUDGE = [5, 9];           // px a badge may sit off its line (see spotTiers)
 const TIERS = [{ clear: 26, bend: 14 }, { clear: 18, bend: 10 }, { clear: 12, bend: 6 }, { clear: 0, bend: 0 }];
-function spotTiers(pts) {
+function spotTiers(pts, fine = false) {
   const thin = (s) => (s.length > MAX_SPOTS ? Array.from({ length: MAX_SPOTS }, (_, i) => s[Math.round((i * (s.length - 1)) / (MAX_SPOTS - 1))]) : s);
   const tiers = [];
   for (const o of TIERS) {
-    const s = thin(badgeSpots(pts, { ...o, step: STEP, mids: o.clear === 0 }));
+    const s = thin(badgeSpots(pts, { ...o, step: STEP, mids: fine && o.clear === 0 }));
     if (s.length > (tiers.at(-1)?.length ?? 0)) tiers.push(s);
   }
   if (!tiers.length) tiers.push([labelPoint(pts)]);
@@ -134,7 +134,9 @@ export function placeLabels(routes, rects, edges, opts = {}) {
   const byId = Object.fromEntries(edges.map((e) => [e.id, e]));
   const screen = Object.fromEntries(ids.map((id) => [id, routes[id].pts.map(S)]));
   const mid = Object.fromEntries(ids.map((id) => [id, labelPoint(screen[id])]));
-  const tiersOf = Object.fromEntries(ids.map((id) => [id, spotTiers(screen[id]).map((t) => t.map((p) => ({ p, d: Math.abs(p.x - mid[id].x) + Math.abs(p.y - mid[id].y) })))]));
+  const withDist = (id, tiers) => tiers.map((t) => t.map((p) => ({ p, d: Math.abs(p.x - mid[id].x) + Math.abs(p.y - mid[id].y) })));
+  const tiersOf = Object.fromEntries(ids.map((id) => [id, withDist(id, spotTiers(screen[id]))]));
+  const fineTiers = {}; // only built for an arrow whose badge had to sit on a box's air (see choose)
   const sizes = Object.fromEntries(ids.map((id) => [id, pillSizes(stripLabel(byId[id].label ?? ""), measure)]));
   // every run of every arrow as its bounding box (the runs are straight and axis-aligned)
   const runs = Object.fromEntries(ids.map((id) => [id, screen[id].slice(1).map((q, i) => { const a = screen[id][i]; return { x0: Math.min(a.x, q.x), y0: Math.min(a.y, q.y), x1: Math.max(a.x, q.x), y1: Math.max(a.y, q.y) }; })]));
@@ -144,16 +146,16 @@ export function placeLabels(routes, rects, edges, opts = {}) {
 
   // Cost of putting edge `id` at spot p with this word box (size null = the badge alone) against what the others hold now.
   // Stops adding as soon as the cost reaches `limit` (a candidate that is already no better than the best so far).
-  const cost = (id, p, side, valign, size, placed, isLit, limit = Infinity) => {
+  const cost = (id, p, side, valign, size, placed, isLit, limit = Infinity, fine = false) => {
     const rect = labelRect(p, side, valign, size);
     const badge = { x: p.x - BADGE / 2 - AIR, y: p.y - BADGE / 2 - AIR, w: BADGE + 2 * AIR, h: BADGE + 2 * AIR };
     let c = 0;
-    if (size) {
+    if (size || !fine) {
       for (const bx of boxes) if (overlap(rect, bx)) { c += 1000; if (c >= limit) return c; }
     } else {
-      // A badge alone is a circle. How far it reaches into a box counts (squared, so two small dips beat one deep one): where the gap between two boxes is
-      // too narrow for it (24px) the centre of the gap wins over a spot that sits further into one box. Reaching only into the air kept around a box costs
-      // less than any touch, but still enough (over CLEAN) that a looser tier is looked at.
+      // `fine`, a badge alone: it is a circle. How far it reaches into a box counts (squared, so two small dips beat one deep one): where the gap between two
+      // boxes is too narrow for it (24px) the centre of the gap wins over a spot that sits further into one box. Reaching only into the air kept around a box
+      // costs less than any touch, but still enough (over CLEAN) that a looser tier is looked at.
       for (const r of real) {
         const d = Math.hypot(Math.max(r.x - p.x, 0, p.x - r.x - r.w), Math.max(r.y - p.y, 0, p.y - r.y - r.h));
         if (d < BADGE / 2) c += 700 + 300 * (BADGE / 2 - d) ** 2;
@@ -190,16 +192,16 @@ export function placeLabels(routes, rects, edges, opts = {}) {
   const hoverClear = (id, p, placed) => wordOptions(id).some(({ size, side, valign }) => cost(id, p, side, valign, size, placed, true, HARD) < HARD);
   const mk = (c, p, side, valign, size, words) => ({ c, p, side, valign, size, words, rect: labelRect(p, side, valign, size), badge: { x: p.x - BADGE / 2, y: p.y - BADGE / 2, w: BADGE, h: BADGE } });
 
-  const choose = (id, placed) => {
+  const pass = (id, placed, tiers, fine) => {
     const isLit = showing.has(id);
     const options = isLit ? wordOptions(id) : plain;
     let best = null;
-    for (const tier of tiersOf[id]) {
+    for (const tier of tiers) {
       const tried = [];
       for (const { p, d } of tier) {
         for (const { size, side, valign } of options) {
           const extra = d * 0.05 + prefs(size, side, valign);
-          const c = cost(id, p, side, valign, size, placed, isLit, isLit && best ? best.c - extra : Infinity) + extra; // an unlit spot keeps its true cost: the hover check below ranks by it
+          const c = cost(id, p, side, valign, size, placed, isLit, isLit && best ? best.c - extra : Infinity, fine) + extra; // an unlit spot keeps its true cost: the hover check below ranks by it
           if (!isLit) tried.push({ c, p });
           if (!best || c < best.c) best = mk(c, p, side, valign, size, isLit);
         }
@@ -217,6 +219,15 @@ export function placeLabels(routes, rects, edges, opts = {}) {
       if (best.c < CLEAN) break;
     }
     return best;
+  };
+  // A badge alone (no words showing) that ends up on the air kept around a box has no clear spot on its arrow: the gap between two boxes is too narrow for it.
+  // Only then it is placed again with finer spots and a cost that follows how far it reaches into a box, so it sits in the middle of the gap. Every other
+  // badge is placed exactly as before.
+  const choose = (id, placed) => {
+    const first = pass(id, placed, tiersOf[id], false);
+    if (showing.has(id) || !boxes.some((bx) => overlap(badgeRect(first.p), bx))) return first;
+    fineTiers[id] ??= withDist(id, spotTiers(screen[id], true));
+    return pass(id, placed, fineTiers[id], true);
   };
 
   let placed = {};
