@@ -62,6 +62,28 @@ function adminApi(ns, port) {
   });
 }
 
+/** The scripts that set up the kit's own PingFederate (base URL, certificate, ID-JAG issuer) may only reach a loopback admin API. */
+function requireLocalAdmin() {
+  let host = '';
+  try { host = new URL(process.env.PF_ADMIN_URL || '').hostname; } catch { /* unset or not a URL */ }
+  if (!['127.0.0.1', 'localhost'].includes(host)) {
+    console.error('this script configures the kit\'s own local PingFederate: set PF_ADMIN_URL (https://127.0.0.1:4731), or run npm run setup -- --mode=pf-local');
+    process.exit(2);
+  }
+}
+
+/**
+ * The sign-in client's redirect URIs for an app origin. A browser reaches a local app as localhost or 127.0.0.1, and the
+ * default port 4720 is always welcome, so a local origin (http, with a port) registers all of those. Callers add these to
+ * the client's existing URIs and never replace them.
+ */
+function signinRedirects(appOrigin) {
+  const origins = new Set([appOrigin]);
+  const local = /^http:\/\/(localhost|127\.0\.0\.1):(\d+)$/.exec(appOrigin);
+  if (local) for (const h of ['localhost', '127.0.0.1']) { origins.add(`http://${h}:${local[2]}`); origins.add(`http://${h}:4720`); }
+  return [...origins].flatMap((o) => [`${o}/auth/callback`, `${o}/api/id-jag-playground/issuer/callback`]);
+}
+
 let failed = false;
 function report(what, r) {
   const ok = r.status >= 200 && r.status < 300;
@@ -93,4 +115,4 @@ const same = (names) => names.map((n) => [n, n]);
 const done = (tag, okLine) => { console.log(failed ? `[${tag}] finished with failures` : okLine); process.exit(failed ? 1 : 0); };
 const fail = (tag, port) => (err) => { console.error(`[${tag}] ${err.message || err.code} (${process.env.PF_ADMIN_URL ? 'is PingFederate up?' : `is the admin port-forward on ${port} up?`})`); process.exit(1); };
 
-module.exports = { args, setting, secret, adminApi, report, ensure, writeEnv, acceptAll, from, same, done, fail, ENV_FILE };
+module.exports = { args, setting, secret, adminApi, report, ensure, writeEnv, acceptAll, from, same, done, fail, requireLocalAdmin, signinRedirects, hasFailed: () => failed, ENV_FILE };

@@ -1,5 +1,9 @@
 import http from 'node:http';
+import { fileURLToPath } from 'node:url';
 import { createHandler } from './app.js';
+import { loadSettings } from './settings.js';
+
+loadSettings({ repoEnv: fileURLToPath(new URL('../../.env', import.meta.url)) });
 
 const port = Number(process.env.PORT || 9090);
 const asIssuer = (process.env.AS_ISSUER || 'http://localhost:9080').replace(/\/+$/, '');

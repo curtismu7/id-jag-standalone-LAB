@@ -11,6 +11,7 @@ import { missingConfig, oidcConfig } from './auth/oidc.js';
 import { probeBackends, settings } from './idJagPlayground.js';
 import { activeAdapter } from './idp/index.js';
 import { currentMode, isMock, runtimeEnv } from './mode.js';
+import { issuerKeyCheck } from './jwksCheck.js';
 import { mockSigninProblem } from './mockSignin.js';
 import { netguard, outboundFetch } from './outbound.js';
 
@@ -105,10 +106,31 @@ export async function checkDiscovery(id, label, url, fetchImpl = outboundFetch) 
     const res = await fetchImpl(`${url}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(4000) });
     if (res.status < 200 || res.status >= 300) return r(id, 'fail', `${url} discovery answered HTTP ${res.status}`, `Check ${label} and that the server is up.`);
     const issuer = (await res.json().catch(() => ({}))).issuer;
-    return issuer === url ? pass(id, `${url} discovery OK, issuer matches`)
-      : r(id, 'fail', `${label} is ${url} but discovery says issuer is ${issuer ?? '(missing)'}`, `Set ${label} to exactly the issuer the server publishes (no trailing slash, same scheme and host).`);
+    if (issuer === url) return pass(id, `${url} discovery OK, issuer matches`);
+    // A PingFederate that was never given a base URL publishes the image default; the fix is on the PingFederate side.
+    const local = /^https:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url);
+    return r(id, 'fail', `${label} is ${url} but discovery says issuer is ${issuer ?? '(missing)'}`, local
+      ? `Do not change ${label} to match: that issuer may belong to another PingFederate on this machine. Rerun npm run setup -- --mode=pf-local, which sets this PingFederate's base URL to ${url}.`
+      : `Set ${label} to exactly the issuer the server publishes (no trailing slash, same scheme and host).`);
   } catch (err) {
     return r(id, 'fail', `could not reach ${url} (${err?.cause?.code || err?.message})`, `Check ${label}, the network and VPN.`);
+  }
+}
+
+/** pf-as, live only (the mock PingFederate signs with an EC key): the issuer's /pf/JWKS must carry an RSA key with x5t (what ID-JAGs are signed with), and ideally only one. */
+export async function checkIssuerJwks(id, url, fetchImpl = outboundFetch) {
+  const jwksUrl = `${url}/pf/JWKS`;
+  try {
+    const res = await fetchImpl(jwksUrl, { signal: AbortSignal.timeout(4000) });
+    if (res.status < 200 || res.status >= 300) return r(id, 'fail', `${jwksUrl} answered HTTP ${res.status}`, 'Check PF_URL and that PingFederate is up.');
+    const v = issuerKeyCheck((await res.json().catch(() => ({}))).keys);
+    const fix = 'Rerun npm run setup -- --mode=pf-local (it publishes the one ID-JAG signing key), or publish it yourself through a JWT access token manager and set a static JWKS.';
+    if (v.status === 'fail') return r(id, 'fail', `${jwksUrl} has no RSA key with x5t, so nothing can verify an ID-JAG from this issuer`, fix);
+    return v.status === 'warn'
+      ? r(id, 'warn', `${jwksUrl} lists ${v.rsa} distinct RSA keys (${v.withX5t} with x5t): PingFederate's own JWT-bearer consumer may pick the wrong one`, fix)
+      : pass(id, `${jwksUrl} has one RSA key, with x5t`);
+  } catch (err) {
+    return r(id, 'fail', `could not read ${jwksUrl} (${err?.cause?.code || err?.message})`, 'Check PF_URL, the network, and PF_CA_FILE if PingFederate uses its own certificate.');
   }
 }
 
@@ -158,6 +180,7 @@ export async function runDoctor({ mode = 'mock', env = runtimeEnv(), fetchImpl =
       [checkEnvRequired(mode, env), checkSignin(), checkSessionSecret(env), checkRegistrationKey(env), checkAccess(env)],
       ...await Promise.all([
         guard('pf-discovery', async () => [await checkDiscovery('pf-discovery', 'PF_URL', c.pfUrl, fetchImpl)]),
+        mode === 'pf-as' && !isMock() ? guard('pf-jwks', async () => [await checkIssuerJwks('pf-jwks', c.pfUrl, fetchImpl)]) : [],
         mode === 'pf-pf' ? guard('acme-discovery', async () => [await checkDiscovery('acme-discovery', 'ACME_PF_URL', c.acmePfUrl, fetchImpl)]) : [],
         guard('pf-admin', () => activeAdapter(env).doctor({ env, adminCall })),
         guard('backends', () => checkBackends(mode, fetchImpl)),

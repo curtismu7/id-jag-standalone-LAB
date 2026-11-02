@@ -95,6 +95,10 @@ sign-in does not double as the pf-as issuer session). Set `RESOURCE_AS_CLIENTS_F
 
 ## PingFederate as the ID-JAG issuer
 
+On your own machine `npm run setup -- --mode=pf-local` does all of this (steps 1 to 3, with `idjagkit-signing`, `idJagKitKeyPublisher`,
+`idJagKitPolicy` and `idJagKitResourceAsSp`) and checks the result; see the README, "PingFederate for ID-JAG". Do it by hand
+for any other PingFederate:
+
 PingFederate 13.1 issues ID-JAGs through token exchange. The user signs in to an OAuth client; that client
 exchanges the user's refresh token (or ID token) for an ID-JAG addressed to our resource AS.
 

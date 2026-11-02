@@ -19,8 +19,11 @@ AI-DEMO2 names (its default registry URL and token manager), so treat it as refe
   `id-jag-vscode` (signing in through the kit's PingOne), and the resource AS files under `deploy/local/` used by
   `deploy/docker-compose.desktop-clients.yml`. `pf-admin.js` holds the helpers these scripts share.
 
-`npm run setup -- --mode=pf-local` runs `configure-signin.js --local` and `configure-local-signin.js` against a
-PingFederate on 127.0.0.1:4731. Their admin API is then reached directly through `PF_ADMIN_URL`, `PF_ADMIN_USER`,
-`PF_ADMIN_PASSWORD` and `PF_ADMIN_INSECURE_TLS=true` in the environment (no kubectl, no `--ns`), and `PF_SETTINGS_FILE`
-names the file that receives the client id and secret (the shared `~/Development/.env`). The other scripts still use a
-cluster port-forward.
+`npm run setup -- --mode=pf-local` runs, against a PingFederate on 127.0.0.1:4731: `configure-signin.js --local`,
+`configure-local-signin.js`, `configure-base-url.js` (issuer = `PF_URL`), `configure-local-tls.js` (a certificate for
+127.0.0.1 and `PF_CA_FILE`), and `configure-idjag-issuer.js` (the ID-JAG signing key, static JWKS, exchange policy and the
+`idJagKitResourceAsSp` connection), then a self-check. Their admin API is reached directly through `PF_ADMIN_URL`,
+`PF_ADMIN_USER`, `PF_ADMIN_PASSWORD` and `PF_ADMIN_INSECURE_TLS=true` in the environment (no kubectl, no `--ns`), and
+`PF_SETTINGS_FILE` names the file that receives the client id and secret and `PF_CA_FILE` (the shared `~/Development/.env`).
+The three new scripts refuse to run unless `PF_ADMIN_URL` is a loopback address. The other scripts still use a cluster
+port-forward. PingFederate key pair ids cannot hold upper case, hence `idjagkit-signing` and `idjagkit-local-tls`.
