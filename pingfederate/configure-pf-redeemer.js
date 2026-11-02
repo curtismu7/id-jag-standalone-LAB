@@ -35,6 +35,15 @@ const JWT_ATM = 'com.pingidentity.pf.access.token.management.plugins.JwtBearerAc
 const DEFAULT_RESOURCE = 'http://localhost:9090/mcp';
 const DEFAULT_CLIENT = 'id-jag-redeemer';
 
+/** The api with a backup before its first write (deps.backup throws: nothing is written without it); a run that writes nothing takes none. */
+const withBackup = (api, deps) => {
+  let saved = false;
+  return async (method, p, body) => {
+    if (method !== 'GET' && !saved) { await deps.backup(); saved = true; }
+    return api(method, p, body);
+  };
+};
+
 const atmBody = (descriptor, { pfUrl, resource }) => {
   const fields = (descriptor?.configDescriptor?.fields || []).filter((x) => x.defaultValue !== undefined && x.defaultValue !== null)
     .map((x) => ({ name: x.name, value: String(x.defaultValue) }));
@@ -72,7 +81,7 @@ async function run(api, o, deps) {
   const acme = o.acmeUrl.replace(/\/$/, '');
   if (acme === o.pfUrl.replace(/\/$/, '')) throw new Error('ACME_PF_URL is this PingFederate: an IdP must not redeem its own ID-JAG (draft section 9.3)');
 
-  await deps.backup(); // throws: nothing is written without it
+  api = withBackup(api, deps);
 
   const keys = await api('GET', '/keyPairs/signing');
   if (!(keys.body?.items || []).some((k) => k.id === ID.key)) throw new Error(`the signing key ${ID.key} is missing: run npm run setup -- --mode=pf-local first`);
@@ -132,7 +141,7 @@ async function run(api, o, deps) {
 
 /** Remove what run() made (the client, the IdP connection, the token manager). The settings file is not edited. */
 async function remove(api, o, deps) {
-  await deps.backup();
+  api = withBackup(api, deps);
   for (const [what, p] of [['client', `/oauth/clients/${encodeURIComponent(o.client)}`], ['IdP connection', `/sp/idpConnections/${IDP_CONNECTION}`], ['token manager', `/oauth/accessTokenManagers/${ID.atm}`]]) {
     if ((await api('GET', p)).status === 200) pf.report(`delete ${what}`, await api('DELETE', p));
     else console.log(`  keep (absent) ${what}`);
@@ -159,8 +168,9 @@ async function saveBackup(api, dir, now = new Date()) {
 }
 
 /** docker restart, then wait until the admin API answers again. */
-async function restartContainer(api, name, { exec = (cmd, a) => execFileSync(cmd, a, { encoding: 'utf8' }), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), tries = 90 } = {}) {
+async function restartContainer(api, name, { adminPort = process.env.PF_ADMIN_PORT || '4731', exec = (cmd, a) => execFileSync(cmd, a, { encoding: 'utf8' }), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), tries = 90 } = {}) {
   if (exec('docker', ['context', 'show']).trim() !== 'orbstack') throw new Error('the docker context is not orbstack: run docker context use orbstack, then restart the container by hand');
+  if (!new RegExp(`:${adminPort}$`, 'm').test(exec('docker', ['port', name]))) throw new Error(`container ${name} does not publish the admin port ${adminPort}, so it is not the kit's PingFederate: restart the right container by hand`);
   console.log(`  restarting ${name} (PingFederate caches an issuer's JWKS forever); this takes a minute or two`);
   exec('docker', ['restart', name]);
   for (let i = 0; i < tries; i++) {
@@ -189,6 +199,7 @@ if (require.main === module) {
     if (!args.remove && !/^https:\/\/[^/\s]+$/.test(o.acmeUrl.replace(/\/$/, ''))) {
       console.error('ACME_PF_URL is not set: it comes from the Acme owner\'s three-key settings block. Run npm run setup -- --mode=pf-pf --acme-settings=<file>'); process.exit(2);
     }
+    await pf.requireIssuer(api, o.pfUrl);
     const dir = flag('backup-dir') || path.join(os.homedir(), '.config', 'demo-kit', 'id-jag-kit', 'backups');
     const deps = {
       backup: async () => console.log(`  backup saved: ${await saveBackup(api, dir)} (mode 600)`),

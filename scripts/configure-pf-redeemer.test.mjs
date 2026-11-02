@@ -88,6 +88,7 @@ test('redeemer: a second run changes nothing, restarts nothing and keeps the sec
   assert.equal(r.changed, false);
   assert.equal(f.writes().length, before, 'no write');
   assert.ok(!d.order.includes('restart'));
+  assert.ok(!d.order.some((x) => x.startsWith('backup')), 'a run that writes nothing takes no backup');
   assert.equal(f.store.get('/oauth/clients/id-jag-redeemer').clientAuth.secret, 'secret-1');
   assert.deepEqual(d.written, [{ PF_REDEEMER_CLIENT_ID: 'id-jag-redeemer', PF_RESOURCE: RESOURCE }], 'no new secret is written');
 });
@@ -180,11 +181,15 @@ test('restartContainer: refuses a non-orbstack docker context, restarts, and wai
   const exec = (cmd, a) => { calls.push([cmd, ...a]); return a[0] === 'context' ? 'desktop-linux\n' : ''; };
   await assert.rejects(() => redeemer.restartContainer(async () => ({ status: 200 }), 'c', { exec, sleep: async () => {} }), /orbstack/);
   assert.ok(!calls.some((c) => c[1] === 'restart'));
-  const ok = (cmd, a) => { calls.push([cmd, ...a]); return a[0] === 'context' ? 'orbstack\n' : ''; };
+  const ok = (cmd, a) => { calls.push([cmd, ...a]); return a[0] === 'context' ? 'orbstack\n' : a[0] === 'port' ? '9999/tcp -> 127.0.0.1:4731\n9031/tcp -> 127.0.0.1:4732\n' : ''; };
   let n = 0;
   await quiet(() => redeemer.restartContainer(async () => { if (++n < 3) throw new Error('down'); return { status: 200 }; }, 'pingfederate-lab', { exec: ok, sleep: async () => {} }));
   assert.deepEqual(calls.at(-1), ['docker', 'restart', 'pingfederate-lab']);
   assert.equal(n, 3);
+  const other = (cmd, a) => { calls.push([cmd, ...a]); return a[0] === 'context' ? 'orbstack\n' : a[0] === 'port' ? '9999/tcp -> 127.0.0.1:9999\n9031/tcp -> 127.0.0.1:9031\n' : ''; };
+  const before = calls.length;
+  await assert.rejects(() => redeemer.restartContainer(async () => ({ status: 200 }), 'other-pf', { exec: other, sleep: async () => {} }), /does not publish the admin port 4731/);
+  assert.ok(!calls.slice(before).some((c) => c[1] === 'restart'), 'a container that is not the kit\'s PingFederate is never restarted');
   await assert.rejects(() => quiet(() => redeemer.restartContainer(async () => { throw new Error('down'); }, 'c', { exec: ok, sleep: async () => {}, tries: 2 })), /did not come back/);
 });
 
@@ -198,7 +203,7 @@ test('the script refuses any admin API that is not loopback, and a missing ACME_
     assert.equal(r.status, 2);
     assert.match(r.stderr, /local PingFederate/);
   }
-  const r = run({ PF_URL, PF_ADMIN_URL: 'https://127.0.0.1:1' });
+  const r = run({ PF_URL, PF_ADMIN_URL: 'https://127.0.0.1:4731' });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /--acme-settings/);
   assert.equal(pf.ENV_FILE.endsWith('.env'), true);
