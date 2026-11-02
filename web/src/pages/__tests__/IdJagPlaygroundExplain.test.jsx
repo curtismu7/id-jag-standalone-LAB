@@ -9,7 +9,8 @@ describe("explain: invalid_client", () => {
     expect(hint).toMatch(/mock authorization server/i);
     expect(hint).toMatch(/Mock mode has no RESOURCE_AS_CLIENT_ID or RESOURCE_AS_CLIENT_SECRET to set/);
     expect(hint).toMatch(/idp-<id>/);
-    expect(hint).toMatch(/Our client at the resource AS/);
+    expect(hint).toMatch(/each approved Trusted IdP/);
+    expect(hint).not.toMatch(/leave/i); // the idp-<id> client is provisioned on approval: there is no blank field to leave
   });
 
   it("in Live mode it still points at the real settings", () => {

@@ -203,7 +203,7 @@ export function explain(e, resource, saml, appMock = false) {
     return "resource-as does not trust this ID-JAG's issuer. It learns its trust list from this server's registry: set ID_JAG_REGISTRY_TOKEN for both, and for an outside IdP add it on the Trusted IdPs panel. Its cache lasts 30 s.";
   }
   if (/invalid_client/i.test(text) && appMock) {
-    return "The mock authorization server did not accept the client. Mock mode has no RESOURCE_AS_CLIENT_ID or RESOURCE_AS_CLIENT_SECRET to set: it knows its own mock client and the idp-<id> client of each approved Trusted IdP (whose secret was shown once, when it was approved). For an ID-JAG from your own IdP, leave \"Our client at the resource AS\" blank on its Trusted IdP entry so the mock's own client redeems, or switch the header to Live and use real client settings.";
+    return "The mock authorization server did not accept the client. Mock mode has no RESOURCE_AS_CLIENT_ID or RESOURCE_AS_CLIENT_SECRET to set: it knows its own mock client and the idp-<id> client of each approved Trusted IdP (whose secret was shown once, when it was approved). For an ID-JAG from your own IdP, redeem with that idp-<id> client, or switch the header to Live and use real client settings.";
   }
   if (/invalid_client/i.test(text)) return "The authorization server did not accept our client: RESOURCE_AS_CLIENT_ID and RESOURCE_AS_CLIENT_SECRET (or the PingFederate redeemer's) must match what it has registered.";
   if (/invalid_target/i.test(text)) {
