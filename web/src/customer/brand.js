@@ -3,7 +3,7 @@
 
 const DARK_INK = "#051727"; // Core Dark: the text colour used on light brand colours
 const LIGHT_BG = "#ffffff"; // card background, light theme
-const DARK_BG = "#0b2033"; // card background, dark theme
+const DARK_BG = "#172033"; // card background, dark theme (the shared --surface dark value)
 const AA = 4.5;
 
 const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));

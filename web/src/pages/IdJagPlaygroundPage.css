@@ -119,7 +119,7 @@
 .ijp-page__url { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: var(--font-size-xs); }
 .ijp-pill { flex: none; padding: 0.1rem 0.6rem; border-radius: 999px; background: var(--surface); font-size: var(--font-size-2xs); font-weight: 700; }
 .ijp-pill.is-ok { color: var(--ijp-ok); }
-.ijp-pill.is-bad { color: var(--ijp-red); }
+.ijp-pill.is-bad { color: var(--danger-text); } /* semantic status, not the brand accent */
 .ijp-page__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem; padding: 0.4rem 0.9rem 0.9rem; }
 .ijp-page__card { padding: 0.65rem 0.8rem; border: 1px solid var(--th-border); border-radius: 8px; background: var(--th-bg-card); font-size: var(--font-size-xs); }
 .ijp-page__card h4 { margin: 0 0 0.45rem; font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--th-text-muted); }
@@ -142,7 +142,7 @@
 .ijp-chip__led { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--muted); }
 .ijp-chip.is-up .ijp-chip__led { background: var(--ijp-ok); }
 .ijp-chip.is-slow .ijp-chip__led { background: var(--ijp-warn); }
-.ijp-chip.is-down .ijp-chip__led { background: var(--ijp-red); }
+.ijp-chip.is-down .ijp-chip__led { background: var(--danger-text); }
 .ijp-story { margin: 0 0 1rem; padding: 0.6rem 0.9rem; border-left: 4px solid var(--ijp-red); border-radius: 0 6px 6px 0; background: var(--th-bg-page); }
 
 /* Step tabs: Request · Response · Decoded · Code. */
