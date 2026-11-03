@@ -54,3 +54,4 @@
   .shell-bar { gap: 0.75rem; padding: 0.6rem 1rem; }
   .shell-nav { order: 3; flex-basis: 100%; }
 }
+.shell-signin { border-color: var(--accent, currentColor); color: var(--accent, inherit); font-weight: 600; }
