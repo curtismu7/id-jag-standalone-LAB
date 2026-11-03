@@ -100,7 +100,14 @@ test('the real setup.mjs wiring gives runSetup every fs call it makes (mock setu
 
 test('.env backups are ignored by git and docker, so --force cannot stage or bake in real secrets', () => {
   const repo = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-  assert.equal(spawnSync('git', ['check-ignore', '-q', '.env.bak.1'], { cwd: repo }).status, 0);
+  const git = spawnSync('git', ['check-ignore', '-q', '.env.bak.1'], { cwd: repo });
+  // Outside a git clone (e.g. the air-test sync, which ships no .git) there is no
+  // index to consult: the .gitignore rule below is the check that still applies.
+  if (git.error || git.status === 128) {
+    assert.match(fs.readFileSync(path.join(repo, '.gitignore'), 'utf8'), /^\.env\.bak\.\*$/m);
+  } else {
+    assert.equal(git.status, 0);
+  }
   assert.match(fs.readFileSync(path.join(repo, '.dockerignore'), 'utf8'), /^\.env\.bak\.\*$/m);
 });
 
