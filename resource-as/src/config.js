@@ -62,6 +62,22 @@ function loadSigningKey(pemFile, dataDir) {
   return key;
 }
 
+/** The registry to read: TRUSTED_IDPS_REGISTRY_URL, else (when no TRUSTED_IDPS_FILE names the IdPs) the kit's own, at APP_ORIGIN. */
+function registryUrl(env) {
+  if (env.TRUSTED_IDPS_REGISTRY_URL) return env.TRUSTED_IDPS_REGISTRY_URL;
+  if (env.TRUSTED_IDPS_FILE) return '';
+  return `${(env.APP_ORIGIN || 'http://localhost:4720').replace(/\/+$/, '')}/api/id-jag-playground/trusted-idps/registry`;
+}
+
+/** PF_CA_FILE trusts the local PingFederate's own certificate for PF_URL's origin only: { origin, ca }. */
+function loadPfCa(env) {
+  if (!env.PF_CA_FILE || !env.PF_URL) return undefined;
+  try { return { origin: new URL(env.PF_URL).origin, ca: fs.readFileSync(env.PF_CA_FILE) }; } catch (err) {
+    console.warn(`[resource-as] PF_CA_FILE is set but unusable (${err.code || err.message}); PF_URL's certificate will not be trusted`);
+    return undefined; // a container gets the host's path in a shared settings file: compose mounts its own copy
+  }
+}
+
 export function loadConfig(env = process.env) {
   const port = Number(env.PORT || 9080);
   const dataDir = path.resolve(env.DATA_DIR || '.data');
@@ -78,9 +94,10 @@ export function loadConfig(env = process.env) {
     // Re-read per token request: the playground provisions idp-<id> clients into CLIENTS_FILE at runtime.
     reloadClients: env.CLIENTS_FILE ? () => loadClients(env) : undefined,
     idps: env.TRUSTED_IDPS_FILE ? loadIdps(env.TRUSTED_IDPS_FILE) : [],
-    registry: env.TRUSTED_IDPS_REGISTRY_URL
-      ? { url: env.TRUSTED_IDPS_REGISTRY_URL, token: env.ID_JAG_REGISTRY_TOKEN, caFile: env.REGISTRY_CA_FILE }
+    registry: registryUrl(env)
+      ? { url: registryUrl(env), token: env.ID_JAG_REGISTRY_TOKEN, caFile: env.REGISTRY_CA_FILE }
       : undefined,
+    pfCa: loadPfCa(env),
     signingKey: loadSigningKey(env.SIGNING_KEY_PEM_FILE, dataDir),
     replayFile: path.join(dataDir, 'replay.json'),
   };

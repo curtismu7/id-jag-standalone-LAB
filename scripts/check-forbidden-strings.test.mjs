@@ -61,6 +61,13 @@ test('private hostnames fail unless allowlisted', () => {
   assert.equal(repo({ 'server/config.js': "url: 'https://ok.ping-devops.com'\n" }).run(), 0);
 });
 
+test('a ping-devops-<name> cluster namespace fails, and is not covered by the hostname allowlist', () => {
+  const bad = repo({ 'docs/runbook.md': 'the namespace is ping-devops-someone\n' });
+  assert.equal(bad.run(), 1);
+  assert.match(bad.err[0], /private-namespace {2}ping-devops-someone/);
+  assert.equal(repo({ 'docs/runbook.md': 'use <acme-ns> from your own notes\n' }).run(), 0);
+});
+
 test('binary files are skipped', () => {
   const t = repo({ 'x.bin': 'abc\0 acme-pf.ping-devops.com' });
   assert.equal(t.run(), 0);

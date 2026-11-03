@@ -2,9 +2,10 @@
 // PKCE and mints an ID token. Tests steer it through `provider.claims`, `provider.signWith`, etc.
 import crypto from 'node:crypto';
 import http from 'node:http';
+import https from 'node:https';
 import * as jose from 'jose';
 
-export async function startProvider() {
+export async function startProvider({ tls } = {}) { // tls: { key, cert } serves https
   const { privateKey, publicKey } = await jose.generateKeyPair('RS256');
   const jwk = { ...(await jose.exportJWK(publicKey)), kid: 'k1', alg: 'RS256', use: 'sig' };
   const p = {
@@ -13,7 +14,7 @@ export async function startProvider() {
     clientPublicKey: null, // set to verify private_key_jwt client assertions
   };
 
-  const server = http.createServer(async (req, res) => {
+  const handler = async (req, res) => {
     const send = (status, body) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
     const url = new URL(req.url, p.issuer);
     if (url.pathname === '/.well-known/openid-configuration') {
@@ -42,9 +43,10 @@ export async function startProvider() {
       sub: 'user-1', email: 'alice@pingidentity.com', email_verified: true, name: 'Alice', nonce: grant.nonce, ...p.claims,
     }).setProtectedHeader({ alg: 'RS256', kid: 'k1' }).sign(p.signWith);
     return send(200, { access_token: 'at-not-used', token_type: 'Bearer', id_token: idToken, refresh_token: p.refreshToken });
-  });
+  };
+  const server = tls ? https.createServer(tls, handler) : http.createServer(handler);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  p.issuer = `http://127.0.0.1:${server.address().port}`;
+  p.issuer = `${tls ? 'https' : 'http'}://127.0.0.1:${server.address().port}`;
 
   /** Play the user at the authorization endpoint: returns the code for the callback. */
   p.authorize = (location) => {

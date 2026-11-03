@@ -26,7 +26,7 @@ import { getIssuerSubjectToken } from './issuerSession.js';
 import { mountInterop } from './interop.js';
 import { outboundFetch } from './outbound.js';
 import * as trustedIdps from './trustedIdps.js';
-import { SPEC, decodeJwt, inspect, scopeList, trimSlash } from './tokenChecks.js';
+import { SPEC, decodeJwt, inspect, issuerKeyCheck, scopeList, trimSlash } from './tokenChecks.js';
 import { piFlowHandlers } from './auth/piFlow.js';
 import { allowedDomains, checkEmail } from './auth/emailRules.js';
 import gatewayRedeemRoutes from './gatewayRedeemRoutes.js';
@@ -124,8 +124,13 @@ function missing(mode, target, saml = false) {
   }
   return need(target === 'pingfederate' ? pfRedeem : asRedeem);
 }
+// The Acme values are not the user's to invent: the owner of the shared Acme PingFederate supplies them.
+const ACME_KEYS = ['ACME_PF_URL', 'ACME_EXCHANGE_CLIENT_ID', 'ACME_EXCHANGE_CLIENT_SECRET'];
+const supplyHint = (keys) => (keys.some((k) => ACME_KEYS.includes(k))
+  ? ` ${ACME_KEYS.filter((k) => keys.includes(k)).join(', ')} come from the owner of the shared Acme PingFederate as a three-key settings block: run npm run setup -- --mode=pf-pf --acme-settings=<file>, which also sets up the redeemer on your PingFederate (PF_REDEEMER_CLIENT_SECRET, PF_RESOURCE). The acme-user password is sent separately and typed into the sign-in modal.`
+  : keys.includes('PF_REDEEMER_CLIENT_SECRET') ? ' PF_REDEEMER_CLIENT_SECRET is written by npm run setup -- --mode=pf-pf (it sets up the redeemer on your PingFederate).' : '');
 const notConfigured = (res, keys) => res.status(409).json({ error: 'not_configured', missing: keys,
-  message: `Not configured yet: set ${keys.join(', ')} (see .env.example), then restart the server.` });
+  message: `Not configured yet: set ${keys.join(', ')} (see .env.example), then restart the server.${supplyHint(keys)}` });
 
 const issuerSecret = (mode) => secret(mode === 'pf-pf' ? 'ACME_EXCHANGE_CLIENT_SECRET' : 'PF_EXCHANGE_CLIENT_SECRET');
 
@@ -278,7 +283,7 @@ function configFor(req) {
     modes: MODES.map((id) => {
       if (id === 'gateway-redeem') return { id, label: MODE_LABELS[id], available: isMock(), reason: isMock() ? null : LIVE_UNAVAILABLE };
       const keys = id === 'byo' ? [] : missing(id);
-      return { id, label: MODE_LABELS[id], available: !keys.length, reason: keys.length ? `Not configured: set ${keys.join(', ')}` : null };
+      return { id, label: MODE_LABELS[id], available: !keys.length, reason: keys.length ? `Not configured: set ${keys.join(', ')}.${supplyHint(keys)}` : null };
     }),
     // What an outside IdP needs: aud = the issuer, and where its client redeems.
     publicEndpoints: {
@@ -468,7 +473,7 @@ async function preflight(req, step) {
     const liveBlocked = target === 'gateway-redeem' && !isMock();
     add('mode', `This server can run ${known ? target : 'that mode'}`, !known || keys.length || liveBlocked ? 'fail' : 'pass',
       !known ? `"${target}" is not a playground mode.` : liveBlocked ? LIVE_UNAVAILABLE : keys.length ? `Not configured: ${keys.join(', ')} unset.` : 'Available.',
-      liveBlocked ? 'Switch the header toggle to Mock to use this mode.' : known ? `Set ${keys.join(', ')} in .env (see .env.example), then restart the server.` : 'Pick a mode from the toolbar.');
+      liveBlocked ? 'Switch the header toggle to Mock to use this mode.' : known ? `Set ${keys.join(', ')} in .env (see .env.example), then restart the server.${supplyHint(keys)}` : 'Pick a mode from the toolbar.');
     return checks;
   }
 
@@ -579,6 +584,12 @@ async function preflight(req, step) {
       add('jwks', `${s.idp.name} signing keys`, 'warn',
         `${rsa.length} distinct RSA keys (${withX5t} with x5t): the PingFederate redeemer may pick the wrong key and answer "Invalid JWT token".`,
         'Publish a single-key JWKS at the issuer, then make the redeeming PingFederate re-fetch it: re-save its IdP connection for this issuer, or restart it.');
+    } else if (mode === 'pf-as' && !isMock() && issuerKeyCheck(jwks).status !== 'pass') { // the mock PingFederate signs with an EC key
+      const v = issuerKeyCheck(jwks);
+      add('jwks', `${s.idp.name} signing keys`, v.status,
+        v.status === 'fail' ? `${rsa.length} distinct RSA key(s), none with x5t: PingFederate signs ID-JAGs with an x5t header and no kid, so resource-as cannot pick the key.`
+          : `${rsa.length} distinct RSA keys (${withX5t} with x5t): PingFederate's own JWT-bearer consumer may pick the wrong one and answer "Invalid JWT token".`,
+        'Rerun npm run setup -- --mode=pf-local, or publish the ID-JAG signing key through a JWT access token manager and set a static JWKS that holds only that key.');
     } else {
       add('jwks', `${s.idp.name} signing keys`, 'pass', `${jwks.length} key(s), ${rsa.length} distinct RSA.`);
     }

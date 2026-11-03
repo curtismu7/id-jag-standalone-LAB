@@ -4,15 +4,15 @@
 #   - Otherwise install the official image in Docker, bound to 127.0.0.1 only, with the default
 #     administrator login, and save the login.
 # Admin credentials are written only to ~/.config/demo-kit/provisioning.json (mode 600), never to the shared .env.
-# Environment overrides: PF_ADMIN_PORT (4731), PF_ENGINE_PORT (4732), PF_CONTAINER (pingfederate-lab),
-#   PF_IMAGE (pingidentity/pingfederate:latest), PF_LICENSE_FILE (~/Documents/pingfederate.lic),
+# Environment overrides: PF_ADMIN_PORT (4731), PF_ENGINE_PORT (4732), PF_CONTAINER (id-jag-kit-pf for a new install; an
+#   existing container named pingfederate-lab, from an earlier version of this kit, is found and reused, never recreated),
+#   PF_IMAGE (pingidentity/pingfederate:13.1.3-latest, the version the shared Acme PingFederate runs), PF_LICENSE_FILE (~/Documents/pingfederate.lic),
 #   PF_SERVER_PROFILE_URL and PF_SERVER_PROFILE_PATH (Ping getting-started profile), PF_ACCEPT_EULA=YES to skip the prompt.
 set -u
 
 ADMIN_PORT="${PF_ADMIN_PORT:-4731}"
 ENGINE_PORT="${PF_ENGINE_PORT:-4732}"
-NAME="${PF_CONTAINER:-pingfederate-lab}"
-IMAGE="${PF_IMAGE:-pingidentity/pingfederate:latest}"
+IMAGE="${PF_IMAGE:-pingidentity/pingfederate:13.1.3-latest}"
 LICENSE="${PF_LICENSE_FILE:-$HOME/Documents/pingfederate.lic}"
 # Ping's public "getting-started" server profile creates the first administrator from PING_IDENTITY_PASSWORD.
 # Without a profile a fresh PingFederate shows a setup wizard and has no admin account yet.
@@ -24,6 +24,12 @@ PROVISIONING="$HOME/.config/demo-kit/provisioning.json"
 BASE="https://127.0.0.1:$ADMIN_PORT/pf-admin-api/v1"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
+
+# New installs are named id-jag-kit-pf ("pingfederate-lab" is also the name of another app). An earlier version of this kit
+# named its container pingfederate-lab: when that one exists, keep using it instead of creating a second PingFederate.
+if [ -n "${PF_CONTAINER:-}" ]; then NAME="$PF_CONTAINER"
+elif docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx pingfederate-lab; then NAME="pingfederate-lab"
+else NAME="id-jag-kit-pf"; fi
 
 # HTTP status of the version endpoint with no login ("000" means nothing is listening).
 probe() { curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "$BASE/version" 2>/dev/null || true; }
@@ -58,7 +64,7 @@ agreement_help() {
 PingFederate needs its own license agreement accepted once, in the admin console. This is a legal step,
 so this script does not do it for you:
   1. Open https://127.0.0.1:$ADMIN_PORT in a browser (accept the local certificate warning).
-  2. Sign in as $DEFAULT_USER with the default password from the README.
+  2. Sign in as $DEFAULT_USER (the image's documented default password; see the PingFederate image documentation).
   3. Read and accept the PingFederate license agreement.
   4. Run this script again. It will verify the login and save it.
 EOF
@@ -157,4 +163,4 @@ save_creds "$DEFAULT_USER" "$DEFAULT_PASSWORD"
 echo "PingFederate is up."
 echo "  Admin console and API: https://127.0.0.1:$ADMIN_PORT"
 echo "  Runtime (engine):      https://127.0.0.1:$ENGINE_PORT"
-echo "  Login: $DEFAULT_USER / $DEFAULT_PASSWORD (change it for anything beyond local use)"
+echo "  The administrator login is saved in $PROVISIONING (mode 600); it is not shown here."

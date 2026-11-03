@@ -1,7 +1,10 @@
 // Token decoding and the draft-04 spec checks, shared by the playground (/api/id-jag-playground) and the
 // Inspector (/api/inspect). Pure except the signature check, which a caller can inject.
 
+import { issuerKeyCheck } from './jwksCheck.js';
 import { outboundFetch } from './outbound.js';
+
+export { issuerKeyCheck };
 
 export const SPEC = 'draft-ietf-oauth-identity-assertion-authz-grant';
 export const OIDC_ONLY = new Set(['openid', 'profile', 'email', 'offline_access', 'phone', 'address']);

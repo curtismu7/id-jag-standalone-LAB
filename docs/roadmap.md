@@ -12,6 +12,7 @@ The build phases this kit was made in, kept for history. The README describes wh
 - **Phase 3B:** PingFederate pi.flow sign-in at `/auth/pi-flow` (which also grants admin for the Trusted IdPs
   registry), IdP self-registration, audit log. The playground reads the signed-in user's issuer token only
   through `getIssuerSubjectToken(req, mode)` (`server/src/issuerSession.js`).
-- **Phase 3, rest:** the real `pf-pf` setup, and `pingfederate/sync-id-jag-trusted-idps.js` adapted to this repo
-  (`configure-acme-idp.js` and `tools/outside-agent.js` are).
+- **Phase 3, rest:** done. The real `pf-pf` setup (`npm run setup -- --mode=pf-pf --acme-settings=<file>`, the owner's
+  [runbook](acme-owner-runbook.md)) and `pingfederate/sync-id-jag-trusted-idps.js` and `configure-kid-workaround.js`
+  adapted to the kit's own PingFederate. Not done: `configure-acme-idp.js` still describes the demo's Acme setup and must never be run against the shared one.
 - **Phase 4:** packaging, CI hardening, SE deployment.

@@ -35,6 +35,7 @@ const ok = (data, status = 200) => ({ status, json: async () => data });
 // A fake network: discovery documents by URL, everything else 200.
 const net_ = (issuer = 'https://pf.test') => vi.fn(async (url) => {
   if (String(url) === 'https://pf.test/.well-known/openid-configuration') return ok({ issuer });
+  if (String(url).endsWith('/pf/JWKS')) return ok({ keys: [{ kty: 'RSA', n: 'a', e: 'AQAB', x5t: 't' }] });
   return ok({});
 });
 const freePort = { createServer: () => { const h = {}; return { once: (e, f) => { h[e] = f; }, listen: () => setTimeout(() => h.listening?.(), 0), close: (cb) => cb() }; } };
@@ -113,6 +114,27 @@ describe('individual checks', () => {
     expect(down.status).toBe('fail');
     expect(down.message).toContain('ENOTFOUND');
   });
+  it('discovery: a local issuer that differs gets advice that points at the PingFederate, not at PF_URL', async () => {
+    const bad = await doctor.checkDiscovery('d', 'PF_URL', 'https://127.0.0.1:4732', async () => ok({ issuer: 'https://localhost:9031' }));
+    expect(bad.status).toBe('fail');
+    expect(bad.message).toContain('https://localhost:9031');
+    expect(bad.fix).not.toContain('Set PF_URL to https://localhost:9031');
+    expect(bad.fix).toContain('Do not change PF_URL');
+    expect(bad.fix).toContain('setup -- --mode=pf-local');
+    const remote = await doctor.checkDiscovery('d', 'PF_URL', 'https://pf.test', net_('https://pf.test/'));
+    expect(remote.fix).toContain('Set PF_URL to exactly the issuer');
+  });
+  it('issuer JWKS (pf-as): one RSA key with x5t passes; none with x5t fails; two distinct warns; unreadable fails', async () => {
+    const jwks = (keys, status = 200) => async () => ok({ keys }, status);
+    const one = { kty: 'RSA', n: 'a', e: 'AQAB', x5t: 't' };
+    expect((await doctor.checkIssuerJwks('j', 'https://pf.test', jwks([one, { ...one, kid: 'k2' }]))).status).toBe('pass');
+    const none = await doctor.checkIssuerJwks('j', 'https://pf.test', jwks([{ kty: 'RSA', n: 'a', e: 'AQAB' }]));
+    expect(none).toMatchObject({ status: 'fail', message: expect.stringContaining('no RSA key with x5t') });
+    expect((await doctor.checkIssuerJwks('j', 'https://pf.test', jwks([one, { ...one, n: 'b', x5t: 'u' }]))).status).toBe('warn');
+    expect((await doctor.checkIssuerJwks('j', 'https://pf.test', jwks([], 500))).message).toContain('HTTP 500');
+    const down = await doctor.checkIssuerJwks('j', 'https://pf.test', async () => { throw Object.assign(new Error('x'), { cause: { code: 'CERT_HAS_EXPIRED' } }); });
+    expect(down).toMatchObject({ status: 'fail', message: expect.stringContaining('CERT_HAS_EXPIRED') });
+  });
   it('pf admin: skipped when unset; password missing, unreachable, 401, no validator, and good', async () => {
     expect(await checkPfAdmin({})).toEqual([]);
     const env = { PF_ADMIN_URL: 'https://pf:9999', PF_ADMIN_PASSWORD: 'p', PF_EXCHANGE_CLIENT_ID: 'kit' };
@@ -149,10 +171,57 @@ describe('runDoctor', () => {
     expect(rep.checks.filter((c) => c.status === 'fail')).toEqual([]);
     expect(rep.ok).toBe(true);
   });
+  it('pf-as checks the issuer\'s JWKS (live mode only), and pf-pf does not', async () => {
+    setEnv(GOOD);
+    const noX5t = async (url) => (String(url).endsWith('/pf/JWKS') ? ok({ keys: [{ kty: 'RSA', n: 'a', e: 'AQAB' }] }) : net_()(url));
+    const rep = await doctor.runDoctor({ mode: 'pf-as', fetchImpl: noX5t, netImpl: freePort, envFile: __filename, fsImpl: { ...fs, existsSync: () => true, accessSync: () => {} } });
+    expect(get(rep, 'pf-jwks').status).toBe('fail');
+    expect(rep.ok).toBe(false);
+    setEnv({ ...GOOD, ACME_PF_URL: 'https://acme.test' });
+    expect(get(await doctor.runDoctor({ mode: 'pf-pf', fetchImpl: noX5t, netImpl: freePort }), 'pf-jwks')).toBeUndefined();
+  });
   it('pf-pf also checks the Acme issuer', async () => {
     setEnv({ ...GOOD, ACME_PF_URL: 'https://acme.test' });
     const rep = await doctor.runDoctor({ mode: 'pf-pf', fetchImpl: net_(), netImpl: freePort });
     expect(get(rep, 'acme-discovery').status).toBe('fail');
+  });
+  it('pf-pf checks the Acme JWKS (one RSA key with x5t) and that Acme starts a pi.flow sign-in, in live mode', async () => {
+    const PFPF = { ...GOOD, ACME_PF_URL: 'https://acme.test', ACME_EXCHANGE_CLIENT_ID: 'id-jag-kit-acme', ACME_EXCHANGE_CLIENT_SECRET: 'sentinel-acme-secret', PF_REDEEMER_CLIENT_SECRET: 'sentinel-redeemer', PF_RESOURCE: 'http://mcp.test/mcp' };
+    setEnv(PFPF);
+    const acme = (jwks, flow) => vi.fn(async (url) => {
+      const u = String(url);
+      if (u === 'https://acme.test/.well-known/openid-configuration') return ok({ issuer: 'https://acme.test' });
+      if (u === 'https://acme.test/pf/JWKS') return ok(jwks);
+      if (u.startsWith('https://acme.test/as/authorization.oauth2?')) return ok(flow);
+      return net_()(url);
+    });
+    const good = acme({ keys: [{ kty: 'RSA', n: 'a', e: 'AQAB', x5t: 't' }] }, { id: 'abc123', status: 'USERNAME_PASSWORD_REQUIRED' });
+    const rep = await doctor.runDoctor({ mode: 'pf-pf', fetchImpl: good, netImpl: freePort });
+    expect(get(rep, 'acme-discovery').status).toBe('pass');
+    expect(get(rep, 'acme-jwks').status).toBe('pass');
+    expect(get(rep, 'acme-signin').status).toBe('pass');
+    const start = new URL(good.mock.calls.map(([u]) => String(u)).find((u) => u.includes('/as/authorization.oauth2')));
+    expect(start.searchParams.get('response_mode')).toBe('pi.flow');
+    expect(start.searchParams.get('client_id')).toBe('id-jag-kit-acme');
+    expect(start.searchParams.get('redirect_uri')).toMatch(/\/api\/id-jag-playground\/issuer\/callback$/);
+
+    const two = await doctor.runDoctor({ mode: 'pf-pf', fetchImpl: acme({ keys: [{ kty: 'RSA', n: 'a', e: 'AQAB', x5t: 't' }, { kty: 'RSA', n: 'b', e: 'AQAB', x5t: 'u' }] }, { status: 'USERNAME_PASSWORD_REQUIRED' }), netImpl: freePort });
+    expect(get(two, 'acme-jwks').status).toBe('warn');
+    expect(get(two, 'acme-jwks').fix).toContain('Acme owner');
+    const refused = await doctor.runDoctor({ mode: 'pf-pf', fetchImpl: acme({ keys: [{ kty: 'RSA', n: 'a', e: 'AQAB', x5t: 't' }] }, { code: 'INVALID_REQUEST' }), netImpl: freePort });
+    expect(get(refused, 'acme-signin').status).toBe('fail');
+    expect(get(refused, 'acme-signin').fix).toContain('configure-acme-signin.js');
+    expect(JSON.stringify(rep)).not.toContain('sentinel-acme-secret');
+  });
+  it('pf-pf with settings missing tells the user who supplies the Acme values', async () => {
+    setEnv({ ...GOOD });
+    const rep = await doctor.runDoctor({ mode: 'pf-pf', fetchImpl: net_(), netImpl: freePort });
+    const c = get(rep, 'env-required');
+    expect(c.status).toBe('fail');
+    expect(c.fix).toContain('owner of the shared Acme PingFederate');
+    expect(c.fix).toContain('--acme-settings=<file>');
+    const signin = get(rep, 'acme-signin');
+    expect(signin.status).toBe('fail');
   });
   it('a deliberately broken setup names a fix for each problem', async () => {
     setEnv({ ...GOOD, PF_URL: 'https://pf.test' });

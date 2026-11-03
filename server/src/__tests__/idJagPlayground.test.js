@@ -120,6 +120,17 @@ describe('gating', () => {
     expect(res.body.publicEndpoints.pingfederate.issuer).toBe('https://pf.example.invalid');
   });
 
+  it('"Not configured" for pf-pf says who supplies the Acme values and how to import them; other modes get no such hint', async () => {
+    const res = await post(appWith({ idJagPlaygroundMode: 'pf-pf' }), '/pg/issue');
+    expect(res.status).toBe(409);
+    expect(res.body.message).toContain('owner of the shared Acme PingFederate');
+    expect(res.body.message).toContain('npm run setup -- --mode=pf-pf --acme-settings=<file>');
+    expect(res.body.message).toContain('typed into the sign-in modal');
+    const modes = (await request(appWith({})).get('/pg/config')).body.modes;
+    expect(modes.find((m) => m.id === 'pf-pf').reason).toContain('--acme-settings=<file>');
+    expect(modes.find((m) => m.id === 'pf-as').reason).not.toContain('Acme');
+  });
+
   it('/config never carries a secret', async () => {
     setEnv({ ...PF_AS_ENV, ACME_EXCHANGE_CLIENT_SECRET: 'acme-secret', PF_REDEEMER_CLIENT_SECRET: 'redeemer-secret' });
     const res = await request(appWith({})).get('/pg/config');

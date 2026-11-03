@@ -3,7 +3,8 @@
 import { currentMode } from './mode.js';
 import { MOCK_ORIGINS, mockFetch } from './mock/index.js';
 import { createNetguard } from './netguard.js';
+import { trustedFetch } from './pfTrust.js';
 
-export const netguard = createNetguard({ mode: currentMode, mock: { origins: MOCK_ORIGINS, fetch: mockFetch } });
+export const netguard = createNetguard({ mode: currentMode, mock: { origins: MOCK_ORIGINS, fetch: mockFetch }, realFetch: trustedFetch });
 export const outboundFetch = (url, init) => netguard.fetch(url, init);
 export const guardSocket = (url) => netguard.assertAllowed(url);

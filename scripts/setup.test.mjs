@@ -86,7 +86,7 @@ test('the real setup.mjs wiring gives runSetup every fs call it makes (mock setu
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'idjag-setup-real-'));
   fs.mkdirSync(path.join(root, 'scripts'));
   fs.symlinkSync(path.join(here, '..', 'server'), path.join(root, 'server'), 'dir'); // setup-lib imports server/src/doctor.js
-  for (const f of fs.readdirSync(here).filter((n) => /^setup.*\.mjs$/.test(n) && !n.endsWith('.test.mjs'))) fs.copyFileSync(path.join(here, f), path.join(root, 'scripts', f));
+  for (const f of fs.readdirSync(here).filter((n) => /^(setup|pf-selfcheck).*\.mjs$/.test(n) && !n.endsWith('.test.mjs'))) fs.copyFileSync(path.join(here, f), path.join(root, 'scripts', f));
   fs.writeFileSync(path.join(root, 'scripts', 'doctor.mjs'), "console.log('Doctor (stub)');\n");
   fs.writeFileSync(path.join(root, '.env.example'), EXAMPLE);
   const r = spawnSync(process.execPath, [path.join(root, 'scripts', 'setup.mjs'), '--yes', '--mode=mock'], { cwd: root, encoding: 'utf8' });

@@ -8,7 +8,7 @@
  *   kubectl -n <ns> port-forward svc/pingfederate-admin 29999:9999 &
  *   node pingfederate/configure-acme-idp.js --ns=<ns>
  *
- * Every target comes from an option or this repo's settings (env, else the repo-root .env); there are no built-in hosts:
+ * Every target comes from an option or this repo's settings (env, else the shared settings file, else the repo-root .env); there are no built-in hosts:
  *   --host=…         Acme's public host (its issuer is https://<host>)     else the host of ACME_PF_URL
  *   --resource-as=…  our resource AS issuer = ID-JAG aud                   else RESOURCE_AS_ISSUER
  *   --resource=…     the MCP resource that selects that connection         else ID_JAG_RESOURCE
@@ -19,7 +19,7 @@
  * For our resource AS, client_id is acme-agent: register that as "client_id your IdP writes in the ID-JAG" on Trusted IdPs.
  * The PingFederate connection (acmeToPingFed) is updated in place: on an Acme PingFederate another deployment also
  * uses, its resource and client become the ones given here.
- * Secrets (env, else the repo-root .env; never printed):
+ * Secrets (env, else the shared settings file, else the repo-root .env; never printed):
  *   OUTSIDE_IDP_USER_PASSWORD  password of the test user acme-user
  *   OUTSIDE_IDP_CLIENT_SECRET  secret of the acme-agent client
  * The admin password comes from the pingfederate-admin secret in --ns.
@@ -52,7 +52,7 @@ const SCOPE = 'read mcp:invoke'; // what mcp-sample's tools need
 
 function secret(name) {
   if (process.env[name]) return process.env[name];
-  console.error(`set ${name} (env or the repo-root .env)`);
+  console.error(`set ${name} (env, the shared settings file or the repo-root .env)`);
   process.exit(2);
 }
 

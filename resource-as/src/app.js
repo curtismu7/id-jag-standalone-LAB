@@ -31,10 +31,11 @@ async function readBody(req) {
  * @param config.idps        trusted IdPs from TRUSTED_IDPS_FILE (win issuer collisions)
  * @param config.registry    { url, token, caFile, cacheMs } or undefined
  * @param config.replayFile  persist the jti replay cache here (optional)
+ * @param config.pfCa        { origin, ca }: a CA trusted for JWKS fetches from that origin only (PF_CA_FILE)
  */
 export function createHandler({
   issuer, acceptedResources, clients, reloadClients, allowPublicClients = false, accessTokenTtl = 3600,
-  signingKey, idps = [], registry, replayFile, log = console.log,
+  signingKey, idps = [], registry, replayFile, log = console.log, pfCa,
 }) {
   const { kty, n, e } = createPublicKey(signingKey).export({ format: 'jwk' });
   const kid = createHash('sha256').update(JSON.stringify({ e, kty, n })).digest('base64url'); // RFC 7638 thumbprint
@@ -67,18 +68,22 @@ export function createHandler({
   const decisions = createEvents();
   const remoteJwks = new Map();
 
+  // The local PingFederate's own certificate is trusted for its origin only; any other JWKS URL uses the default trust store.
+  const caFor = (url) => (pfCa && new URL(url).origin === pfCa.origin ? pfCa.ca : undefined);
+
   function keyResolver(idp) {
     return async (header, token) => {
       // PingFederate identifies certificate-backed keys by x5t, and a static PF
       // key set lists the same key under several kids. jose's JWKS selector only
       // matches kid, so resolve x5t here and require one DISTINCT key behind it.
       if (header.x5t) {
-        const { keys = [] } = await getJson(idp.jwksUrl);
+        const { keys = [] } = await getJson(idp.jwksUrl, { ca: caFor(idp.jwksUrl) });
         const matches = keys.filter((k) => k.x5t === header.x5t && (!k.alg || k.alg === header.alg));
         const distinct = new Map(matches.map((k) => [`${k.kty}.${k.n}.${k.e}.${k.crv}.${k.x}.${k.y}`, k]));
         if (distinct.size !== 1) throw new Error(`expected one JWKS key for x5t ${header.x5t}, found ${distinct.size}`);
         return jose.importJWK([...distinct.values()][0], header.alg);
       }
+      if (caFor(idp.jwksUrl)) return jose.createLocalJWKSet(await getJson(idp.jwksUrl, { ca: caFor(idp.jwksUrl) }))(header, token);
       if (!remoteJwks.has(idp.jwksUrl)) remoteJwks.set(idp.jwksUrl, jose.createRemoteJWKSet(new URL(idp.jwksUrl)));
       return remoteJwks.get(idp.jwksUrl)(header, token);
     };
