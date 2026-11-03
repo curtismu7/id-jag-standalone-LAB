@@ -55,12 +55,12 @@ function Shell({ children }) {
             <button type="submit" className="shell-theme">Sign out</button>
           </form>
         )}
-        {me === null && <button type="button" className="shell-theme" onClick={() => signIn()}>Sign in</button>}
         <ModeToggle />
         <PresentToggle />
         <button type="button" className="shell-theme" onClick={flip} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>
           {theme === "dark" ? "Light" : "Dark"}
         </button>
+        {me === null && <button type="button" className="shell-theme shell-signin" onClick={() => signIn()}>Sign in</button>}
       </header>
       <ModeBanner />
       <ClaimBanner />
