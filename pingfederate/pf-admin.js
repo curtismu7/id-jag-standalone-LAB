@@ -4,14 +4,19 @@
 //   - a cluster (default): a kubectl port-forward on --port, password from the pingfederate-admin secret in --ns.
 //   - direct (`npm run setup`, mode pf-local): PF_ADMIN_URL, PF_ADMIN_USER and PF_ADMIN_PASSWORD in the environment, and
 //     PF_ADMIN_INSECURE_TLS=true for the local self-signed certificate. --ns and --port are then not needed.
-// PF_SETTINGS_FILE (set by `npm run setup`) names the file writeEnv() updates; default is the repo-root .env.
+// writeEnv() updates PF_SETTINGS_FILE (set by `npm run setup`), else the ONE shared settings file (STANDALONE_ENV, else
+// ~/Development/.env). Never the repo-root .env: a rerun from another folder must not leave a secret in a second place.
+// --context=<kube context> names the cluster for the kubectl calls (a cluster run should always pass it).
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const https = require('https');
 const { execFileSync } = require('child_process');
 
-const ENV_FILE = process.env.PF_SETTINGS_FILE || path.join(__dirname, '../.env');
-try { process.loadEnvFile(ENV_FILE); } catch { /* no .env: env and args only */ }
+const ENV_FILE = process.env.PF_SETTINGS_FILE || process.env.STANDALONE_ENV || path.join(os.homedir(), 'Development', '.env');
+for (const f of [ENV_FILE, path.join(__dirname, '../.env')]) { // the repo-root .env is read for existing users, never written
+  try { process.loadEnvFile(f); } catch { /* missing: env and args only */ }
+}
 
 const args = Object.fromEntries(process.argv.slice(2).map((a) => {
   const [k, ...v] = a.replace(/^--/, '').split('=');
@@ -28,7 +33,7 @@ function setting(option, envName, what) {
 
 function secret(name) {
   if (process.env[name]) return process.env[name];
-  console.error(`set ${name} (env or the repo-root .env)`);
+  console.error(`set ${name} (env or the shared settings file)`);
   process.exit(2);
 }
 
@@ -44,7 +49,7 @@ function adminApi(ns, port) {
   } else {
     base = `https://localhost:${port}/pf-admin-api/v1`;
     user = 'administrator';
-    pw = Buffer.from(execFileSync('kubectl', ['-n', ns, 'get', 'secret', 'pingfederate-admin', '-o', 'jsonpath={.data.password}']).toString(), 'base64').toString();
+    pw = Buffer.from(execFileSync('kubectl', [...(args.context && args.context !== true ? ['--context', args.context] : []), '-n', ns, 'get', 'secret', 'pingfederate-admin', '-o', 'jsonpath={.data.password}']).toString(), 'base64').toString();
     agent = new https.Agent({ rejectUnauthorized: false }); // port-forwarded admin API, self-signed
   }
   return (method, p, body) => new Promise((resolve, reject) => {
@@ -60,6 +65,42 @@ function adminApi(ns, port) {
     if (body) req.write(JSON.stringify(body));
     req.end();
   });
+}
+
+/**
+ * The scripts that set up the kit's own PingFederate (base URL, certificate, ID-JAG issuer, redeemer) may only reach ITS admin API:
+ * https on loopback at the kit's admin port (4731, or PF_ADMIN_PORT as pingfederate-setup.sh honours it). The admin ports of the other
+ * PingFederates on this machine are refused whatever the settings say, so a stale PF_ADMIN_URL in the shell cannot send a write there.
+ */
+const OTHER_PFS = new Set(['9031', '9032', '9999']);
+function requireLocalAdmin() {
+  const port = process.env.PF_ADMIN_PORT || '4731';
+  let u = null;
+  try { u = new URL(process.env.PF_ADMIN_URL || ''); } catch { /* unset or not a URL */ }
+  if (!u || u.protocol !== 'https:' || !['127.0.0.1', 'localhost'].includes(u.hostname) || u.port !== port || OTHER_PFS.has(port)) {
+    console.error(`this script configures the kit's own local PingFederate: set PF_ADMIN_URL (https://127.0.0.1:${OTHER_PFS.has(port) ? 4731 : port}), or run npm run setup -- --mode=pf-local`);
+    process.exit(2);
+  }
+}
+
+/** Throws unless this admin API belongs to the PingFederate whose issuer is `url` (its base URL): the second check after requireLocalAdmin. */
+async function requireIssuer(api, url) {
+  const r = await api('GET', '/serverSettings');
+  if (r.status !== 200 || r.body?.federationInfo?.baseUrl !== String(url).replace(/\/$/, '')) {
+    throw new Error(`the admin API at PF_ADMIN_URL is not the PingFederate whose base URL is ${url}: nothing was changed. Run npm run setup -- --mode=pf-local first, and check PF_ADMIN_URL`);
+  }
+}
+
+/**
+ * The sign-in client's redirect URIs for an app origin. A browser reaches a local app as localhost or 127.0.0.1, and the
+ * default port 4720 is always welcome, so a local origin (http, with a port) registers all of those. Callers add these to
+ * the client's existing URIs and never replace them.
+ */
+function signinRedirects(appOrigin) {
+  const origins = new Set([appOrigin]);
+  const local = /^http:\/\/(localhost|127\.0\.0\.1):(\d+)$/.exec(appOrigin);
+  if (local) for (const h of ['localhost', '127.0.0.1']) { origins.add(`http://${h}:${local[2]}`); origins.add(`http://${h}:4720`); }
+  return [...origins].flatMap((o) => [`${o}/auth/callback`, `${o}/api/id-jag-playground/issuer/callback`]);
 }
 
 let failed = false;
@@ -93,4 +134,4 @@ const same = (names) => names.map((n) => [n, n]);
 const done = (tag, okLine) => { console.log(failed ? `[${tag}] finished with failures` : okLine); process.exit(failed ? 1 : 0); };
 const fail = (tag, port) => (err) => { console.error(`[${tag}] ${err.message || err.code} (${process.env.PF_ADMIN_URL ? 'is PingFederate up?' : `is the admin port-forward on ${port} up?`})`); process.exit(1); };
 
-module.exports = { args, setting, secret, adminApi, report, ensure, writeEnv, acceptAll, from, same, done, fail, ENV_FILE };
+module.exports = { args, setting, secret, adminApi, report, ensure, writeEnv, acceptAll, from, same, done, fail, requireLocalAdmin, requireIssuer, signinRedirects, hasFailed: () => failed, ENV_FILE };

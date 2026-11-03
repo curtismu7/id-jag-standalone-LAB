@@ -11,7 +11,7 @@ const EXAMPLE = '# example\nSESSION_SECRET=\nPF_URL=https://pf.example.invalid\n
 const PASSWORD = 'pw-for-tests-only-7f3a';
 const here = path.dirname(new URL(import.meta.url).pathname);
 
-function fixture({ installer = 0, configure = {}, doctorCode = 0, provisioning, answers = [], leak = false } = {}) {
+function fixture({ installer = 0, configure = {}, doctorCode = 0, provisioning, answers = [], leak = false, selfCheckResult } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'idjag-pflocal-'));
   const home = path.join(root, 'home');
   fs.mkdirSync(path.join(home, '.config', 'demo-kit'), { recursive: true });
@@ -38,28 +38,33 @@ function fixture({ installer = 0, configure = {}, doctorCode = 0, provisioning, 
     return { code, stdout: `  ok   ${script}${leak ? ` echoed ${opts.env?.PF_ADMIN_PASSWORD}` : ''}\n`, stderr: leak ? `boom ${opts.env?.PF_ADMIN_PASSWORD}\n` : '' };
   };
   const rand = () => `generated${++n}`.padEnd(32, 'x');
-  const run = (argv, env = {}) => runSetup({ argv, env: { HOME: home, ...env }, root, home, io, fs: { existsSync: fs.existsSync, ...fs.promises }, exec, rand });
+  const checks = [];
+  const check = async (o) => { checks.push(o); return selfCheckResult ?? { ok: true, checks: [{ id: 'tls', ok: true, message: 'stub' }] }; };
+  const run = (argv, env = {}) => runSetup({ argv, env: { HOME: home, ...env }, root, home, io, fs: { existsSync: fs.existsSync, ...fs.promises }, exec, rand, check });
   const out = () => [...log, ...err].join('\n');
-  return { root, home, shared, prov, log, err, calls, asked, run, out, sharedText: () => fs.readFileSync(shared, 'utf8') };
+  return { root, home, shared, prov, log, err, calls, asked, checks, run, out, sharedText: () => fs.readFileSync(shared, 'utf8') };
 }
 
 test('pf-local is a setup mode', () => {
   assert.ok(SETUP_MODES.includes('pf-local'));
 });
 
-test('pf-local happy path: installer with the terminal, then both configure scripts with the login in their environment only', async () => {
+test('pf-local happy path: installer with the terminal, then every configure script with the login in their environment only', async () => {
   const t = fixture();
   const r = await t.run(['--yes', '--mode=pf-local', '--users=kit-user@pingone.com']);
   assert.equal(r.code, 0);
-  assert.deepEqual(t.calls.map((c) => path.basename(c.argv[1])), ['pingfederate-setup.sh', 'configure-signin.js', 'configure-local-signin.js', 'doctor.mjs']);
-  const [installer, signin, local, doctor] = t.calls;
+  assert.deepEqual(t.calls.map((c) => path.basename(c.argv[1])), ['pingfederate-setup.sh', 'configure-signin.js', 'configure-local-signin.js', 'configure-base-url.js', 'configure-local-tls.js', 'configure-idjag-issuer.js', 'doctor.mjs']);
+  const [installer, signin, local, baseUrl, tls, issuer, doctor] = t.calls;
   assert.equal(installer.argv[0], 'bash');
   assert.equal(installer.opts.stdio, 'inherit');
   assert.equal(installer.opts.env.PF_ADMIN_PORT, '4731');
   assert.equal(installer.opts.env.PF_ENGINE_PORT, '4732');
   assert.deepEqual(signin.argv.slice(2), ['--local']);
   assert.deepEqual(local.argv.slice(2), ['--users=kit-user@pingone.com']);
-  for (const c of [signin, local]) {
+  assert.deepEqual(tls.argv.slice(2), [`--ca-out=${path.join(t.home, '.config', 'demo-kit', 'id-jag-kit', 'pf-ca.pem')}`]);
+  assert.deepEqual(baseUrl.argv.slice(2), []);
+  assert.deepEqual(issuer.argv.slice(2), []);
+  for (const c of [signin, local, baseUrl, tls, issuer]) {
     assert.equal(c.opts.env.PF_ADMIN_URL, PF_ADMIN_ORIGIN);
     assert.equal(c.opts.env.PF_ADMIN_USER, 'administrator');
     assert.equal(c.opts.env.PF_ADMIN_PASSWORD, PASSWORD);
@@ -237,4 +242,103 @@ test('pf-admin direct mode talks to PF_ADMIN_URL, never kubectl, and refuses to 
   const r = inChild(`require(${JSON.stringify(pfAdmin)}).adminApi('direct', '1')('GET', '/version').then(() => process.exit(3), (e) => { console.log(e.code); })`,
     { PF_ADMIN_URL: 'https://127.0.0.1:1', PF_ADMIN_PASSWORD: PASSWORD, PF_ADMIN_INSECURE_TLS: 'true' });
   assert.equal(r.stdout.trim(), 'ECONNREFUSED');
+});
+
+test('pf-local writes APP_ORIGIN (default http://localhost:4720) and ADMIN_EMAILS (the first user), keeping values already there', async () => {
+  const t = fixture();
+  await t.run(['--yes', '--mode=pf-local', '--users=first@pingone.com,second@pingone.com']);
+  assert.match(t.sharedText(), /^APP_ORIGIN=http:\/\/localhost:4720$/m);
+  assert.match(t.sharedText(), /^ADMIN_EMAILS=first@pingone\.com$/m);
+  const kept = fixture();
+  fs.mkdirSync(path.dirname(kept.shared), { recursive: true });
+  fs.writeFileSync(kept.shared, 'APP_ORIGIN=http://localhost:4999\nADMIN_EMAILS=boss@pingone.com\n', { mode: 0o600 });
+  await kept.run(['--yes', '--mode=pf-local', '--users=first@pingone.com']);
+  assert.match(kept.sharedText(), /^APP_ORIGIN=http:\/\/localhost:4999$/m);
+  assert.match(kept.sharedText(), /^ADMIN_EMAILS=boss@pingone\.com$/m);
+  const flagged = fixture();
+  fs.mkdirSync(path.dirname(flagged.shared), { recursive: true });
+  fs.writeFileSync(flagged.shared, 'APP_ORIGIN=http://localhost:4999\n', { mode: 0o600 });
+  await flagged.run(['--yes', '--mode=pf-local', '--app-origin=http://localhost:4724/']);
+  assert.match(flagged.sharedText(), /^APP_ORIGIN=http:\/\/localhost:4724$/m, 'an explicit --app-origin replaces it');
+  assert.ok(!/ADMIN_EMAILS=/.test(flagged.sharedText()), 'no users given: no admin is invented');
+});
+
+test('the self-check runs after the configure scripts, for PF_URL, with the PF_CA_FILE the TLS script wrote', async () => {
+  const t = fixture();
+  await t.run(['--yes', '--mode=pf-local', '--users=kit-user@pingone.com']);
+  assert.equal(t.checks.length, 1);
+  assert.equal(t.checks[0].pfUrl, PF_RUNTIME_URL);
+  assert.equal(t.checks[0].caFile, undefined, 'the stubbed TLS script wrote no PF_CA_FILE');
+  const withCa = fixture();
+  fs.mkdirSync(path.dirname(withCa.shared), { recursive: true });
+  fs.writeFileSync(withCa.shared, 'PF_CA_FILE=/somewhere/pf-ca.pem\n', { mode: 0o600 });
+  await withCa.run(['--yes', '--mode=pf-local', '--users=kit-user@pingone.com']);
+  assert.equal(withCa.checks[0].caFile, '/somewhere/pf-ca.pem');
+});
+
+test('a failed self-check fails the run loudly and does not run doctor', async () => {
+  const t = fixture({ selfCheckResult: { ok: false, checks: [{ id: 'issuer', ok: false, message: 'discovery says the issuer is https://localhost:9031', fix: 'rerun setup' }] } });
+  const r = await t.run(['--yes', '--mode=pf-local', '--users=kit-user@pingone.com']);
+  assert.equal(r.code, 1);
+  assert.match(t.err.join('\n'), /FAIL\s+issuer\s+discovery says the issuer is https:\/\/localhost:9031/);
+  assert.match(t.err.join('\n'), /SELF-CHECK FAILED/);
+  assert.ok(!t.calls.some((c) => path.basename(c.argv[1]) === 'doctor.mjs'));
+});
+
+// ---- the real installer script, with docker and curl stubbed ----
+
+function installer({ existing = [], healthyAfterRun = true } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'idjag-inst-'));
+  const bin = path.join(dir, 'bin'); fs.mkdirSync(bin);
+  const dockerLog = path.join(dir, 'docker.log');
+  const up = path.join(dir, 'up');
+  const w = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+  // docker: `ps` lists the containers that exist; `run` records its arguments and "starts" PingFederate.
+  w('docker', `echo "$*" >> ${dockerLog}
+case "$1" in
+  ps) printf '%s\\n' ${existing.map((n) => `'${n}'`).join(' ')} ;;
+  run) ${healthyAfterRun ? `touch ${up}` : ':'} ;;
+esac
+exit 0`);
+  // curl: nothing listens until docker run (or an existing install); then the version and login probes answer 200.
+  w('curl', `if [ -f ${up} ] || [ -n "${existing.length ? '1' : ''}" ]; then case "$*" in *-K*) printf '{}\\n200' ;; *) printf 200 ;; esac; else printf 000; fi`);
+  w('sleep', 'exit 0');
+  w('lsof', 'exit 1');
+  const lic = path.join(dir, 'pingfederate.lic'); fs.writeFileSync(lic, 'x');
+  const run = () => spawnSync('bash', [path.join(here, 'pingfederate-setup.sh')], {
+    encoding: 'utf8', input: '',
+    env: { PATH: `${bin}:${path.dirname(process.execPath)}:/usr/bin:/bin`, HOME: dir, PF_LICENSE_FILE: lic, PF_ACCEPT_EULA: 'YES' },
+  });
+  return { dir, run, docker: () => (fs.existsSync(dockerLog) ? fs.readFileSync(dockerLog, 'utf8') : ''), prov: path.join(dir, '.config', 'demo-kit', 'provisioning.json') };
+}
+
+test('installer: a new install is named id-jag-kit-pf, pins the PingFederate version Acme runs, and prints no credential', () => {
+  const i = installer();
+  const r = i.run();
+  assert.equal(r.status, 0, r.stderr);
+  const run = i.docker().split('\n').find((l) => l.startsWith('run '));
+  assert.match(run, /--name id-jag-kit-pf /);
+  assert.match(run, /pingidentity\/pingfederate:13\.1\.3-latest$/);
+  assert.ok(!/pingfederate:latest/.test(i.docker()));
+  assert.ok(!/2FederateM0re/.test(r.stdout + r.stderr), 'the default administrator password is not printed');
+  assert.match(r.stdout, /not shown here/);
+  assert.equal(fs.statSync(i.prov).mode & 0o777, 0o600, 'the login is saved to provisioning.json');
+});
+
+test('installer: an existing pingfederate-lab container is reused, never recreated or renamed', () => {
+  const i = installer({ existing: ['pingfederate-lab', 'some-other'] });
+  const r = i.run();
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /Existing PingFederate verified/);
+  assert.ok(!/^run /m.test(i.docker()), 'docker run was not called');
+});
+
+test('installer: PF_CONTAINER still names the container', () => {
+  const dir = installer();
+  const r = spawnSync('bash', [path.join(here, 'pingfederate-setup.sh')], {
+    encoding: 'utf8', input: '',
+    env: { PATH: `${path.join(dir.dir, 'bin')}:${path.dirname(process.execPath)}:/usr/bin:/bin`, HOME: dir.dir, PF_LICENSE_FILE: path.join(dir.dir, 'pingfederate.lic'), PF_ACCEPT_EULA: 'YES', PF_CONTAINER: 'my-pf' },
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(dir.docker(), /--name my-pf /);
 });

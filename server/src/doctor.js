@@ -11,6 +11,7 @@ import { missingConfig, oidcConfig } from './auth/oidc.js';
 import { probeBackends, settings } from './idJagPlayground.js';
 import { activeAdapter } from './idp/index.js';
 import { currentMode, isMock, runtimeEnv } from './mode.js';
+import { issuerKeyCheck } from './jwksCheck.js';
 import { mockSigninProblem } from './mockSignin.js';
 import { netguard, outboundFetch } from './outbound.js';
 
@@ -43,7 +44,9 @@ export function checkEnvFile(mode, envFile, fsImpl = fs) {
 export function checkEnvRequired(mode, env = runtimeEnv()) {
   const missing = (REQUIRED[mode] || []).filter((k) => !val(env, k));
   return missing.length
-    ? r('env-required', 'fail', `unset: ${missing.join(', ')}`, `Set ${missing.join(', ')} in .env (see .env.example for what each is).`)
+    ? r('env-required', 'fail', `unset: ${missing.join(', ')}`, mode === 'pf-pf'
+      ? `The ACME_* values come from the owner of the shared Acme PingFederate as a three-key settings block; PF_REDEEMER_CLIENT_SECRET and PF_RESOURCE are written by the same step: npm run setup -- --mode=pf-pf --acme-settings=<file> (needs npm run setup -- --mode=pf-local first). Unset: ${missing.join(', ')}.`
+      : `Set ${missing.join(', ')} in .env (see .env.example for what each is).`)
     : pass('env-required', `all ${REQUIRED[mode].length} settings for ${mode} are set`);
 }
 
@@ -105,10 +108,51 @@ export async function checkDiscovery(id, label, url, fetchImpl = outboundFetch) 
     const res = await fetchImpl(`${url}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(4000) });
     if (res.status < 200 || res.status >= 300) return r(id, 'fail', `${url} discovery answered HTTP ${res.status}`, `Check ${label} and that the server is up.`);
     const issuer = (await res.json().catch(() => ({}))).issuer;
-    return issuer === url ? pass(id, `${url} discovery OK, issuer matches`)
-      : r(id, 'fail', `${label} is ${url} but discovery says issuer is ${issuer ?? '(missing)'}`, `Set ${label} to exactly the issuer the server publishes (no trailing slash, same scheme and host).`);
+    if (issuer === url) return pass(id, `${url} discovery OK, issuer matches`);
+    // A PingFederate that was never given a base URL publishes the image default; the fix is on the PingFederate side.
+    const local = /^https:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url);
+    return r(id, 'fail', `${label} is ${url} but discovery says issuer is ${issuer ?? '(missing)'}`, local
+      ? `Do not change ${label} to match: that issuer may belong to another PingFederate on this machine. Rerun npm run setup -- --mode=pf-local, which sets this PingFederate's base URL to ${url}.`
+      : `Set ${label} to exactly the issuer the server publishes (no trailing slash, same scheme and host).`);
   } catch (err) {
     return r(id, 'fail', `could not reach ${url} (${err?.cause?.code || err?.message})`, `Check ${label}, the network and VPN.`);
+  }
+}
+
+/** pf-as, live only (the mock PingFederate signs with an EC key): the issuer's /pf/JWKS must carry an RSA key with x5t (what ID-JAGs are signed with), and ideally only one. */
+export async function checkIssuerJwks(id, url, fetchImpl = outboundFetch, { label = 'PF_URL', fix = null } = {}) {
+  const jwksUrl = `${url}/pf/JWKS`;
+  try {
+    const res = await fetchImpl(jwksUrl, { signal: AbortSignal.timeout(4000) });
+    if (res.status < 200 || res.status >= 300) return r(id, 'fail', `${jwksUrl} answered HTTP ${res.status}`, `Check ${label} and that the server is up.`);
+    const v = issuerKeyCheck((await res.json().catch(() => ({}))).keys);
+    fix ??= 'Rerun npm run setup -- --mode=pf-local (it publishes the one ID-JAG signing key), or publish it yourself through a JWT access token manager and set a static JWKS.';
+    if (v.status === 'fail') return r(id, 'fail', `${jwksUrl} has no RSA key with x5t, so nothing can verify an ID-JAG from this issuer`, fix);
+    return v.status === 'warn'
+      ? r(id, 'warn', `${jwksUrl} lists ${v.rsa} distinct RSA keys (${v.withX5t} with x5t): PingFederate's own JWT-bearer consumer may pick the wrong one`, fix)
+      : pass(id, `${jwksUrl} has one RSA key, with x5t`);
+  } catch (err) {
+    return r(id, 'fail', `could not read ${jwksUrl} (${err?.cause?.code || err?.message})`, `Check ${label}, the network, and PF_CA_FILE if PingFederate uses its own certificate.`);
+  }
+}
+
+/** pf-pf, live only: Acme starts a pi.flow sign-in for the kit's client at Acme (what step 1 does), asking for nothing a user could type. */
+export async function checkAcmeSignin(id, { acmeUrl, clientId, redirectUri }, fetchImpl = outboundFetch) {
+  const fix = 'Ask the owner of the shared Acme PingFederate to run pingfederate/configure-acme-signin.js (the client, its redirect URIs and the Authentication API), then to send a fresh three-key settings block.';
+  if (!clientId) return r(id, 'fail', 'ACME_EXCHANGE_CLIENT_ID is unset, so no sign-in can start at Acme', fix);
+  const url = new URL(`${acmeUrl}/as/authorization.oauth2`);
+  url.search = new URLSearchParams({
+    response_type: 'code', client_id: clientId, redirect_uri: redirectUri, scope: 'offline_access', response_mode: 'pi.flow', state: 'doctor',
+    code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM', code_challenge_method: 'S256',
+  }).toString();
+  try {
+    const res = await fetchImpl(url.toString(), { headers: { Accept: 'application/json' }, redirect: 'manual', signal: AbortSignal.timeout(6000) });
+    const data = await res.json().catch(() => ({}));
+    if (data?.status === 'USERNAME_PASSWORD_REQUIRED') return pass(id, 'Acme starts a pi.flow sign-in for this client (it asks for a username and password)');
+    return r(id, 'fail', `Acme answered HTTP ${res.status}${data?.status || data?.code || data?.error ? ` (${String(data.status || data.code || data.error).slice(0, 60)})` : ''} instead of starting a pi.flow sign-in`,
+      `${fix} The redirect URI Acme must have is ${redirectUri}.`);
+  } catch (err) {
+    return r(id, 'fail', `could not start a sign-in at Acme (${err?.cause?.code || err?.message})`, 'Check ACME_PF_URL, the network and VPN.');
   }
 }
 
@@ -158,7 +202,11 @@ export async function runDoctor({ mode = 'mock', env = runtimeEnv(), fetchImpl =
       [checkEnvRequired(mode, env), checkSignin(), checkSessionSecret(env), checkRegistrationKey(env), checkAccess(env)],
       ...await Promise.all([
         guard('pf-discovery', async () => [await checkDiscovery('pf-discovery', 'PF_URL', c.pfUrl, fetchImpl)]),
+        mode === 'pf-as' && !isMock() ? guard('pf-jwks', async () => [await checkIssuerJwks('pf-jwks', c.pfUrl, fetchImpl)]) : [],
         mode === 'pf-pf' ? guard('acme-discovery', async () => [await checkDiscovery('acme-discovery', 'ACME_PF_URL', c.acmePfUrl, fetchImpl)]) : [],
+        mode === 'pf-pf' && !isMock() ? guard('acme-jwks', async () => [await checkIssuerJwks('acme-jwks', c.acmePfUrl, fetchImpl, { label: 'ACME_PF_URL',
+          fix: 'Acme\'s /pf/JWKS must list exactly one RSA key with x5t (its ID-JAG signing key). Ask the Acme owner; after Acme changes keys, rerun npm run setup -- --mode=pf-pf to restart your PingFederate (it caches Acme\'s keys forever).' })]) : [],
+        mode === 'pf-pf' && !isMock() ? guard('acme-signin', async () => [await checkAcmeSignin('acme-signin', { acmeUrl: c.acmePfUrl, clientId: c.acmeExchangeClientId, redirectUri: `${c.appOrigin}/api/id-jag-playground/issuer/callback` }, fetchImpl)]) : [],
         guard('pf-admin', () => activeAdapter(env).doctor({ env, adminCall })),
         guard('backends', () => checkBackends(mode, fetchImpl)),
       ]),

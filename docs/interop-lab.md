@@ -154,6 +154,6 @@ natively. All lab objects were removed afterwards.
 ### In the playground
 
 The Interop panel (pf-as mode) shows motd.xaa.rocks and xaa.dev twice: the native ID-JAG (x5t, no kid; refused) and the
-workaround (kid; accepted). `node pingfederate/configure-kid-workaround.js --ns=<ns> --xaa-client-id=<id>` creates the token
-managers, mappings and the `idjag-kit-kid` client and writes `INTEROP_KID_CLIENT_ID` / `_SECRET` to `.env`; `--remove` deletes them.
+workaround (kid; accepted). `node pingfederate/configure-kid-workaround.js --xaa-client-id=<id>` (the kit's own PingFederate, `PF_ADMIN_URL` set as in `pingfederate/README.md`) creates the token
+managers, mappings and the `id-jag-kit-kid` client and writes `INTEROP_KID_CLIENT_ID` / `_SECRET` to the shared settings file; `--remove` deletes them.
 

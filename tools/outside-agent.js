@@ -7,6 +7,7 @@
  *   3. RFC 7523 JWT bearer redemption at OUR public token endpoint
  *   4. optionally, tools/list at our MCP server (mcp-sample) with the token we returned
  * Prints decoded claims and OAuth errors only, never a raw token.
+ * OWNER ONLY: it needs the demo's acme-agent credential, which is never handed to colleagues (they get the three-key pf-pf block).
  *
  * Usage (secrets come from env or the repo-root .env, never args):
  *   OUTSIDE_IDP_CLIENT_SECRET=… OUTSIDE_IDP_USER_PASSWORD=… OUR_AS_CLIENT_ID=idp-acme OUR_AS_CLIENT_SECRET=… \

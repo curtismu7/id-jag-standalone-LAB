@@ -6,4 +6,5 @@
   `RESOURCE_AS_ISSUER`, client `OUR_AS_CLIENT_ID`, the `idp-<id>` client from My IdPs, resource `ID_JAG_RESOURCE`)
   or `--target=pingfederate` (`PF_URL`, `PF_REDEEMER_CLIENT_ID`, `PF_RESOURCE`). Every address and client comes from
   an option or this repo's settings (env, else the repo-root `.env`); a missing one stops it with the option and
-  variable to set. The header comment lists every option.
+  variable to set. The header comment lists every option. It signs in with the demo's `acme-agent` credential
+  (`OUTSIDE_IDP_CLIENT_SECRET`), which is far more powerful than the `pf-pf` settings block: it belongs to the Acme owner and is never handed to colleagues.

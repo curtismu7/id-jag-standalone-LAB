@@ -4,8 +4,10 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { MODES } from '../server/src/doctor.js';
 import { runPfLocal } from './setup-pf-local.mjs';
+import { runPfPf } from './setup-pf-pf.mjs';
 
-// pf-local is the pf-as flow against a PingFederate this script installs or finds on 127.0.0.1 (setup-pf-local.mjs).
+// pf-local is the pf-as flow against a PingFederate this script installs or finds on 127.0.0.1 (setup-pf-local.mjs). pf-pf has its own
+// flow too (setup-pf-pf.mjs): the owner's three-key Acme settings block, then the local PingFederate as the redeemer.
 export const SETUP_MODES = [...MODES, 'pf-local'];
 
 export const IDPS = [
@@ -16,13 +18,11 @@ export const IDPS = [
 
 // Asked (or taken from a flag or the environment) only for the modes listed. `flag` is the --flag form for non-secrets.
 const FIELDS = [
-  { key: 'PF_URL', flag: 'pf-url', label: 'PingFederate base URL', modes: ['pf-as', 'pf-pf', 'byo'] },
-  { key: 'PF_EXCHANGE_CLIENT_ID', flag: 'pf-client-id', label: 'PingFederate exchange client id', modes: ['pf-as', 'pf-pf'] },
-  { key: 'PF_EXCHANGE_CLIENT_SECRET', secret: true, label: 'PingFederate exchange client secret', modes: ['pf-as', 'pf-pf'] },
-  { key: 'PF_ADMIN_URL', flag: 'pf-admin-url', label: 'PingFederate admin URL (blank to skip the admin checks)', modes: ['pf-as', 'pf-pf'] },
-  { key: 'PF_ADMIN_PASSWORD', secret: true, label: 'PingFederate admin password', modes: ['pf-as', 'pf-pf'], when: (v) => v.PF_ADMIN_URL },
-  { key: 'ACME_EXCHANGE_CLIENT_ID', flag: 'acme-client-id', label: 'Acme PingFederate exchange client id', modes: ['pf-pf'] },
-  { key: 'ACME_EXCHANGE_CLIENT_SECRET', secret: true, label: 'Acme PingFederate exchange client secret', modes: ['pf-pf'] },
+  { key: 'PF_URL', flag: 'pf-url', label: 'PingFederate base URL', modes: ['pf-as', 'byo'] },
+  { key: 'PF_EXCHANGE_CLIENT_ID', flag: 'pf-client-id', label: 'PingFederate exchange client id', modes: ['pf-as'] },
+  { key: 'PF_EXCHANGE_CLIENT_SECRET', secret: true, label: 'PingFederate exchange client secret', modes: ['pf-as'] },
+  { key: 'PF_ADMIN_URL', flag: 'pf-admin-url', label: 'PingFederate admin URL (blank to skip the admin checks)', modes: ['pf-as'] },
+  { key: 'PF_ADMIN_PASSWORD', secret: true, label: 'PingFederate admin password', modes: ['pf-as'], when: (v) => v.PF_ADMIN_URL },
 ];
 
 // Where `npm start -w resource-as` and `-w mcp-sample` listen, for npm runs (compose sets its own).
@@ -58,7 +58,7 @@ export async function checkDockerContext(exec) {
   return `Docker context is "${ctx}", not "orbstack". This kit runs on OrbStack, not Docker Desktop. Switch with: docker context use orbstack`;
 }
 
-export async function runSetup({ argv = [], env = {}, root, home = env.HOME, io, fs, exec, rand = (n) => crypto.randomBytes(n).toString('hex') }) {
+export async function runSetup({ argv = [], env = {}, root, home = env.HOME, io, fs, exec, rand = (n) => crypto.randomBytes(n).toString('hex'), check }) {
   const flags = parseArgs(argv);
   const yes = flags.yes === true;
   const envFile = path.join(root, '.env');
@@ -66,7 +66,8 @@ export async function runSetup({ argv = [], env = {}, root, home = env.HOME, io,
 
   const mode = flags.mode ?? (yes ? 'mock' : await io.ask(`Mode to configure (${SETUP_MODES.join(', ')})`, 'mock'));
   if (!SETUP_MODES.includes(mode)) { io.err(`unknown mode ${mode}; use one of ${SETUP_MODES.join(', ')}`); return { code: 2 }; }
-  if (mode === 'pf-local') return runPfLocal({ flags, yes, env, root, home, io, fs, exec, rand });
+  if (mode === 'pf-local') return runPfLocal({ flags, yes, env, root, home, io, fs, exec, rand, check });
+  if (mode === 'pf-pf') return runPfPf({ flags, env, root, home, io, fs, exec });
 
   if (fs.existsSync(envFile) && flags.force !== true) {
     io.err('.env already exists; not touching it. Rerun with --force to replace it (the old one is saved as .env.bak.<n>).');
