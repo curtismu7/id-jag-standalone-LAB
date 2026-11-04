@@ -30,10 +30,10 @@ router.get('/state', (req, res) => {
   const live = mock ? null : (() => {
     const ep = liveEndpoints(config());
     return {
-      exchange: { TokenURL: ep.exchange.TokenURL, ClientID: ep.exchange.ClientID, Resource: ep.exchange.Resource },
+      exchange: { TokenURL: ep.exchange.TokenURL, ClientID: ep.exchange.ClientID, Audience: ep.exchange.Audience, Resource: ep.exchange.Resource },
       redeem: { TokenURL: ep.redeem.TokenURL, ClientID: ep.redeem.ClientID },
       missing: ep.missing({ pfExchangeClientSecret: secret('PF_EXCHANGE_CLIENT_SECRET'), resourceAsClientSecret: secret('RESOURCE_AS_CLIENT_SECRET') }),
-      signedIn: !!getIssuerSubjectToken(req, 'pf-as'),
+      signedIn: !!(getIssuerSubjectToken(req, 'aws-agentcore') || getIssuerSubjectToken(req, 'pf-as')),
       runtime: { deployed: false, reason: LIVE_RUNTIME_MISSING },
     };
   })();
@@ -64,7 +64,9 @@ router.post('/run-live', async (req, res) => {
   if (req.body?.subject_token !== undefined) {
     return res.status(400).json({ error: 'invalid_request', message: 'The subject token comes from your pf-as sign-in session, never from the request body.' });
   }
-  const subjectToken = getIssuerSubjectToken(req, 'pf-as');
+  // This mode's issuer sign-in stores its session under this mode's name; read it under either name so a pf-as
+  // sign-in and an aws-agentcore sign-in both work.
+  const subjectToken = getIssuerSubjectToken(req, 'aws-agentcore') || getIssuerSubjectToken(req, 'pf-as');
   try {
     return reply(req, res, 200, await liveRun({ subjectToken, scopeOverride: typeof req.body?.scope === 'string' ? req.body.scope : undefined }));
   } catch {

@@ -247,7 +247,7 @@ export default function AgentCorePanel() {
           <strong>Live: legs 1 and 2 run for real; the runtime hop refuses.</strong>{" "}
           {state.live && (
             <>
-              Leg 1 exchanges your pf-as issuer session's refresh token at <code>{state.live.exchange.TokenURL || "(PF_URL unset)"}</code> (client <code>{state.live.exchange.ClientID || "(unset)"}</code>);
+              Leg 1 exchanges your pf-as issuer session's refresh token at <code>{state.live.exchange.TokenURL || "(PF_URL unset)"}</code> (client <code>{state.live.exchange.ClientID || "(unset)"}</code>, ID-JAG aud <code>{state.live.exchange.Audience || "(RESOURCE_AS_ISSUER unset)"}</code>);
               leg 2 redeems the ID-JAG at the kit's resource-as <code>{state.live.redeem.TokenURL || "(unset)"}</code> (client <code>{state.live.redeem.ClientID || "(unset)"}</code>).
               {state.live.missing.length > 0 && <> Still missing: <strong>{state.live.missing.join(", ")}</strong>.</>}
               {state.live.runtime && <> Runtime: {state.live.runtime.reason}</>}
