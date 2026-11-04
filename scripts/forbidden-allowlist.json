@@ -8,6 +8,10 @@
     {
       "host": "pf-acme.example.invalid",
       "reason": "Placeholder default ACME_PF_URL in server/src/config.js and .env.example. Replace it with your own outside-company PingFederate host in your local .env."
+    },
+    {
+      "host": "local.ping-devops.com",
+      "reason": "Comment in deploy/docker-compose.yml only (live-PF wiring, PR #20): documents that extra_hosts resolves the host's dev-loopback origin to the host gateway so the container can reach the owner's local PingFederate. No config default uses it; the real PF_URL comes from the untracked .env."
     }
   ],
   "uuids": []
