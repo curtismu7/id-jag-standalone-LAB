@@ -80,7 +80,12 @@ kill_port "$port_server"; kill_port "$port_ras"; kill_port "$port_mcp"
 # shellcheck disable=SC1091
 set -a; source "$env_file"; set +a
 
-export MODE=live PORT="$port_ras" ISSUER="http://localhost:$port_ras" DATA_DIR="$root/.data-resource-as"
+# Which resource-as redeems the ID-JAGs: the SE-hosted one (SE_RESOURCE_AS_ISSUER in .env) or a
+# local one. The server's settings win from the environment either way.
+ras_issuer="${SE_RESOURCE_AS_ISSUER:-http://localhost:$port_ras}"
+idjag_resource="${SE_ID_JAG_RESOURCE:-http://localhost:$port_mcp/mcp}"
+
+export MODE=live PORT="$port_ras" ISSUER="${SE_RESOURCE_AS_ISSUER:+http://localhost:$port_ras}" DATA_DIR="$root/.data-resource-as"
 export RESOURCE_AS_CLIENT_ID="${RESOURCE_AS_CLIENT_ID:-id-jag-playground}"
 nohup node "$root/resource-as/src/index.js" >"/tmp/idjag-dev-ras.log" 2>&1 &
 echo $! >"/tmp/idjag-dev-ras.pid"
@@ -90,9 +95,9 @@ nohup node "$root/mcp-sample/src/index.js" >"/tmp/idjag-dev-mcp.log" 2>&1 &
 echo $! >"/tmp/idjag-dev-mcp.pid"
 
 export PORT="$port_server" APP_ORIGIN="http://localhost:$port_server" \
-  RESOURCE_AS_ISSUER="http://localhost:$port_ras" \
-  RESOURCE_AS_TOKEN_ENDPOINT="http://localhost:$port_ras/token" \
-  ID_JAG_RESOURCE="http://localhost:$port_mcp/mcp" MCP_URL="http://localhost:$port_mcp/mcp"
+  RESOURCE_AS_ISSUER="$ras_issuer" \
+  RESOURCE_AS_TOKEN_ENDPOINT="$ras_issuer/token" \
+  ID_JAG_RESOURCE="$idjag_resource" MCP_URL="http://localhost:$port_mcp/mcp"
 npm --prefix "$root" start >"/tmp/idjag-dev-server.log" 2>&1 &
 echo $! >"/tmp/idjag-dev-server.pid"
 

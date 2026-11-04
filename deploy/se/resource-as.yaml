@@ -1,0 +1,96 @@
+# The AgentCore leg's redemption host: the kit's resource-as on the SE cluster, served at
+# https://<ras-host>.ping-demo.example.invalid/resource-as (path-rewritten to the container root).
+# The issuer string (with the /resource-as path) is what the ID-JAG's audience and the access
+# token's iss claim carry, and what AgentCore's customJWTAuthorizer discovers JWKS from.
+#
+# kubectl apply -n <k8s-namespace> --context ping-dev-aws-us-east-2-oidc -f deploy/se/resource-as.yaml
+#
+# Secrets: create RESOURCE_AS_CLIENT_SECRET before applying (the playground server and the
+# resource-as must share one value; the runtime leg's client auth is a plain comparison):
+#   kubectl -n <k8s-namespace> create secret generic id-jag-resource-as-secrets \
+#     --from-literal=RESOURCE_AS_CLIENT_SECRET="$(openssl rand -hex 24)"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: id-jag-resource-as
+  labels: { app: id-jag-resource-as }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: id-jag-resource-as } }
+  template:
+    metadata:
+      labels: { app: id-jag-resource-as }
+    spec:
+      containers:
+        - name: resource-as
+          image: ghcr.io/ping-sandbox/id-jag-resource-as:sha-a9d7cd7
+          ports: [{ name: http, containerPort: 8080 }]
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "8080"
+            - name: MODE
+              value: live
+            - name: ISSUER
+              value: https://<ras-host>.ping-demo.example.invalid/resource-as
+            - name: RESOURCE_AS_CLIENT_ID
+              value: id-jag-playground
+            - name: RESOURCE_AS_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: id-jag-resource-as-secrets, key: RESOURCE_AS_CLIENT_SECRET } }
+            - name: ACCEPTED_RESOURCES
+              value: https://<ras-host>.ping-demo.example.invalid/mcp
+            - name: TRUSTED_IDPS_FILE
+              value: /config/trusted-idps.json
+            - name: DATA_DIR
+              value: /data
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: trusted-idps, mountPath: /config, readOnly: true }
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /jwks, port: http }
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet: { path: /jwks, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - { name: data, emptyDir: { sizeLimit: 16Mi } }
+        - { name: trusted-idps, configMap: { name: id-jag-resource-as-trusted-idps } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: id-jag-resource-as
+  labels: { app: id-jag-resource-as }
+spec:
+  selector: { app: id-jag-resource-as }
+  ports: [{ name: http, port: 80, targetPort: http }]
+---
+# Path route on the existing id-jag host. The rewrite strips /resource-as, so the container
+# serves its root routes (/token, /jwks, /.well-known/...) while the public issuer keeps the
+# path. Nginx capture group: /resource-as(/|$)(.*) -> /$2.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: id-jag-resource-as
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx-public
+  rules:
+    - host: <ras-host>.ping-demo.example.invalid
+      http:
+        paths:
+          - path: /resource-as(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: id-jag-resource-as
+                port: { name: http }
