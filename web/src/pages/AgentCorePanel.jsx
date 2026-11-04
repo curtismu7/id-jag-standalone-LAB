@@ -268,7 +268,14 @@ export default function AgentCorePanel() {
           <span className="ijp-cite">User {state.cast.user} · agent client {state.cast.callerClient} · runtime {available ? state.cast.runtime : "the live runtime (not deployed yet)"}</span>
         </div>
         {error && <div className="ijp-banner ijp-banner--error" role="alert">{error}</div>}
-        {run && <Verdict run={run} />}
+        {run && run.verdict && <Verdict run={run} />}
+        {run?.live && (
+          <p className="ijp-status" data-state={run.redeemed ? "ok" : "bad"} data-testid="ac-live-result">
+            Live run: {run.redeemed
+              ? "leg 1 issued a real ID-JAG and leg 2 redeemed it for real (both decoded below); the runtime hop refused, so the redeemed access token was discarded."
+              : `refused at ${run.refusal?.stage ?? "?"} (${run.refusal?.error ?? "unknown"}).`}
+          </p>
+        )}
         {run?.callerToken && <details className="agentcore__hop"><summary>The caller token (mock-issued, shown raw)</summary><Json value={run.callerToken.decoded} /></details>}
       </Section>
 
