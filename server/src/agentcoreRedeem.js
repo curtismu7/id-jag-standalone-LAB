@@ -11,6 +11,7 @@ import { API_AUDIENCE, AUTH_METHODS, CALLER_CLIENT_ID, CALLER_USER, RUNTIME_TOOL
 import { runWith } from './mock/gatewayWorld.js';
 import { ORIGINS } from './mock/env.js';
 import { ID_JAG_TYP } from './mock/pf.js';
+import { config, secret } from './config.js';
 import { outboundFetch } from './outbound.js';
 import { decodeJwt } from './tokenChecks.js';
 import { childTraceparent, newTraceparent } from './trace/traceparent.js';
@@ -231,6 +232,8 @@ async function invokeRuntime(ctx, { url, token }) {
 }
 
 const view = (token) => { const d = decodeJwt(token); return d ? { header: d.header, claims: d.claims } : null; };
+/** Live answers never carry a token: a decodeable JWT becomes its decoded view, anything else a placeholder. */
+const shownLiveToken = (token) => (decodeJwt(token) ? { decoded: view(token) } : '[token, kept server-side]');
 const oauthRefusal = (stage, r, check) => ({ stage, kind: 'oauth', status: r.status, error: r.data?.error ?? `http_${r.status}`, description: String(r.data?.error_description ?? '').slice(0, 280), ...(check ? { check } : {}) });
 
 /**
@@ -401,5 +404,115 @@ export async function redeemOnly(ctx, spec, assertion, out = {}) {
   }
   return r2.data.access_token;
 }
+
+// ---- The live run: real PingFederate and resource-as, mock runtime ---------------------------------------------------------
+
+/**
+ * What live mode uses for each hop. Legs 1 and 2 are the pf-as mode's real servers, driven by the same settings:
+ * leg 1 exchanges the pf-as issuer session's refresh token at PF_URL (the pf-exchange client), leg 2 redeems the
+ * ID-JAG at the kit's resource-as (the resource-as client). The runtime hop stays the mock until a real AgentCore
+ * runtime is deployed: live runs answer 409 until then, so nothing here can run without one.
+ */
+export function liveEndpoints(c) {
+  return {
+    exchange: {
+      TokenURL: c.pfUrl ? `${c.pfUrl}/as/token.oauth2` : '',
+      ClientID: c.pfExchangeClientId,
+      Resource: c.resourceAsIssuer, // the ID-JAG is addressed to the resource AS, which redeems it
+    },
+    redeem: {
+      TokenURL: c.resourceAsTokenEndpoint,
+      ClientID: c.resourceAsClientId,
+    },
+    runtime: null, // no live runtime yet: the routes refuse a live run
+    /** The settings a live run needs, in the order to set them. */
+    missing: (secrets) => [
+      ['PF_URL', c.pfUrl], ['PF_EXCHANGE_CLIENT_ID', c.pfExchangeClientId],
+      ['PF_EXCHANGE_CLIENT_SECRET', secrets.pfExchangeClientSecret],
+      ['RESOURCE_AS_ISSUER', c.resourceAsIssuer], ['RESOURCE_AS_CLIENT_SECRET', secrets.resourceAsClientSecret],
+    ].filter(([, v]) => !v).map(([k]) => k),
+  };
+}
+
+/**
+ * One live run: the pf-as issuer session's refresh token is exchanged at PingFederate for an ID-JAG (leg 1, real),
+ * the ID-JAG is redeemed at the kit's resource-as (leg 2, real), and the runtime hop REFUSES: there is no live
+ * AgentCore runtime yet, so the run stops after leg 2 with a 409-shaped refusal. Real tokens never reach the browser:
+ * the answer carries decoded views and redacted requests only.
+ *   subjectToken  the pf-as issuer session's refresh token (from getIssuerSubjectToken(req, 'pf-as'))
+ *   scopeOverride scope to ask for at both hops; empty means the server's configured ID_JAG_SCOPE
+ * Returns the same shape the mock's agentCoreCall returns, plus `live: true` and `stopReason`.
+ */
+export async function liveRun({ subjectToken, scopeOverride }) {
+  const c = config();
+  const ep = liveEndpoints(c);
+  const scope = scopeOverride || c.scope || '';
+  const out = { live: true, stage: 'leg1', leg1: null, leg2: null, redeemed: false, refusal: null, runtime: null, backendToken: null,
+    stopReason: LIVE_RUNTIME_MISSING, endpoints: { exchange: { ...ep.exchange, TokenURL: ep.exchange.TokenURL }, redeem: { ...ep.redeem } } };
+
+  if (!subjectToken) {
+    out.refusal = { stage: 'leg1', kind: 'session', error: 'sign_in_required', description: 'Sign in at PingFederate first: the pf-as issuer session holds the refresh token this run exchanges.' };
+    return out;
+  }
+
+  // Leg 1: RFC 8693 exchange at PingFederate. Same request shape as the mock leg, sent to the real endpoint.
+  const f1 = new URLSearchParams({
+    grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+    subject_token: subjectToken, subject_token_type: 'urn:ietf:params:oauth:token-type:refresh_token',
+    requested_token_type: 'urn:ietf:params:oauth:token-type:id-jag',
+  });
+  if (ep.exchange.Resource) f1.set('resource', ep.exchange.Resource);
+  if (scope) f1.set('scope', scope);
+  const hop1 = { n: 1, label: 'Leg 1: exchange the pf-as session refresh token for an ID-JAG (RFC 8693, real PingFederate)', from: 'runner', to: 'PingFederate', method: 'POST', url: ep.exchange.TokenURL,
+    request: { authentication: 'Basic [client credentials, from settings, never shown]', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { grant_type: f1.get('grant_type'), subject_token: '[your pf-as session refresh token, never sent to the browser]', subject_token_type: f1.get('subject_token_type'),
+        requested_token_type: f1.get('requested_token_type'), resource: ep.exchange.Resource, scope, client_id: ep.exchange.ClientID } } };
+  const auth1 = `Basic ${Buffer.from(`${ep.exchange.ClientID}:${secret('PF_EXCHANGE_CLIENT_SECRET')}`).toString('base64')}`;
+  let r1;
+  try {
+    const res = await outboundFetch(ep.exchange.TokenURL, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000), body: f1.toString(),
+      headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json', authorization: auth1 } });
+    hop1.status = res.status;
+    hop1.response = await res.json().catch(() => ({}));
+    r1 = { status: res.status, data: hop1.response };
+  } catch (err) {
+    out.refusal = { stage: 'leg1', kind: 'network', error: 'network', description: `Could not reach ${ep.exchange.TokenURL} (${String(err.cause?.code || err.message).slice(0, 120)})` };
+    return out;
+  }
+  if (r1.status !== 200 || !r1.data.access_token) { out.refusal = oauthRefusal('leg1', r1); return out; }
+  const idJag = r1.data.access_token;
+  out.leg1 = { issuedTokenType: r1.data.issued_token_type, decoded: view(idJag), isIdJag: view(idJag)?.header?.typ === ID_JAG_TYP };
+  out.stage = 'leg2';
+
+  // Leg 2: RFC 7523 redemption at the kit's resource-as.
+  const f2 = new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: idJag, client_id: ep.redeem.ClientID });
+  if (scope) f2.set('scope', scope);
+  const hop2 = { n: 2, label: "Leg 2: redeem the ID-JAG at the kit's resource-as (RFC 7523, real)", from: 'runner', to: 'resource-as', method: 'POST', url: ep.redeem.TokenURL,
+    request: { authentication: 'Basic [client credentials, from settings, never shown]', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: { grant_type: f2.get('grant_type'), assertion: shownLiveToken(idJag), client_id: ep.redeem.ClientID, scope } } };
+  const auth2 = `Basic ${Buffer.from(`${ep.redeem.ClientID}:${secret('RESOURCE_AS_CLIENT_SECRET')}`).toString('base64')}`;
+  let r2;
+  try {
+    const res = await outboundFetch(ep.redeem.TokenURL, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000), body: f2.toString(),
+      headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json', authorization: auth2 } });
+    hop2.status = res.status;
+    hop2.response = await res.json().catch(() => ({}));
+    r2 = { status: res.status, data: hop2.response };
+  } catch (err) {
+    out.refusal = { stage: 'leg2', kind: 'network', error: 'network', description: `Could not reach ${ep.redeem.TokenURL} (${String(err.cause?.code || err.message).slice(0, 120)})` };
+    return out;
+  }
+  if (r2.status !== 200 || !r2.data.access_token) { out.refusal = oauthRefusal('leg2', r2); return out; }
+  out.redeemed = true;
+  out.leg2 = { decoded: view(r2.data.access_token), scope: r2.data.scope };
+
+  // The runtime hop refuses: no live AgentCore runtime exists yet. The redeemed token is never used.
+  out.stage = 'runtime';
+  out.refusal = { stage: 'runtime', kind: 'not_deployed', error: 'runtime_not_deployed', status: 409, description: LIVE_RUNTIME_MISSING };
+  return out;
+}
+
+export const LIVE_RUNTIME_MISSING = 'No live AgentCore runtime is deployed yet (owner-run setup), so the runner stops here: legs 1 and 2 ran for real, the redeemed access token is discarded, and the runtime hop refuses.';
+
 
 export { CALLER_CLIENT_ID, CALLER_USER, API_AUDIENCE, SCOPES };

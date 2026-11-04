@@ -209,6 +209,14 @@ export default function AgentCorePanel() {
       return data;
     } catch (e) { setError(errText(e)); return null; } finally { setBusy(""); }
   };
+  const runLive = async () => {
+    setBusy("run-live"); setError(null);
+    try {
+      const { data } = await api.post(`${BASE}/run-live`, {});
+      setRun(data);
+      return data;
+    } catch (e) { setError(errText(e)); return null; } finally { setBusy(""); }
+  };
   const runAll = async () => {
     for (const s of state.scenarios) { if (!(await runScenario(s.id))) break; }
   };
@@ -235,8 +243,17 @@ export default function AgentCorePanel() {
         <strong>A lab simulation of the AWS side.</strong> No AWS service is called and nothing here is a product test of AgentCore: the runtime, its workload identity and the tool are mocks inside this app. The ID-JAG hops are the same RFC 8693 and RFC 7523 shapes the live modes use.
       </div>
       {!available && (
-        <div className="ijp-banner ijp-banner--error" role="alert" data-testid="ac-live-unavailable">
-          <strong>Live is unavailable for this leg.</strong> {state.reason} Switch the header toggle to Mock to run it.
+        <div className="ijp-banner" role="note" data-testid="ac-live-note">
+          <strong>Live: legs 1 and 2 run for real; the runtime hop refuses.</strong>{" "}
+          {state.live && (
+            <>
+              Leg 1 exchanges your pf-as issuer session's refresh token at <code>{state.live.exchange.TokenURL || "(PF_URL unset)"}</code> (client <code>{state.live.exchange.ClientID || "(unset)"}</code>);
+              leg 2 redeems the ID-JAG at the kit's resource-as <code>{state.live.redeem.TokenURL || "(unset)"}</code> (client <code>{state.live.redeem.ClientID || "(unset)"}</code>).
+              {state.live.missing.length > 0 && <> Still missing: <strong>{state.live.missing.join(", ")}</strong>.</>}
+              {state.live.runtime && <> Runtime: {state.live.runtime.reason}</>}
+              {!state.live.signedIn && state.live.missing.length === 0 && <> Sign in at PingFederate first (step 1 of this page uses the pf-as sign-in).</>}
+            </>
+          )}
         </div>
       )}
       <p className="ijp-note" data-testid="ac-legend">
@@ -244,10 +261,11 @@ export default function AgentCorePanel() {
         {" "}<Tag title="made up for this lab">lab-invented</Tag> = made up for the lab (the cast, the scenarios, the allow-list, the workload identity, the mock hosts).
       </p>
 
-      <Section n={1} title="The agent hands its caller token to the runner" note="The mock exchange issuer signs the agent in as the user and issued the caller token. The runner starts from it and never sees the user's session.">
+      <Section n={1} title="The agent hands its caller token to the runner" note={available ? "The mock exchange issuer signs the agent in as the user and issued the caller token. The runner starts from it and never sees the user's session." : "Live: the runner starts from your pf-as issuer session's refresh token — the same sign-in the PingFederate → resource AS mode uses. Sign in there (or in this mode's step 1), then run live."}>
         <div className="agentcore__bar">
-          <button type="button" className="ijp-btn ijp-btn--primary" disabled={off} onClick={() => runScenario("happy")} data-testid="ac-run-happy">{busy === "run-happy" ? "Running…" : "Run all three hops"}</button>
-          <span className="ijp-cite">User {state.cast.user} · agent client {state.cast.callerClient} · runtime {state.cast.runtime}</span>
+          {available && <button type="button" className="ijp-btn ijp-btn--primary" disabled={off} onClick={() => runScenario("happy")} data-testid="ac-run-happy">{busy === "run-happy" ? "Running…" : "Run all three hops"}</button>}
+          {!available && <button type="button" className="ijp-btn ijp-btn--primary" disabled={!!busy || !state?.live || state.live.missing.length > 0} onClick={runLive} data-testid="ac-run-live">{busy === "run-live" ? "Running…" : "Run live legs 1-2"}</button>}
+          <span className="ijp-cite">User {state.cast.user} · agent client {state.cast.callerClient} · runtime {available ? state.cast.runtime : "the live runtime (not deployed yet)"}</span>
         </div>
         {error && <div className="ijp-banner ijp-banner--error" role="alert">{error}</div>}
         {run && <Verdict run={run} />}
@@ -268,7 +286,7 @@ export default function AgentCorePanel() {
               <div><h4>Request</h4><Json value={hops.one.request} /></div>
               <div><h4>Response</h4><Json value={hops.one.response ?? (hops.one.blocked ? { blocked: hops.one.blocked } : null)} /></div>
             </div>
-            {run.leg1 && <><h4>The ID-JAG, decoded <span className="ijp-cite">(mock-issued, issued_token_type {run.leg1.issuedTokenType}{run.leg1.isIdJag ? ", typ oauth-id-jag+jwt" : ", NOT an ID-JAG"})</span></h4><Json value={run.leg1.decoded} /></>}
+            {run.leg1 && <><h4>The ID-JAG, decoded <span className="ijp-cite">({run.live ? "real PingFederate, " : "mock-issued, "}issued_token_type {run.leg1.issuedTokenType}{run.leg1.isIdJag ? ", typ oauth-id-jag+jwt" : ", NOT an ID-JAG"})</span></h4><Json value={run.leg1.decoded} /></>}
           </div>
         )}
         {refusal(refusalAt("leg1"))}
@@ -299,7 +317,7 @@ export default function AgentCorePanel() {
               <div><h4>Request</h4><Json value={hops.two.request} /></div>
               <div><h4>Response</h4><Json value={hops.two.response ?? (hops.two.blocked ? { blocked: hops.two.blocked } : null)} /></div>
             </div>
-            {run.leg2 && <><h4>The runtime's access token, decoded <span className="ijp-cite">(minted by the AgentCore target issuer)</span></h4><Json value={run.leg2.decoded} /></>}
+            {run.leg2 && <><h4>The runtime's access token, decoded <span className="ijp-cite">({run.live ? "minted by the kit's resource-as (real)" : "minted by the AgentCore target issuer"})</span></h4><Json value={run.leg2.decoded} /></>}
           </div>
         )}
         {refusal(refusalAt("leg2"))}
@@ -314,16 +332,23 @@ export default function AgentCorePanel() {
         )}
       </Section>
 
-      <Section n={4} title="The runtime runs the tool under the workload identity" note="The runner invokes the mock runtime with the access token the target issuer minted. The runtime verifies it against its own issuer's keys and resolves the workload identity (wid).">
+      <Section n={4} title="The runtime runs the tool under the workload identity" note={available ? "The runner invokes the mock runtime with the access token the target issuer minted. The runtime verifies it against its own issuer's keys and resolves the workload identity (wid)." : "Live: this hop refuses. No live AgentCore runtime is deployed yet, so the runner discards the redeemed access token and stops here."}>
         {run?.runtime ? (
           <div className="agentcore__result" data-testid="ac-runtime">
             <p className="ijp-status" data-state={run.runtime.status === 200 ? "ok" : "bad"}>The runtime answered {run.runtime.status}{run.runtime.body?.principal ? `: it sees ${run.runtime.body.principal.sub}${run.runtime.body.principal.act ? `, acting for ${run.runtime.body.principal.act.sub}` : ""}` : ""}{run.runtime.body?.workloadIdentity ? ` · workload identity ${run.runtime.body.workloadIdentity}` : ""}.</p>
             <Json value={run.runtime.body} />
           </div>
-        ) : <p className="ijp-note">Run all three hops to see the runtime's answer.</p>}
+        ) : run?.live ? <p className="ijp-note" data-testid="ac-live-runtime-note">The live run stops here: {run.refusal?.description || "no live runtime is deployed yet"}.</p> : <p className="ijp-note">Run all three hops to see the runtime's answer.</p>}
         {refusal(refusalAt("runtime"))}
       </Section>
 
+      {!available && (
+        <Section n={5} title="Live: what a run proves, and what it cannot yet" note="Live mode has no mock scenarios: the mock-only scenarios below are hidden.">
+          <p className="ijp-note">A live run proves: PingFederate issued an ID-JAG from your pf-as session (leg 1), and the kit's resource-as redeemed it and minted an access token (leg 2) — both shown decoded, real tokens never leaving the server. It cannot yet prove the runtime hop: no live AgentCore runtime is deployed, so the redeemed token is discarded and the run answers a refusal at stage <code>runtime</code>.</p>
+        </Section>
+      )}
+
+      {available && (
       <Section n={5} title="What the runtime refuses, and the scenarios" note="Each scenario breaks one thing and shows the stage and the check that refused it. The verdict compares what was expected with what the run did.">
         {run?.controls?.length > 0 && (
           <div className="agentcore__result" data-testid="ac-controls">
@@ -367,6 +392,7 @@ export default function AgentCorePanel() {
         </details>
         <p className="ijp-cite">Allow-list (lab-invented): {state.allowList.map((o) => new URL(o).host).join(", ")}. Anything else is refused before a request is made.</p>
       </Section>
+      )}
     </div>
   );
 }

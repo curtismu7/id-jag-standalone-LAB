@@ -9,11 +9,13 @@
 // ClientSecret is write-only: every answer goes through scrub(), which removes any stored or just-typed value.
 
 import express from 'express';
-import { CALLER_CLIENT_ID, CALLER_USER, CLAIMS, FIELD_PATHS, LIVE_UNAVAILABLE, SCENARIOS, WRITE_ONLY, AUTH_METHODS, TOKEN_TYPES, API_AUDIENCE, SCOPES,
-  applyPatch, getSpec, maskSpec, resetAgentCore, runScenario, scenarioList, scrub, secretsIn, setSpec } from './agentcoreRedeem.js';
+import { CALLER_CLIENT_ID, CALLER_USER, CLAIMS, FIELD_PATHS, LIVE_RUNTIME_MISSING, LIVE_UNAVAILABLE, SCENARIOS, WRITE_ONLY, AUTH_METHODS, TOKEN_TYPES, API_AUDIENCE, SCOPES,
+  applyPatch, getSpec, liveEndpoints, liveRun, maskSpec, resetAgentCore, runScenario, scenarioList, scrub, secretsIn, setSpec } from './agentcoreRedeem.js';
 import { isMock } from './mode.js';
 import { agentCoreWorld } from './mock/index.js';
 import { ORIGINS } from './mock/env.js';
+import { getIssuerSubjectToken } from './issuerSession.js';
+import { config, secret } from './config.js';
 import { currentWorkspace } from './workspace.js';
 
 const router = express.Router();
@@ -23,10 +25,23 @@ const reply = (req, res, status, body) => res.status(status).json(scrub(body, se
 
 router.get('/state', (req, res) => {
   const world = agentCoreWorld();
+  const mock = isMock();
+  // Live: what the real legs would use, and what is still missing. Never a secret: only whether each is set.
+  const live = mock ? null : (() => {
+    const ep = liveEndpoints(config());
+    return {
+      exchange: { TokenURL: ep.exchange.TokenURL, ClientID: ep.exchange.ClientID, Resource: ep.exchange.Resource },
+      redeem: { TokenURL: ep.redeem.TokenURL, ClientID: ep.redeem.ClientID },
+      missing: ep.missing({ pfExchangeClientSecret: secret('PF_EXCHANGE_CLIENT_SECRET'), resourceAsClientSecret: secret('RESOURCE_AS_CLIENT_SECRET') }),
+      signedIn: !!getIssuerSubjectToken(req, 'pf-as'),
+      runtime: { deployed: false, reason: LIVE_RUNTIME_MISSING },
+    };
+  })();
   return reply(req, res, 200, {
-    available: isMock(),
-    simulated: true,
-    reason: isMock() ? null : LIVE_UNAVAILABLE,
+    available: mock,
+    simulated: mock,
+    reason: mock ? null : LIVE_UNAVAILABLE,
+    live,
     spec: maskSpec(getSpec(currentWorkspace())),
     writeOnly: WRITE_ONLY,
     authMethods: AUTH_METHODS,
@@ -38,6 +53,23 @@ router.get('/state', (req, res) => {
     scenarios: scenarioList(),
     claims: CLAIMS,
   });
+});
+
+// The live run: real legs 1-2 (PingFederate, the kit's resource-as), the runtime hop refuses. Mock-only routes stay
+// guarded below; this route is deliberately before that guard.
+router.post('/run-live', async (req, res) => {
+  if (isMock()) return res.status(409).json({ error: 'mock_mode', message: 'Mock mode already runs everything in-process: POST /run instead. /run-live is the live legs.' });
+  // The subject token is the pf-as issuer session's refresh token: the same sign-in the pf-as mode uses. The body
+  // carries only the scope choice; a caller-supplied subject token is refused, so real tokens stay in the session.
+  if (req.body?.subject_token !== undefined) {
+    return res.status(400).json({ error: 'invalid_request', message: 'The subject token comes from your pf-as sign-in session, never from the request body.' });
+  }
+  const subjectToken = getIssuerSubjectToken(req, 'pf-as');
+  try {
+    return reply(req, res, 200, await liveRun({ subjectToken, scopeOverride: typeof req.body?.scope === 'string' ? req.body.scope : undefined }));
+  } catch {
+    return res.status(502).json({ error: 'live_run_failed', message: 'The live run failed before it could answer.' });
+  }
 });
 
 // Everything below runs only against the mock.
