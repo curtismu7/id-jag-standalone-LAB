@@ -1,0 +1,33 @@
+/* AWS AgentCore panel. Layout and component rules only: colours come from the shared tokens, state from data-state. */
+.agentcore { min-width: 0; }
+.agentcore__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin: 0.5rem 0; }
+.agentcore__tag { display: inline-block; margin-left: 0.4rem; padding: 0 0.45rem; border: 1px solid var(--border); border-radius: 999px; font-size: var(--font-size-3xs); font-weight: 700; letter-spacing: 0.03em; color: var(--muted); }
+.agentcore__fieldset { margin: 0.75rem 0; padding: 0.6rem 0.8rem; border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+.agentcore__fieldset legend { padding: 0 0.3rem; font-size: var(--font-size-xs); font-weight: 700; }
+.agentcore__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.6rem 1rem; }
+.agentcore__field { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; font-size: var(--font-size-xs); }
+.agentcore__field input, .agentcore__field select { min-width: 0; width: 100%; box-sizing: border-box; }
+.agentcore__field .ijp-check input { width: auto; flex: none; }
+.agentcore__name { font-weight: 700; overflow-wrap: anywhere; }
+.agentcore__verdict { margin: 0.6rem 0; padding: 0.6rem 0.9rem; border: 1px solid var(--border); border-left-width: 5px; border-radius: 8px; background: var(--surface-2); }
+.agentcore__verdict[data-state="ok"] { border-left-color: var(--status-ok); }
+.agentcore__verdict[data-state="bad"] { border-left-color: var(--accent); }
+.agentcore__table { width: 100%; margin-top: 0.4rem; border-collapse: collapse; font-size: var(--font-size-2xs); }
+.agentcore__table th, .agentcore__table td { padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.agentcore__table tr[data-state="bad"] td { background: var(--accent-soft); }
+.agentcore__result { margin-top: 0.75rem; padding: 0.6rem 0.8rem; border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 8px; background: var(--surface); }
+.agentcore__result h3, .agentcore__result h4 { margin: 0.3rem 0; font-size: var(--font-size-xs); }
+.agentcore__hop { margin: 0.4rem 0; padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 8px; }
+.agentcore__hop[data-state="bad"] { border-left: 5px solid var(--accent); }
+.agentcore__hop summary { cursor: pointer; font-weight: 600; overflow-wrap: anywhere; }
+.agentcore__n { display: inline-flex; width: 1.4rem; height: 1.4rem; align-items: center; justify-content: center; border-radius: 50%; background: var(--accent-gradient); color: var(--on-accent); font-size: var(--font-size-2xs); font-weight: 700; }
+.agentcore__trace { margin: 0.75rem 0; }
+.agentcore__trace > summary { cursor: pointer; font-weight: 700; }
+.agentcore .ijp-negatives li[data-state="ok"] { border-left: 5px solid var(--status-ok); }
+.agentcore .ijp-negatives li[data-state="bad"] { border-left: 5px solid var(--accent); }
+.agentcore .ijp-status[data-state="ok"] { color: var(--status-ok); }
+.agentcore .ijp-status[data-state="bad"] { color: var(--danger-text); }
+
+@media (max-width: 600px) {
+  .agentcore__grid { grid-template-columns: minmax(0, 1fr); }
+}

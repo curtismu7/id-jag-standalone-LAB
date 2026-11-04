@@ -568,6 +568,12 @@
   ],
   "diagrams": [
     {
+      "id": "flow-aws-agentcore",
+      "label": "ID-JAG to the (mock) AgentCore runtime diagram",
+      "href": "/diagram/aws-agentcore",
+      "mode": "aws-agentcore"
+    },
+    {
       "id": "flow-byo",
       "label": "Your IdP → our resource AS diagram",
       "href": "/diagram/byo",

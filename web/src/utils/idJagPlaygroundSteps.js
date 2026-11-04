@@ -7,4 +7,5 @@ export const MODE_STEPS = {
   "pf-pf": [1, 2, 3, 4, 5, 6],
   byo: [1, 2, 3, 4, 5],
   "gateway-redeem": [1, 2, 3, 4, 5],
+  "aws-agentcore": [1, 2, 3, 4, 5],
 };

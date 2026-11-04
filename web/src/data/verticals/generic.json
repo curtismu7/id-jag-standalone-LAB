@@ -1,18 +1,32 @@
 {
-  "id": "generic",
-  "displayName": "ID-JAG Kit",
-  "tagline": "Cross-company access for agents",
-  "source": "kit default",
-  "brand": { "primary": "#d20e0f", "headerStart": "#051727", "headerEnd": "#051727" },
-  "vocab": {
-    "partner": "Acme, a partner company",
-    "partnerShort": "Acme",
-    "resource": "a shared dataset",
-    "resourceTool": "the sample MCP server"
+ "id": "generic",
+ "displayName": "ID-JAG Kit",
+ "tagline": "Cross-company access for agents",
+ "source": "kit default",
+ "brand": {
+  "primary": "#d20e0f",
+  "headerStart": "#051727",
+  "headerEnd": "#051727"
+ },
+ "vocab": {
+  "partner": "Acme, a partner company",
+  "partnerShort": "Acme",
+  "resource": "a shared dataset",
+  "resourceTool": "the sample MCP server",
+  "agentcore": "cloud agent runtime"
+ },
+ "cast": {
+  "lena": {
+   "name": "Lena",
+   "role": "Employee at the partner company"
   },
-  "cast": {
-    "lena": { "name": "Lena", "role": "Employee at the partner company" },
-    "mark": { "name": "Mark", "role": "Employee whose agent works on their behalf" },
-    "mary": { "name": "Mary", "role": "Employee who uses agents and MCP tools" }
+  "mark": {
+   "name": "Mark",
+   "role": "Employee whose agent works on their behalf"
+  },
+  "mary": {
+   "name": "Mary",
+   "role": "Employee who uses agents and MCP tools"
   }
+ }
 }

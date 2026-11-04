@@ -13,7 +13,7 @@ const files = fs.readdirSync(dir).filter((f) => f.endsWith(".json")).map((f) => 
 
 describe("diagram-studio/1 data in diagrams/", () => {
   it("has one file per playground mode, and the loader finds them all by name", () => {
-    expect(files).toEqual(["byo", "gateway-redeem", "mock", "pf-as", "pf-pf"]);
+    expect(files).toEqual(["aws-agentcore", "byo", "gateway-redeem", "mock", "pf-as", "pf-pf"]);
     expect(diagramNames().sort()).toEqual(files);
   });
 
@@ -126,6 +126,7 @@ describe("the playground model built from the data", () => {
     "pf-as": { browser: [0, 300], server: [480, 300], pf: [960, 0], ras: [960, 600], mcp: [1440, 300], profile: [480, 640], registry: [480, 1000] },
     "pf-pf": { browser: [0, 300], server: [480, 300], acme: [960, 0], ourpf: [960, 600], mcp: [1440, 300], profile: [480, 640] },
     "gateway-redeem": { agent: [0, 340], gateway: [420, 340], exchange: [420, 0], targetidp: [420, 680], api: [840, 340] },
+    "aws-agentcore": { agent: [0, 340], runner: [480, 340], exchange: [480, 0], targetidp: [480, 680], runtime: [960, 340] },
   };
   it.each(files)("%s: every box is where it was measured", (name) => {
     expect(Object.fromEntries(PLAYGROUND_DIAGRAMS[name].nodes.map((n) => [n.id, [n.x, n.y]]))).toEqual(LAYOUT[name]);
