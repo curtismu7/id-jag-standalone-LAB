@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: resource-as
-          image: ghcr.io/ping-sandbox/id-jag-resource-as:sha-a9d7cd7
+          image: ghcr.io/ping-sandbox/id-jag-resource-as:sha-810aeea
           ports: [{ name: http, containerPort: 8080 }]
           env:
             - name: NODE_ENV
