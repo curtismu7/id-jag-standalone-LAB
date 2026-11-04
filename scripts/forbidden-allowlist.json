@@ -12,6 +12,10 @@
     {
       "host": "local.ping-devops.com",
       "reason": "Comment in deploy/docker-compose.yml only (live-PF wiring, PR #20): documents that extra_hosts resolves the host's dev-loopback origin to the host gateway so the container can reach the owner's local PingFederate. No config default uses it; the real PF_URL comes from the untracked .env."
+    },
+    {
+      "host": "cmuir-pf-acme.ping-devops.com",
+      "reason": "README live-verification section (PR #22): documents the SE Kubernetes PingFederate the pf-pf mode was verified against. The runtime PF_URL still comes from the untracked .env; no config default uses this host."
     }
   ],
   "uuids": []
