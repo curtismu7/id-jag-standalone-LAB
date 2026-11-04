@@ -51,8 +51,15 @@ export function createMockPf({ origin, label, clients, user, validatorId, admin 
     grant_types_supported: ['authorization_code', TOKEN_EXCHANGE, JWT_BEARER],
     code_challenge_methods_supported: ['S256'],
     id_token_signing_alg_values_supported: ['ES256'],
-    token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post'],
+    token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'none'],
+    client_id_metadata_document_supported: true,
   };
+  // CIMD: documents this PingFederate fetches when an authorization request names a URL client_id (setCimdSource),
+  // and the document URLs its CIMD policy allows. No source = CIMD off (URL client_ids are unknown clients).
+  let cimdSource = null;
+  const cimdPolicy = new Set();
+  const setCimdSource = (fn, urls = []) => { cimdSource = fn; for (const u of urls) cimdPolicy.add(u); };
+  const resetCimd = () => { cimdSource = null; cimdPolicy.clear(); };
 
   const authenticate = (req) => {
     const { id, secret } = clientCredentials(req);
@@ -64,7 +71,26 @@ export function createMockPf({ origin, label, clients, user, validatorId, admin 
 
   async function authorize(req) {
     const q = req.url.searchParams;
-    const c = Object.hasOwn(clients, q.get('client_id') ?? '') ? clients[q.get('client_id')] : null;
+    const clientId = q.get('client_id') ?? '';
+    let c = Object.hasOwn(clients, clientId) ? clients[clientId] : null;
+    // CIMD: a URL client_id (draft-ietf-oauth-client-id-metadata-document) goes through the document, not the client table.
+    if (!c && /^https?:\/\//.test(clientId)) {
+      if (!cimdSource) return oauthError(400, 'invalid_client', '400 - Invalid client_id: unknown client');
+      if (!cimdPolicy.has(clientId)) return oauthError(400, 'invalid_client', '400 - Invalid client_id: the document URL is not allowed by the CIMD policy');
+      let doc = null;
+      try {
+        const res = await cimdSource(clientId);
+        doc = res && res.status === 200 ? await res.json() : null;
+      } catch { doc = null; }
+      if (!doc || doc.client_id !== clientId) return oauthError(400, 'invalid_client', '400 - Invalid client_id: the document does not match the URL');
+      if (!Array.isArray(doc.redirect_uris) || !doc.redirect_uris.includes(q.get('redirect_uri'))) {
+        return oauthError(400, 'invalid_request', '400 - Invalid redirect_uri: the document does not list it');
+      }
+      if (doc.token_endpoint_auth_method && doc.token_endpoint_auth_method !== 'none') {
+        return oauthError(400, 'invalid_client', '400 - Invalid client_id: a public document cannot hold a shared secret');
+      }
+      c = { id: clientId, scope: 'openid' }; // a document client signs in without a registered row
+    }
     if (!c) return oauthError(400, 'invalid_client', 'unknown client_id');
     if (q.get('response_type') !== 'code') return oauthError(400, 'unsupported_response_type', 'only code is supported');
     if (q.get('response_mode') !== 'pi.flow') return oauthError(400, 'invalid_request', 'this mock PingFederate signs in with pi.flow only (no redirect login)');
@@ -214,9 +240,9 @@ export function createMockPf({ origin, label, clients, user, validatorId, admin 
   }
 
   return {
-    origin, publicKey: key.publicKey, handle, adminSend,
+    origin, publicKey: key.publicKey, handle, adminSend, setCimdSource, resetCimd,
     trust: (issuer, publicKey) => peers.set(issuer, publicKey),
     /** Forget sign-in state, refresh tokens and used ID-JAGs (the demo's reset). Users are removed through the admin API, as for a real server. */
-    reset() { flows.clear(); codes.clear(); refresh.clear(); consumed.clear(); },
+    reset() { flows.clear(); codes.clear(); refresh.clear(); consumed.clear(); resetCimd(); },
   };
 }
