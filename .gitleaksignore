@@ -3,3 +3,7 @@
 # write-only PrivateKeyPEM field is never echoed. No real key material is involved.
 e8747325724537148ac29fa37401b138d87d5eae:server/src/__tests__/gatewayRedeemRoutes.test.js:private-key:182
 e8747325724537148ac29fa37401b138d87d5eae:server/src/__tests__/gatewayRedeem.test.js:private-key:298
+# Same commit re-based/re-cherry-picked onto PR #20's branch as c842c8a — identical tree,
+# same two test-only PEM wrappers (made-up ${typed} variable, no key material).
+c842c8a4aea823aa7f3992b44f27e058e523f8a5:server/src/__tests__/gatewayRedeemRoutes.test.js:private-key:182
+c842c8a4aea823aa7f3992b44f27e058e523f8a5:server/src/__tests__/gatewayRedeem.test.js:private-key:298
