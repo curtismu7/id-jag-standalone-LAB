@@ -4,6 +4,6 @@ dist/
 .env.bak.*
 *.local
 certs/
-.data/
+.data*/
 deploy/local/
 customer.config.json

@@ -71,6 +71,8 @@ If the port is taken:
 
 In Live mode on the host, the helper services `resource-as` and `mcp-sample` default to 9080 and 9090 in code. They are not started in Mock mode. Set `PORT=4721` and `PORT=4722` for them if you want them inside this app's block.
 
+`scripts/dev-live.sh` starts all three services for a live run against a real PingFederate: it reads `PF_URL`, `PF_EXCHANGE_CLIENT_ID/SECRET` and `PF_CA_FILE` from `.env`, generates and reuses one `RESOURCE_AS_CLIENT_SECRET` (both sides must share it — the resource-as client auth is a secret comparison, and a mismatch is the `invalid_client` refusal at leg 2), trusts the local PingFederate's certificate via `PF_CA_FILE` (never `NODE_TLS_REJECT_UNAUTHORIZED`), frees stale port holders, then starts `resource-as` :9080, `mcp-sample` :9090 and the playground :4720 with logs under `/tmp/idjag-dev-*.log`. Ports must match what the PingFederate's SP connection registered (`http://localhost:9080` as the ID-JAG audience, `http://localhost:9090/mcp` as the resource). Flags: `--pf-url=...`, `--pf-client-id=...`, `--pf-ca-file=...`, `--ports=<server>,<ras>,<mcp>`.
+
 ## Mock and live modes
 
 `MODE=mock|live` decides (unset: mock, or live when `PF_URL`, `PF_EXCHANGE_CLIENT_ID` and `PF_EXCHANGE_CLIENT_SECRET` are already set) what the app talks to. The **Mock / Live** switch in the header of every page shows the mode and changes it, the banner on every page repeats it (presenter mode included), and `GET /api/health` reports it as `mode`. The choice is saved in `DATA_DIR/mode.json`, so it survives a restart. Switching ends every session. Mock data lives in `DATA_DIR/mock` and never mixes with live data.
