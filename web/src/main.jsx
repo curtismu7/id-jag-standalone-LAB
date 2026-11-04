@@ -17,6 +17,7 @@ import TrustedIdpsPage from "./pages/TrustedIdpsPage";
 import GuidesPage from "./pages/GuidesPage";
 import LearnPage from "./pages/LearnPage";
 import InspectPage from "./pages/InspectPage";
+import CimdTesterPage from "./pages/CimdTesterPage";
 import RegisterPage from "./pages/RegisterPage";
 import AccountRequestsPage from "./pages/AccountRequestsPage";
 
@@ -28,7 +29,8 @@ const Page = path.startsWith("/diagram/") ? IdJagPlaygroundDiagramPage
     : path.startsWith("/guides") ? GuidesPage
       : path.startsWith("/learn") ? LearnPage
         : path.startsWith("/inspect") ? InspectPage
-          : path.startsWith("/register") ? RegisterPage
+          : path.startsWith("/cimd") ? CimdTesterPage
+            : path.startsWith("/register") ? RegisterPage
             : path.startsWith("/account-requests") ? AccountRequestsPage
               : IdJagPlaygroundPage;
 
