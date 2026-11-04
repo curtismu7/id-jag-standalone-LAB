@@ -1,0 +1,22 @@
+# The SE resource-as trusts exactly one IdP: the SE-hosted PingFederate
+# (https://<pf-host>.ping-demo.example.invalid), which issues the ID-JAGs it redeems.
+# Static file (TRUSTED_IDPS_FILE) instead of the playground's registry: the SE
+# playground deployment is mock/scaled-0, so there is no registry to poll.
+# clientAliases: the ID-JAG's client_id is the exchanging client at the issuer
+# (id-jag-kit-acme); it must map to the redeeming client here (id-jag-playground).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: id-jag-resource-as-trusted-idps
+data:
+  trusted-idps.json: |
+    [
+      {
+        "id": "se-pf",
+        "name": "SE PingFederate (the issuer IdP)",
+        "issuer": "https://<pf-host>.ping-demo.example.invalid",
+        "jwksUrl": "https://<pf-host>.ping-demo.example.invalid/pf/JWKS",
+        "clientAliases": { "id-jag-playground": "id-jag-playground" },
+        "scopes": "read mcp:invoke"
+      }
+    ]

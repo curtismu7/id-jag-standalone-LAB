@@ -362,7 +362,9 @@ const PROBE_TIMEOUT_MS = 4000;
  * (PingFederate as redeemer) falls back to its OpenID configuration.
  */
 export async function probeBackends(s, mcpUrl, fetchImpl = outboundFetch) {
-  const as = originOf(s.resourceAs.tokenEndpoint);
+  // The issuer, not just its origin: a hosted resource AS can live under a path
+  // (https://host/resource-as), whose discovery and JWKS are served under that path.
+  const as = trimSlash(s.resourceAs.issuer || originOf(s.resourceAs.tokenEndpoint));
   const targets = [
     { id: 'idp', label: s.idp.name, urls: s.idp.issuer ? [`${trimSlash(s.idp.issuer)}/.well-known/openid-configuration`] : [] },
     { id: 'resource-as', label: s.resourceAs.name, urls: as ? [`${as}/.well-known/oauth-authorization-server`, `${as}/.well-known/openid-configuration`] : [] },

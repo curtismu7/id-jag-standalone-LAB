@@ -135,7 +135,8 @@ const PROFILE_FIELDS = ['authorization_grant_profiles_supported', 'scopes_suppor
 
 router.get('/discovery', async (_req, res) => {
   const c = config();
-  const as = originOf(c.resourceAsTokenEndpoint);
+  // The issuer, not just its origin: a hosted resource AS can live under a path.
+  const as = c.resourceAsIssuer || originOf(c.resourceAsTokenEndpoint);
   const targets = [
     { id: 'resource-as', label: 'Resource AS', url: as && `${as}/.well-known/oauth-authorization-server` },
     { id: 'pingfederate', label: 'PingFederate', url: c.pfUrl && `${c.pfUrl}/.well-known/openid-configuration` },

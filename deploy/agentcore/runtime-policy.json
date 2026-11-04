@@ -1,0 +1,19 @@
+[
+  {
+    "Sid": "ReadDeploymentCode",
+    "Effect": "Allow",
+    "Action": "s3:GetObject",
+    "Resource": "arn:aws:s3:::agentcore-code-265988230536-us-east-2/idjag_whoami/*"
+  },
+  {
+    "Sid": "WriteLogs",
+    "Effect": "Allow",
+    "Action": [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+      "logs:DescribeLogStreams"
+    ],
+    "Resource": "*"
+  }
+]
