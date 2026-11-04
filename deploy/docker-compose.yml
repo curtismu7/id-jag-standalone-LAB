@@ -28,6 +28,8 @@ services:
     environment:
       PORT: "4720"
       DATA_DIR: /data
+      # Live-PF TLS: the local PF serves a mkcert cert; trust the bundled root CA.
+      NODE_EXTRA_CA_CERTS: /app/deploy/pf-rootCA.pem
       # Listens wide inside the container; the port above is published on 127.0.0.1 only. Mock sign-in checks this (rule 11).
       HOST: "0.0.0.0"
       LAB_PUBLISH: loopback
@@ -41,6 +43,10 @@ services:
       MCP_URL: http://mcp-sample:9090/mcp
     volumes:
       - id-jag-data:/data
+      - ./pf-rootCA.pem:/app/deploy/pf-rootCA.pem:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "local.ping-devops.com:host-gateway"
 
   resource-as:
     build:
