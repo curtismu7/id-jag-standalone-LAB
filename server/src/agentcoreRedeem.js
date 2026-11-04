@@ -418,7 +418,10 @@ export function liveEndpoints(c) {
     exchange: {
       TokenURL: c.pfUrl ? `${c.pfUrl}/as/token.oauth2` : '',
       ClientID: c.pfExchangeClientId,
-      Resource: c.resourceAsIssuer, // the ID-JAG is addressed to the resource AS, which redeems it
+      // The same pair the pf-as mode sends: aud of the ID-JAG = the resource-as issuer (via `audience`), and
+      // `resource` = ID_JAG_RESOURCE, which is what the PF token-exchange processor policy allows.
+      Audience: c.resourceAsIssuer,
+      Resource: c.resource,
     },
     redeem: {
       TokenURL: c.resourceAsTokenEndpoint,
@@ -455,18 +458,20 @@ export async function liveRun({ subjectToken, scopeOverride }) {
     return out;
   }
 
-  // Leg 1: RFC 8693 exchange at PingFederate. Same request shape as the mock leg, sent to the real endpoint.
+  // Leg 1: RFC 8693 exchange at PingFederate. Same request shape as the pf-as mode: aud (the ID-JAG's audience)
+  // = the resource-as issuer, resource = ID_JAG_RESOURCE (what the PF token-exchange policy allows).
   const f1 = new URLSearchParams({
     grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
     subject_token: subjectToken, subject_token_type: 'urn:ietf:params:oauth:token-type:refresh_token',
     requested_token_type: 'urn:ietf:params:oauth:token-type:id-jag',
+    audience: ep.exchange.Audience,
   });
   if (ep.exchange.Resource) f1.set('resource', ep.exchange.Resource);
   if (scope) f1.set('scope', scope);
   const hop1 = { n: 1, label: 'Leg 1: exchange the pf-as session refresh token for an ID-JAG (RFC 8693, real PingFederate)', from: 'runner', to: 'PingFederate', method: 'POST', url: ep.exchange.TokenURL,
     request: { authentication: 'Basic [client credentials, from settings, never shown]', headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: { grant_type: f1.get('grant_type'), subject_token: '[your pf-as session refresh token, never sent to the browser]', subject_token_type: f1.get('subject_token_type'),
-        requested_token_type: f1.get('requested_token_type'), resource: ep.exchange.Resource, scope, client_id: ep.exchange.ClientID } } };
+        requested_token_type: f1.get('requested_token_type'), audience: ep.exchange.Audience, resource: ep.exchange.Resource, scope, client_id: ep.exchange.ClientID } } };
   const auth1 = `Basic ${Buffer.from(`${ep.exchange.ClientID}:${secret('PF_EXCHANGE_CLIENT_SECRET')}`).toString('base64')}`;
   let r1;
   try {

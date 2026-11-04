@@ -11,6 +11,7 @@ vi.stubEnv('PF_EXCHANGE_CLIENT_SECRET', 'exchange-secret-value-1');
 vi.stubEnv('RESOURCE_AS_ISSUER', 'https://as.example.invalid');
 vi.stubEnv('RESOURCE_AS_CLIENT_ID', 'id-jag-playground');
 vi.stubEnv('RESOURCE_AS_CLIENT_SECRET', 'resource-as-secret-value-1');
+vi.stubEnv('ID_JAG_RESOURCE', 'https://as.example.invalid/mcp');
 vi.stubEnv('ID_JAG_SCOPE', 'tools:invoke');
 
 const REFRESH = 'header.eyJzdWIiOiJhbGljZSIsInR5cCI6InJ0In0.sig-refresh'; // not a JWT the decoder can read
@@ -41,7 +42,8 @@ describe('liveRun', () => {
       expect(form1.get('subject_token')).toBe(REFRESH);
       expect(form1.get('subject_token_type')).toBe('urn:ietf:params:oauth:token-type:refresh_token');
       expect(form1.get('requested_token_type')).toBe('urn:ietf:params:oauth:token-type:id-jag');
-      expect(form1.get('resource')).toBe('https://as.example.invalid');
+      expect(form1.get('audience')).toBe('https://as.example.invalid');
+      expect(form1.get('resource')).toBe('https://as.example.invalid/mcp'); // ID_JAG_RESOURCE (stubbed below)
       expect(init1.headers.authorization).toMatch(/^Basic /);
       expect(out.leg1.isIdJag).toBe(true);
       // Leg 2 went to the kit's resource-as with the ID-JAG as the assertion.
