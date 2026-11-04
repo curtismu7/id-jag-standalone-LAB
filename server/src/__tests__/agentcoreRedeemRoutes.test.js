@@ -1,7 +1,7 @@
 // AWS AgentCore leg over HTTP, through the real app: the state, the spec edits, the runs, Live mode, and the write-only
 // rule (a recognisable secret is posted and every answer of every route is searched for it).
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app.js';
 import { CLAIMS, FIELD_PATHS, SCENARIOS, WRITE_ONLY } from '../agentcoreRedeem.js';
 import { _forceMode } from '../mode.js';
@@ -48,22 +48,44 @@ describe('the playground mode', () => {
   });
 });
 
-describe('Live mode: honestly unavailable', () => {
-  it('says why on every route, and the mode cannot be picked', async () => {
+describe('Live mode: real legs, refusing runtime', () => {
+  it('state names the live endpoints and the missing settings; the mock routes stay 409', async () => {
+    vi.stubEnv('PF_URL', 'https://pf.example.invalid');
+    vi.stubEnv('PF_EXCHANGE_CLIENT_ID', 'pf-exchange-client');
+    vi.stubEnv('RESOURCE_AS_ISSUER', 'https://as.example.invalid');
     _forceMode('live');
     const agent = request.agent(createApp());
     const s = (await agent.get(`${AC}/state`).expect(200)).body;
     expect(s.available).toBe(false);
-    expect(s.reason).toMatch(/runtime deploy step is a separate, owner-run setup/);
+    expect(s.simulated).toBe(false);
+    expect(s.live).toBeTruthy();
+    expect(s.live.exchange.TokenURL).toMatch(/\/as\/token\.oauth2$/);
+    expect(s.live.redeem.TokenURL).toMatch(/\/token$/);
+    expect(s.live.missing).toContain('RESOURCE_AS_CLIENT_SECRET'); // the test env has no resource-as secret
+    expect(s.live.runtime).toMatchObject({ deployed: false });
+    expect(s.live.runtime.reason).toMatch(/owner-run setup/);
+    // The mock-only routes still refuse in live mode.
     for (const [method, p, body] of [['put', 'spec', { Exchange: { Scope: 'tools:invoke' } }], ['post', 'run', { scenario: 'happy' }], ['post', 'reset', {}], ['post', 'spec/reset', {}]]) {
       const r = await agent[method](`${AC}/${p}`).set('Origin', ORIGIN).send(body);
       expect(r.status, p).toBe(409);
       expect(r.body.error).toBe('live_unavailable');
     }
-    const modes = (await agent.get(`${API}/config`).expect(200)).body.modes;
-    expect(modes.find((m) => m.id === 'aws-agentcore')).toMatchObject({ available: false, reason: expect.stringMatching(/owner-run setup/) });
+    // The mode is pickable in live mode (the panel shows the live note and the Run live button).
+    const cfg = (await post(agent, `${API}/mode`, { mode: 'aws-agentcore' }).expect(200)).body;
+    expect(cfg.mode).toBe('aws-agentcore');
     const pre = (await agent.get(`${API}/preflight?step=mode&mode=aws-agentcore&origin=${ORIGIN}`).expect(200)).body;
-    expect(pre.ok).toBe(false);
+    expect(pre.ok).toBe(true);
+  });
+
+  it('run-live refuses a caller-supplied subject token, and answers a sign-in refusal without a pf-as session', async () => {
+    _forceMode('live');
+    const agent = request.agent(createApp());
+    const r = await agent.post(`${AC}/run-live`).set('Origin', ORIGIN).send({ subject_token: 'caller-supplied' });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toBe('invalid_request');
+    const run = (await agent.post(`${AC}/run-live`).set('Origin', ORIGIN).send({})).body;
+    expect(run.live).toBe(true);
+    expect(run.refusal).toMatchObject({ stage: 'leg1', kind: 'session', error: 'sign_in_required' });
   });
 });
 

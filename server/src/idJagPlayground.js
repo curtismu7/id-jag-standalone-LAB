@@ -35,7 +35,6 @@ import { allowedDomains, checkEmail } from './auth/emailRules.js';
 import gatewayRedeemRoutes from './gatewayRedeemRoutes.js';
 import { LIVE_UNAVAILABLE, getSpec, resetGatewayRedeem } from './gatewayRedeem.js';
 import agentcoreRedeemRoutes from './agentcoreRedeemRoutes.js';
-import { LIVE_UNAVAILABLE as AC_LIVE_UNAVAILABLE } from './agentcoreRedeem.js';
 import { currentWorkspace } from './workspace.js';
 import { ORIGINS } from './mock/env.js';
 import { API_AUDIENCE } from './mock/gatewayWorld.js';
@@ -146,7 +145,7 @@ const modeOf = (req) => (MODES.includes(req?.session?.idJagPlaygroundMode) ? req
 function settingsFor(req) {
   const mode = modeOf(req);
   if (mode === 'gateway-redeem') return gatewayRedeemSettings();
-  if (mode === 'aws-agentcore') return gatewayRedeemSettings(); // the shared page config shape; the leg's panel reads its own /state
+  if (mode === 'aws-agentcore') return settings('pf-as'); // live: this leg uses the pf-as issuer session and servers; the panel reads its own /state
   if (mode !== 'byo') return settings(mode);
   const byo = req.session?.idJagPlayground?.byo || {};
   return byoSettings(byo.target, byo.idpId ? trustedIdps.findById(byo.idpId) : null);
@@ -184,7 +183,9 @@ const decoded = (token) => {
 const requireRealWhen = (samlOf) => (req, res, next) => {
   const mode = modeOf(req);
   if (mode === 'gateway-redeem') return res.status(409).json({ error: 'not_applicable', message: 'Gateway redeem has no sign-in, issue or redeem steps here: use its own panel (/api/id-jag-playground/gateway-redeem).' });
-  if (mode === 'aws-agentcore') return res.status(409).json({ error: 'not_applicable', message: 'The AWS AgentCore leg has no sign-in, issue or redeem steps here: use its own panel (/api/id-jag-playground/aws-agentcore).' });
+  if (mode === 'aws-agentcore') return isMock()
+    ? res.status(409).json({ error: 'not_applicable', message: 'The AWS AgentCore leg has no sign-in, issue or redeem steps here: use its own panel (/api/id-jag-playground/aws-agentcore).' })
+    : next(); // live: this leg reuses the pf-as issuer sign-in (its refresh token is what leg 1 exchanges)
   if (mode === 'byo') return next();
   const saml = samlOf(req);
   const keys = missing(mode, undefined, saml);
@@ -290,7 +291,7 @@ function configFor(req) {
   return { ...settingsFor(req), mode,
     modes: MODES.map((id) => {
       if (id === 'gateway-redeem') return { id, label: MODE_LABELS[id], available: isMock(), reason: isMock() ? null : LIVE_UNAVAILABLE };
-      if (id === 'aws-agentcore') return { id, label: MODE_LABELS[id], available: isMock(), reason: isMock() ? null : AC_LIVE_UNAVAILABLE };
+      if (id === 'aws-agentcore') return { id, label: MODE_LABELS[id], available: true, reason: isMock() ? null : 'Live runs legs 1-2 for real (PingFederate, the kit\'s resource-as); the runtime hop refuses until a live AgentCore runtime is deployed.' };
       const keys = id === 'byo' ? [] : missing(id);
       return { id, label: MODE_LABELS[id], available: !keys.length, reason: keys.length ? `Not configured: set ${keys.join(', ')}.${supplyHint(keys)}` : null };
     }),
@@ -482,10 +483,10 @@ async function preflight(req, step) {
     const target = String(req.query.mode || '');
     const known = MODES.includes(target);
     const keys = known && target !== 'byo' ? missing(target) : [];
-    const liveBlocked = (target === 'gateway-redeem' || target === 'aws-agentcore') && !isMock();
-    const liveReason = target === 'gateway-redeem' ? LIVE_UNAVAILABLE : AC_LIVE_UNAVAILABLE;
+    const liveBlocked = target === 'gateway-redeem' && !isMock();
+    const liveReason = LIVE_UNAVAILABLE;
     add('mode', `This server can run ${known ? target : 'that mode'}`, !known || keys.length || liveBlocked ? 'fail' : 'pass',
-      !known ? `"${target}" is not a playground mode.` : liveBlocked ? liveReason : keys.length ? `Not configured: ${keys.join(', ')} unset.` : 'Available.',
+      !known ? `"${target}" is not a playground mode.` : liveBlocked ? liveReason : keys.length ? `Not configured: ${keys.join(', ')} unset.` : target === 'aws-agentcore' && !isMock() ? 'Available: legs 1-2 run for real; the runtime hop refuses until a live AgentCore runtime is deployed.' : 'Available.',
       liveBlocked ? 'Switch the header toggle to Mock to use this mode.' : known ? `Set ${keys.join(', ')} in .env (see .env.example), then restart the server.${supplyHint(keys)}` : 'Pick a mode from the toolbar.');
     return checks;
   }
