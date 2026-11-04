@@ -8,6 +8,7 @@ import { signIn as signInApp, signInIssuer } from "../utils/signIn";
 import { codeSnippet } from "../utils/codeSnippet";
 import InteropPanel from "./InteropPanel";
 import GatewayRedeemPanel from "./GatewayRedeemPanel";
+import AgentCorePanel from "./AgentCorePanel";
 import { mcpcCommand, vscodeMcpJson, vscodeSettings } from "../utils/realClients";
 import terms from "../data/terms.json";
 import { useAppMode } from "../mode/ModeContext";
@@ -30,6 +31,7 @@ const MODES = [
   { id: "pf-pf", label: "Acme PingFederate → PingFederate" },
   { id: "byo", label: "Your IdP → our resource AS" },
   { id: "gateway-redeem", label: "Gateway redeems the ID-JAG (mock only)" },
+  { id: "aws-agentcore", label: "ID-JAG → mock AgentCore runtime (mock only)" },
 ];
 const BYO_TARGETS = [{ id: "resource-as", label: "Resource AS" }, { id: "pingfederate", label: "PingFederate" }];
 const VIEWS = [{ id: "form", label: "Form" }, { id: "json", label: "JSON" }];
@@ -88,6 +90,9 @@ const MODE_TEXT = {
   },
   "gateway-redeem": {
     story: "Ping release claim (2026-11-02), unverified on our tenant. The Privilege MCP gateway, configured with an On-Behalf-Of spec, exchanges the caller's token for an ID-JAG (leg 1) and, when a Redeem spec with a TokenURL is set, redeems it at the target app's own issuer (leg 2), so the target app sees the user and no one shares a credential. Everything here runs against mocks inside this app; Live is not available for this mode.",
+  },
+  "aws-agentcore": {
+    story: "A lab simulation of an agent reaching a (mock) Bedrock AgentCore runtime: the exchange issuer turns the caller's token into an ID-JAG (leg 1), the AgentCore leg's target issuer redeems it (leg 2) and mints the runtime's access token, and the runtime runs a tool under the workload identity that token resolves to. The ID-JAG never reaches the runtime: it is a grant for an authorization server to redeem. No AWS service is called; Live is not available for this leg.",
   },
   mock: {
     story: "Mary signs in once at the company's PingFederate, and the agent then reads Mary's data from the sample MCP server without a second sign-in. In this mode every step uses sample data and nothing is sent.",
@@ -577,6 +582,7 @@ export default function IdJagPlaygroundPage() {
   const appMock = useAppMode()?.mode === "mock"; // the app's Mock/Live setting; isMock is this page's browser-only sample data
   const isByo = mode === "byo";
   const isGateway = mode === "gateway-redeem"; // its own panel replaces the six steps (GatewayRedeemPanel)
+  const isAgentCore = mode === "aws-agentcore"; // its own panel replaces the six steps (AgentCorePanel)
   // SAML is real only in pf-as when the server can sign assertions; mock always has it. Anywhere else the run is OIDC.
   const samlReady = mode === "pf-as" && !!config?.saml?.available;
   const saml = protocol === "saml" && (isMock || samlReady);
@@ -867,14 +873,14 @@ export default function IdJagPlaygroundPage() {
         <div className="ijp-toolbar">
           <div className="ijp-toolbar__group"><span>Mode</span><Segmented label="Playground mode" options={modeOptions} value={mode} onPick={pickMode} disabled={!!busy} />
             <DiagramLink mode={mode}>View {PLAYGROUND_DIAGRAMS[mode].label} diagram ↗</DiagramLink></div>
-          {!isGateway && <div className="ijp-toolbar__group"><span>Sign-in</span><Segmented label="Sign-in protocol" value={saml ? "saml" : "oidc"} onPick={pickProtocol} disabled={!!busy}
+          {!(isGateway || isAgentCore) && <div className="ijp-toolbar__group"><span>Sign-in</span><Segmented label="Sign-in protocol" value={saml ? "saml" : "oidc"} onPick={pickProtocol} disabled={!!busy}
             options={PROTOCOLS.map((p) => (p.id === "saml" && !isMock && !samlReady ? { ...p, disabled: true, title: samlTitle } : p))} /></div>}
-          {!isGateway && <div className="ijp-toolbar__group"><span>View</span><Segmented label="Data view" options={VIEWS} value={view} onPick={pickView} /></div>}
-          {!isGateway && <div className="ijp-toolbar__group">
+          {!(isGateway || isAgentCore) && <div className="ijp-toolbar__group"><span>View</span><Segmented label="Data view" options={VIEWS} value={view} onPick={pickView} /></div>}
+          {!(isGateway || isAgentCore) && <div className="ijp-toolbar__group">
             <button type="button" className="ijp-btn" onClick={startOver} disabled={!!busy || !hasResults} data-testid="ijp-start-over"
               title="Clear every result below and start again from step 2. Your sign-in stays.">Start over</button>
           </div>}
-          {!isGateway && <div className="ijp-toolbar__group" data-admin-only=""><span>Report</span>
+          {!(isGateway || isAgentCore) && <div className="ijp-toolbar__group" data-admin-only=""><span>Report</span>
             <button type="button" className="ijp-btn" onClick={() => downloadReport("md")}>Download report</button>
             <button type="button" className="ijp-btn" onClick={() => downloadReport("json")}>Download JSON</button>
           </div>}
@@ -886,6 +892,13 @@ export default function IdJagPlaygroundPage() {
             <StoryPanel mode={mode} />
             {error && <ErrorNote e={error} resource={config?.request?.resource} saml={saml} />}
             <GatewayRedeemPanel />
+          </>
+        ) : isAgentCore ? (
+          <>
+            <p className="ijp-story" data-testid="ijp-story"><strong>The story.</strong> {text.story}</p>
+            <StoryPanel mode={mode} />
+            {error && <ErrorNote e={error} resource={config?.request?.resource} saml={saml} />}
+            <AgentCorePanel />
           </>
         ) : (<>
         {isMock && <p className="ijp-mock-badge" role="status" data-testid="ijp-mock-badge">Sample data: nothing is sent</p>}

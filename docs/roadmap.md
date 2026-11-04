@@ -16,3 +16,7 @@ The build phases this kit was made in, kept for history. The README describes wh
   [runbook](acme-owner-runbook.md)) and `pingfederate/sync-id-jag-trusted-idps.js` and `configure-kid-workaround.js`
   adapted to the kit's own PingFederate. Not done: `configure-acme-idp.js` still describes the demo's Acme setup and must never be run against the shared one.
 - **Phase 4:** packaging, CI hardening, SE deployment.
+- **Phase 5, planned:** the AWS AgentCore leg's live form. The mock-only leg shipped in this kit simulates the runtime
+  (see the README's "AWS AgentCore leg"); the planned live leg is: real legs 1–2 (the user's PingFederate issues the
+  ID-JAG from the pf-as issuer session; the kit's resource-as redeems it) and a real Bedrock AgentCore runtime, deployed
+  owner-run (IAM execution role, region-pinned), with the runtime hop refusing with 409 until that runtime exists.

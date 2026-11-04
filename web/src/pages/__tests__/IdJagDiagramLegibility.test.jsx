@@ -206,8 +206,8 @@ describe("diagram text stays readable at every zoom the page allows", () => {
       const text = appStylesheets(web).css;
       expect(tooSmall(scanCardCss(text, card, KINDS), READABLE_MIN_ZOOM).map((f) => f.selector).sort()).toEqual([".ijx .cs", ".ijx .ct"]);
     });
-    it("the app's own stylesheets: all ten under src, none from node_modules", () => {
-      expect(cssFiles.filter((f) => f.endsWith(".css")).length).toBe(10);
+    it("the app's own stylesheets: all eleven under src, none from node_modules", () => {
+      expect(cssFiles.filter((f) => f.endsWith(".css")).length).toBe(11);
       expect(cssFiles.every((f) => !f.includes("node_modules"))).toBe(true);
     });
   });

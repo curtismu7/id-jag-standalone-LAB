@@ -1,18 +1,32 @@
 {
-  "id": "healthcare",
-  "displayName": "CareConnect",
-  "tagline": "AI-Powered Healthcare Demo",
-  "source": "AI-DEMO2 demo_api_server/config/verticals/healthcare/manifest.json (identity, theme)",
-  "brand": { "primary": "#0f766e", "headerStart": "#0f766e", "headerEnd": "#0d9488" },
-  "vocab": {
-    "partner": "a partner clinic",
-    "partnerShort": "the partner clinic",
-    "resource": "the shared referral records",
-    "resourceTool": "the care-records MCP server"
+ "id": "healthcare",
+ "displayName": "CareConnect",
+ "tagline": "AI-Powered Healthcare Demo",
+ "source": "AI-DEMO2 demo_api_server/config/verticals/healthcare/manifest.json (identity, theme)",
+ "brand": {
+  "primary": "#0f766e",
+  "headerStart": "#0f766e",
+  "headerEnd": "#0d9488"
+ },
+ "vocab": {
+  "partner": "a partner clinic",
+  "partnerShort": "the partner clinic",
+  "resource": "the shared referral records",
+  "resourceTool": "the care-records MCP server",
+  "agentcore": "cloud agent runtime"
+ },
+ "cast": {
+  "lena": {
+   "name": "Lena",
+   "role": "Care coordinator at the partner clinic"
   },
-  "cast": {
-    "lena": { "name": "Lena", "role": "Care coordinator at the partner clinic" },
-    "mark": { "name": "Mark", "role": "Clinician at the clinic network" },
-    "mary": { "name": "Mary", "role": "Care-team analyst at the clinic network" }
+  "mark": {
+   "name": "Mark",
+   "role": "Clinician at the clinic network"
+  },
+  "mary": {
+   "name": "Mary",
+   "role": "Care-team analyst at the clinic network"
   }
+ }
 }

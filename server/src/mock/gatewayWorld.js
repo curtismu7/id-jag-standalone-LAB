@@ -23,6 +23,7 @@ export const CLIENT_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-typ
 const TOKEN_EXCHANGE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 const JWT_BEARER = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
 const ID_JAG_TTL = 300;
+export { ID_JAG_TTL };
 const MAX_EVENTS = 50;
 
 export const GATEWAY_RESOURCE = `${ORIGINS.gwGateway}/mcp`; // the audience of the caller's token
@@ -182,6 +183,7 @@ function createExchangeIssuer({ origin, label, clients, callerKey, callerIssuer 
   };
   return { origin, key, publicKey: key.publicKey, handle, events, issueCallerToken };
 }
+export { createExchangeIssuer };
 
 /** The target app's own issuer: redeems an ID-JAG from a trusted issuer with the JWT bearer grant. The ID-JAG is single use. */
 function createTargetIssuer({ origin, clients, trusted }) {

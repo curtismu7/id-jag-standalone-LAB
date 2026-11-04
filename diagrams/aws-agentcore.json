@@ -1,0 +1,182 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "aws-agentcore",
+  "title": "ID-JAG to the (mock) AgentCore runtime",
+  "lede": "The exchange issuer turns the agent's caller token into an ID-JAG (leg 1, RFC 8693). The AgentCore leg's target issuer redeems it (leg 2, RFC 7523) and mints the runtime's access token. The (mock) Bedrock AgentCore runtime runs one tool under the workload identity that token resolves to. The AWS side is a lab simulation: no AWS service is called.",
+  "groups": {
+    "user": {
+      "label": "Person or app",
+      "color": "dark"
+    },
+    "gw": {
+      "label": "Runner (this lab)",
+      "color": "blue"
+    },
+    "pf": {
+      "label": "Exchange issuer",
+      "color": "red"
+    },
+    "as": {
+      "label": "AgentCore target issuer",
+      "color": "red"
+    },
+    "rs": {
+      "label": "Mock AgentCore runtime",
+      "color": "grey"
+    }
+  },
+  "nodes": [
+    {
+      "id": "agent",
+      "group": "user",
+      "label": "Agent app",
+      "sub": [
+        "acts for the signed-in user",
+        "Holds the caller token",
+        "agentcore-idp.mock.invalid signed it in"
+      ],
+      "x": 0,
+      "y": 340
+    },
+    {
+      "id": "runner",
+      "group": "gw",
+      "label": "Runner \u00b7 part of this lab",
+      "sub": [
+        "Holds the Exchange and Redeem specs",
+        "Leg 1 at Exchange.TokenURL, leg 2 at Redeem.TokenURL",
+        "Calls only allow-listed https hosts, follows no redirect",
+        "ClientSecret is write-only"
+      ],
+      "x": 480,
+      "y": 340
+    },
+    {
+      "id": "exchange",
+      "group": "pf",
+      "label": "Exchange issuer \u00b7 company IdP",
+      "sub": [
+        "agentcore-idp.mock.invalid",
+        "RFC 8693: caller token in, ID-JAG out",
+        "ID-JAG: aud = Resource, sub = the user, act = the caller"
+      ],
+      "x": 480,
+      "y": 0
+    },
+    {
+      "id": "targetidp",
+      "group": "as",
+      "label": "AgentCore target issuer",
+      "sub": [
+        "agentcore-target.mock.invalid",
+        "RFC 7523 jwt-bearer: trusts the exchange issuer only",
+        "Checks signature, aud, expiry, client, single-use jti",
+        "Mints the runtime token with act and the workload identity"
+      ],
+      "x": 480,
+      "y": 680
+    },
+    {
+      "id": "runtime",
+      "group": "rs",
+      "label": "AgentCore runtime \u00b7 mock",
+      "sub": [
+        "agentcore-runtime.mock.invalid \u00b7 POST /invoke",
+        "Accepts only access tokens its own issuer minted",
+        "Refuses an ID-JAG outright: typ oauth-id-jag+jwt",
+        "Runs get_account_summary, names the workload identity"
+      ],
+      "x": 960,
+      "y": 340
+    }
+  ],
+  "edges": [
+    {
+      "source": "agent",
+      "target": "runner",
+      "label": "caller token: in-process hand-off"
+    },
+    {
+      "source": "runner",
+      "target": "exchange",
+      "label": "leg 1: RFC 8693 exchange \u00b7 requested_token_type=id-jag \u00b7 resource=Resource"
+    },
+    {
+      "source": "exchange",
+      "target": "runner",
+      "label": "ID-JAG \u00b7 aud = Resource \u00b7 sub = user \u00b7 act = caller \u00b7 300 s"
+    },
+    {
+      "source": "runner",
+      "target": "targetidp",
+      "label": "leg 2: RFC 7523 jwt-bearer \u00b7 assertion = the ID-JAG"
+    },
+    {
+      "source": "targetidp",
+      "target": "runner",
+      "label": "access token \u00b7 sub = user \u00b7 act = caller \u00b7 wid = the workload identity"
+    },
+    {
+      "source": "runner",
+      "target": "runtime",
+      "label": "invoke: Bearer access token from the target issuer"
+    },
+    {
+      "source": "agent",
+      "target": "runtime",
+      "label": "the caller's original token: refused (signature)",
+      "dashed": true
+    },
+    {
+      "source": "runner",
+      "target": "runtime",
+      "label": "the raw ID-JAG without leg 2: refused (token type)",
+      "dashed": true
+    }
+  ],
+  "steps": [
+    {
+      "title": "The agent hands its caller token to the runner",
+      "what": "The company IdP signed the user in and issued the caller token. The runner starts from it: it never sees the user's password or session, only this token.",
+      "why": "The agent's credential is a token with one audience, not a shared secret.",
+      "edges": [
+        0
+      ]
+    },
+    {
+      "title": "Leg 1: exchange the caller token for an ID-JAG",
+      "what": "The runner posts an RFC 8693 token exchange to Exchange.TokenURL with its client credentials. Exchange.Resource becomes the aud of the ID-JAG, so it is addressed to the AgentCore leg's target issuer. The ID-JAG names the user as sub and the calling client in act, and lives 300 s.",
+      "why": "The ID-JAG is a grant for one authorization server to redeem, not an access token for a runtime.",
+      "edges": [
+        1,
+        2
+      ]
+    },
+    {
+      "title": "Leg 2: redeem it at the AgentCore target issuer",
+      "what": "The runner posts the ID-JAG as a jwt-bearer assertion to the target issuer, authenticating as the client the ID-JAG names. The target issuer checks signature, trusted issuer, aud, expiry, client binding and that the jti is new, then mints its own access token with act and the workload identity (wid) resolved for that client.",
+      "why": "The runtime's issuer decides, and it mints its own token. Each jti is single use.",
+      "edges": [
+        3,
+        4
+      ]
+    },
+    {
+      "title": "The runtime runs the tool under the workload identity",
+      "what": "The runner invokes the mock AgentCore runtime with the redeemed access token. The runtime verifies it against its own issuer's keys, sees the user as sub and the agent in act, resolves the workload identity, and answers get_account_summary.",
+      "why": "The runtime logs the workload identity, not a shared service account.",
+      "edges": [
+        5
+      ]
+    },
+    {
+      "title": "What the runtime refuses",
+      "what": "The caller's original token is refused: it was not minted by the runtime's issuer. The raw ID-JAG is refused too: it is a grant for an issuer to redeem, never an access token for a runtime. The refusal names the check that failed.",
+      "why": "Both refusals come from the runtime's own answer to a real request, not from a fixed message.",
+      "edges": [
+        6,
+        7
+      ]
+    }
+  ]
+}

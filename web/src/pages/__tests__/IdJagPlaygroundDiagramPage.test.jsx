@@ -11,7 +11,7 @@ afterEach(() => window.history.pushState({}, "", "/"));
 
 describe("ID-JAG playground diagram data", () => {
   it("has one diagram per playground mode", () => {
-    expect(PLAYGROUND_DIAGRAM_MODES).toEqual(["mock", "pf-as", "pf-pf", "byo", "gateway-redeem"]);
+    expect(PLAYGROUND_DIAGRAM_MODES).toEqual(["mock", "pf-as", "pf-pf", "byo", "gateway-redeem", "aws-agentcore"]);
   });
 
   it.each(PLAYGROUND_DIAGRAM_MODES)("%s: every edge joins two actors and every step 1-5 has a call", (mode) => {
@@ -26,8 +26,8 @@ describe("ID-JAG playground diagram data", () => {
     for (const n of [1, 2, 3, 4, 5]) expect(stepParts(d, n).edges.length, `step ${n}`).toBeGreaterThan(0);
   });
 
-  it("uses this repo's actors: no MCP gateway, step 4 goes straight to mcp-sample (the gateway-redeem mode is the gateway and has its own target API)", () => {
-    for (const mode of PLAYGROUND_DIAGRAM_MODES.filter((m) => m !== "gateway-redeem")) {
+  it("uses this repo's actors: no MCP gateway, step 4 goes straight to mcp-sample (the gateway-redeem and aws-agentcore modes have their own target)", () => {
+    for (const mode of PLAYGROUND_DIAGRAM_MODES.filter((m) => m !== "gateway-redeem" && m !== "aws-agentcore")) {
       const d = PLAYGROUND_DIAGRAMS[mode];
       expect(JSON.stringify(d)).not.toMatch(/[Gg]ateway|oauth-mcp|BFF/); // kind "bff" is only a colour
       expect(d.edges.filter((e) => e.steps.includes(4)).some((e) => e.to === "mcp")).toBe(true);

@@ -4,7 +4,7 @@ import { DEFAULT_VERTICAL, STORIES, VERTICALS, storyForMode, verticalById } from
 import { validateStory, validateVertical } from "../storySchema";
 import { MODE_STEPS } from "../../utils/idJagPlaygroundSteps";
 
-const MODES = ["mock", "pf-as", "pf-pf", "byo", "gateway-redeem"];
+const MODES = ["mock", "pf-as", "pf-pf", "byo", "gateway-redeem", "aws-agentcore"];
 const good = () => JSON.parse(JSON.stringify(STORIES[0]));
 
 describe("shipped data", () => {

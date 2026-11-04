@@ -1,18 +1,32 @@
 {
-  "id": "airlines",
-  "displayName": "Airline",
-  "tagline": "Good Leads The Way",
-  "source": "AI-DEMO2 demo_api_server/config/verticals/airlines/manifest.json (identity, theme)",
-  "brand": { "primary": "#002244", "headerStart": "#002244", "headerEnd": "#1414D2" },
-  "vocab": {
-    "partner": "a codeshare partner airline",
-    "partnerShort": "the partner airline",
-    "resource": "the shared flight-operations data",
-    "resourceTool": "the flight-operations MCP server"
+ "id": "airlines",
+ "displayName": "Airline",
+ "tagline": "Good Leads The Way",
+ "source": "AI-DEMO2 demo_api_server/config/verticals/airlines/manifest.json (identity, theme)",
+ "brand": {
+  "primary": "#002244",
+  "headerStart": "#002244",
+  "headerEnd": "#1414D2"
+ },
+ "vocab": {
+  "partner": "a codeshare partner airline",
+  "partnerShort": "the partner airline",
+  "resource": "the shared flight-operations data",
+  "resourceTool": "the flight-operations MCP server",
+  "agentcore": "cloud agent runtime"
+ },
+ "cast": {
+  "lena": {
+   "name": "Lena",
+   "role": "Crew scheduler at the codeshare partner"
   },
-  "cast": {
-    "lena": { "name": "Lena", "role": "Crew scheduler at the codeshare partner" },
-    "mark": { "name": "Mark", "role": "Dispatcher at the airline" },
-    "mary": { "name": "Mary", "role": "Operations analyst at the airline" }
+  "mark": {
+   "name": "Mark",
+   "role": "Dispatcher at the airline"
+  },
+  "mary": {
+   "name": "Mary",
+   "role": "Operations analyst at the airline"
   }
+ }
 }

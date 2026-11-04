@@ -8,9 +8,10 @@ import pf from "./idJagDetail/pf.js";
 import acme from "./idJagDetail/acme.js";
 import byo from "./idJagDetail/byo.js";
 import gateway from "./idJagDetail/gateway.js";
+import agentcore from "./idJagDetail/agentcore.js";
 
-// Diagram mode ids (mock, pf-as, pf-pf, byo, gateway-redeem) and the detail file names both resolve.
-const DATA = { mock, pf, acme, byo, "pf-as": pf, "pf-pf": acme, "gateway-redeem": gateway };
+// Diagram mode ids (mock, pf-as, pf-pf, byo, gateway-redeem, aws-agentcore) and the detail file names both resolve.
+const DATA = { mock, pf, acme, byo, "pf-as": pf, "pf-pf": acme, "gateway-redeem": gateway, "aws-agentcore": agentcore };
 
 /** { forms, tokens, refs } for a step (refs de-duplicated by id), or null when the step has none. */
 export function stepDetail(mode, step) {

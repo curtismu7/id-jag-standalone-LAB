@@ -77,6 +77,7 @@ In Live mode on the host, the helper services `resource-as` and `mcp-sample` def
 
 - **Mock**: the in-app simulation described under [What is simulated](#what-is-simulated). Demo account `alice@mock.example` / `mock-password`, shown in the sign-in dialog (public, mock only). Mock sign-in needs `ALLOW_MOCK_SIGNIN=1`, a loopback bind (`HOST=127.0.0.1`, the default in Mock mode, or `LAB_PUBLISH=loopback` in Docker) and no proxy.
 - **Gateway redeem has no Live form.** Live answers 409 `live_unavailable` for its routes and the mode is disabled in the picker with the reason; the header toggle and the banner say so on every page.
+- **The AWS AgentCore leg has no Live form yet.** Live answers 409 `live_unavailable` for its routes and the mode is disabled in the picker with the reason. The AWS side is a lab simulation; wiring a real AgentCore runtime is a separate, owner-run setup (see the roadmap).
 - **Live**: the servers named in your settings. It can be chosen only when `PF_URL`, `PF_EXCHANGE_CLIENT_ID` and `PF_EXCHANGE_CLIENT_SECRET` (or the Acme set) are present; otherwise the Live button is disabled and the banner names what is missing.
 
 ## Health, doctor and reset
@@ -206,6 +207,8 @@ credential, which is never handed out.
 
 | **Gateway redeems the ID-JAG (mock only)** (`gateway-redeem`) | The company IdP (mock), by exchanging the caller's token for the gateway (leg 1) | The target app's own issuer (mock), by the gateway (leg 2); the target API (mock) accepts the result | Mock only. Ping release claim (2026-11-02), UNVERIFIED on our tenant |
 
+| **ID-JAG → mock AgentCore runtime** (`aws-agentcore`) | The exchange issuer (mock), by exchanging the caller's token for the runner (leg 1) | The AgentCore leg's target issuer (mock), by the runner (leg 2); the mock runtime (mock) runs a tool on the result | Mock only. A lab simulation of the AWS side: no AWS service is called |
+
 Two PingFederates in `pf-pf` because an IdP must not redeem its own ID-JAG (draft §9.3).
 
 The resource AS shows its own work: `GET /` on it is a live page of its last 50 redemptions (accepted or refused, with
@@ -262,6 +265,17 @@ Ping release claim (2026-11-02), **UNVERIFIED on our tenant**. A mock of the gat
 - **Routes.** `/api/id-jag-playground/gateway-redeem/` `state`, `spec` (PUT), `spec/reset`, `run`, `reset`. Writes are same-origin only. The mock servers live in `server/src/mock/gatewayWorld.js`, the gateway in `server/src/gatewayRedeem.js`.
 - **Diagram.** `diagrams/gateway-redeem.json` (diagram-studio/1). Its boxes sit close together (120px apart, enough that a box dragged 70px still has a route; a test pins it) and, like every diagram, the view never zooms out below 0.9, so no on-screen text is under 10px. This map fits a 1920x1080 canvas at the overview, not a 1440x900 one (1026px against 1022px); the view refits when the window is resized.
 - **Why it matters.** The talk track and `content-pack.json` carry a Challenge, Technical and Business draft for the gateway redeem feature. It is written by the lab author from the swagger field names and the feature description, checked against the IETF draft and public vendor descriptions of the same problem, is not Ping wording, and is UNVERIFIED on our tenant; the owner replaces it with the real row.
+
+### AWS AgentCore leg
+
+A lab simulation of an agent reaching a (mock) Bedrock AgentCore runtime under cross-app access. **No AWS service is called**, and nothing here is a product test of AgentCore: the runtime, its workload identity and the tool are mocks inside this app. Mock only.
+
+- **The chain.** The exchange issuer turns the agent's caller token into an ID-JAG (leg 1, RFC 8693, `aud` = `Exchange.Resource`, 300 s). The AgentCore leg's target issuer redeems it (leg 2, RFC 7523: signature, trusted issuer, `aud`, expiry, client binding, single-use `jti`) and mints the runtime's access token with `sub` = the user, `act` = the calling client, and `wid` = the workload identity resolved for the redeeming client (*lab-invented claim*). The mock runtime accepts only that token and runs `get_account_summary`.
+- **The ID-JAG never reaches the runtime.** A control in every run presents the caller's original token and the raw ID-JAG to the runtime; both are refused, each naming the check that failed. The runtime knows an ID-JAG (`typ oauth-id-jag+jwt`) and refuses it outright.
+- **Spec and write-only.** The form edits `Exchange` `{TokenURL, ClientID, ClientSecret, AuthMethod, Resource, Scope, SubjectTokenType, RequestedTokenType}` and `Redeem` `{TokenURL, ClientID, ClientSecret, AuthMethod, Scope}`. `ClientSecret` is write-only, scrubbed from every answer, cleared with `null`.
+- **Ten scenarios (lab-invented).** All three hops as configured; an unknown exchange client; the wrong audience; an expired ID-JAG; a replayed one; a tampered signature; a redemption by the wrong client; the ID-JAG presented straight to the runtime; the wrong client authentication method; a `Redeem.TokenURL` off the allow-list (SSRF). Each verdict is computed from the run.
+- **Routes.** `/api/id-jag-playground/aws-agentcore/` `state`, `spec` (PUT), `spec/reset`, `run`, `reset`. Mock servers in `server/src/mock/agentcoreWorld.js`, the runner in `server/src/agentcoreRedeem.js`.
+- **Live.** Answers 409 `live_unavailable` everywhere but `state`; the runtime deploy step is a separate, owner-run setup (see the roadmap).
 
 ### Layout
 

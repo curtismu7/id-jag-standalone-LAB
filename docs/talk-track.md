@@ -102,10 +102,22 @@ Technical: "The gateway trades the caller's token for an ID-JAG (Identity Assert
 
 Business: "The app receives a token issued for the individual user, not for an identity shared by every user, so it can tie its access to that user, and it still applies its own policy at its own authorization server. ID-JAG is still an IETF draft and may change."
 
-## Step 14: Make it the customer's story
+## Step 14: An agent reaches a cloud runtime (the AWS AgentCore leg, a lab simulation)
+
+Choose **ID-JAG → mock AgentCore runtime (mock only)**. Point at the banner. Say: "The AWS side here is a lab simulation: no AWS service is called. The point is the shape of cross-app access into a cloud runtime."
+
+Click **Run all three hops**. Say: "The exchange issuer turns the agent's caller token into an ID-JAG (leg 1, RFC 8693). The AgentCore leg's target issuer redeems it (leg 2, RFC 7523) and mints the runtime's access token. That token carries the user as `sub`, the agent in `act`, and `wid`, the workload identity the runtime resolves. The runtime runs the tool under that workload identity." Open the decoded ID-JAG and the runtime's answer. Point at `typ oauth-id-jag+jwt` on the ID-JAG and at the workload identity in the answer.
+
+Scroll to the controls table. Say: "The runtime refused the caller's original token and the raw ID-JAG. An ID-JAG is a grant for an authorization server to redeem, never an access token for a runtime."
+
+Click **Run all scenarios**. Say: "Each one breaks one thing: the wrong audience, an expired or replayed ID-JAG, a tampered signature, a redemption by the wrong client, or a token URL off the allow-list. Each stops at a named stage for a named check."
+
+Point at the **Live** button in the header and read its note: this leg has no Live mode yet; wiring a real Bedrock AgentCore runtime is a separate, owner-run setup.
+
+## Step 15: Make it the customer's story
 
 Open the story panel under the mode picker. Pick another vertical in the picker (Airline, Super Banking, CareConnect, Great Buy or Generic) and read the goal and the first step aloud. Say: "The cast and the nouns come from data. The stories hold tokens like the cast member's name, not names. A `customer.config.json` can rename the cast, so the same demo tells the customer's story with their vocabulary."
 
-## Step 15: Close and reset
+## Step 16: Close and reset
 
 Say: "Everything you saw ran offline in Mock mode. To clear this demo for the next visitor, press **Start over** to clear the results and keep the sign-in, or run `npm run reset` to clear the run state. Your saved settings stay."

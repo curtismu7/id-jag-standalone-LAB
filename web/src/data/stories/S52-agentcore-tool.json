@@ -1,0 +1,59 @@
+{
+ "id": "S52",
+ "title": "{{cast.mark}}'s agent runs a tool on the {{vocab.agentcore}}, as {{cast.mark}}",
+ "modes": [
+  "aws-agentcore"
+ ],
+ "demos": [
+  "C1"
+ ],
+ "goal": "{{cast.mark}}'s agent needs to run a tool on the {{vocab.agentcore}} on {{cast.mark}}'s behalf, under its own workload identity, without a shared service credential and without handing the runtime {{cast.mark}}'s own token.",
+ "obstacle": "The runtime accepts only tokens its own issuer minted, and an ID-JAG is a grant for an authorization server to redeem, never an access token. A shared service account would hide who acted.",
+ "control": "Lab simulation, no AWS service called: the exchange issuer turns the caller token into an ID-JAG (leg 1, RFC 8693), the runtime's issuer redeems it (leg 2, RFC 7523) and mints the runtime's access token with {{cast.mark}} as sub and the agent in act, and the runtime runs the tool under the workload identity that token resolves to.",
+ "say": "The AWS side is mocked. The point is the shape: the ID-JAG stops at an authorization server, and the runtime sees a workload identity plus who it acted for.",
+ "steps": [
+  {
+   "n": 1,
+   "title": "The agent hands {{cast.mark}}'s caller token to the runner",
+   "tell": "The exchange issuer signed {{cast.mark}} in and issued a caller token. The runner starts from it and never sees the session.",
+   "say": "The agent's credential is a token with one audience, not a shared secret.",
+   "why": "A token has one audience."
+  },
+  {
+   "n": 2,
+   "title": "Leg 1: exchange it for an ID-JAG",
+   "tell": "The runner exchanges the caller token at the exchange issuer (RFC 8693). The result is an ID-JAG addressed to the runtime's issuer, with {{cast.mark}} as sub and the calling client in act.",
+   "say": "The assertion names {{cast.mark}} and says who is acting for them.",
+   "why": "Delegation is in the token, not in a shared account.",
+   "blocked": {
+    "tell": "Point Exchange.Resource somewhere else. The ID-JAG is addressed to the wrong issuer, and leg 2 refuses it.",
+    "say": "An assertion is redeemable by the issuer it names, and by no one else."
+   }
+  },
+  {
+   "n": 3,
+   "title": "Leg 2: redeem it at the runtime's issuer",
+   "tell": "The runner posts the ID-JAG to the runtime's issuer (RFC 7523). The issuer checks signature, audience, expiry, client and a single-use jti, and mints its own access token with {{cast.mark}} as sub, the agent in act, and the workload identity resolved.",
+   "say": "The runtime's own issuer decides, and it mints its own token.",
+   "why": "Without a redemption the ID-JAG is worthless to a runtime."
+  },
+  {
+   "n": 4,
+   "title": "The runtime runs the tool under the workload identity",
+   "tell": "The runner invokes the mock AgentCore runtime with the redeemed access token. The runtime verifies it against its own issuer's keys, sees {{cast.mark}} as sub and the agent in act, and answers the tool under the workload identity.",
+   "say": "The runtime logs the workload identity, not a shared service account.",
+   "why": "The agent has its own identity, and the human is still in the token."
+  },
+  {
+   "n": 5,
+   "title": "What the runtime refuses",
+   "tell": "{{cast.mark}}'s original caller token is refused: a different issuer minted it. The raw ID-JAG is refused too: it is a grant for an issuer to redeem, never an access token for a runtime.",
+   "say": "The refusal names the check that failed, from the runtime's own answer.",
+   "why": "An ID-JAG stops at an authorization server; only its redeemed token moves on."
+  }
+ ],
+ "proof": {
+  "happy": "The runtime answers the tool call, naming {{cast.mark}} as sub, the agent in act, and the workload identity.",
+  "blocked": "The runtime refuses {{cast.mark}}'s original token (signature) and the raw ID-JAG (token type), each naming the check that failed."
+ }
+}

@@ -19,6 +19,12 @@ export const ORIGINS = {
   gwTarget: 'https://target-idp.mock.invalid',
   gwApi: 'https://target-api.mock.invalid',
   gwGateway: 'https://gateway.mock.invalid',
+  // AWS AgentCore leg (mock/agentcoreWorld.js): the exchange issuer that turns the caller token into an ID-JAG, the
+  // target issuer that redeems it and mints the runtime's access token, and the (mock) Bedrock AgentCore runtime
+  // endpoint that token is presented to.
+  acExchange: 'https://agentcore-idp.mock.invalid',
+  acTarget: 'https://agentcore-target.mock.invalid',
+  acRuntime: 'https://agentcore-runtime.mock.invalid',
 };
 export const MOCK_ORIGINS = new Set(Object.values(ORIGINS));
 export const MCP_RESOURCE = `${ORIGINS.mcp}/mcp`;
@@ -34,7 +40,7 @@ export const CLIENT_IDS = { exchange: 'mock-exchange-client', redeemer: 'mock-re
 export const PF_ADMIN_USER = 'mock-admin';
 
 // Every setting whose name starts like this is dropped in mock mode: it names a real server, client or account.
-const DROPPED = /^(PF_|ACME_|RESOURCE_AS_|OIDC_|XAA_|SAML_|INTEROP_|MCP_URL$|ID_JAG_|ADMIN_|ALLOWED_EMAIL_DOMAINS$|IDP$|HEALTH_MODE$|ALLOW_PRIVATE_ISSUERS$|REGISTRATION_KEY$)/;
+const DROPPED = /^(PF_|ACME_|RESOURCE_AS_|OIDC_|XAA_|SAML_|INTEROP_|MCP_URL$|ID_JAG_|ADMIN_|ALLOWED_EMAIL_DOMAINS$|IDP$|HEALTH_MODE$|ALLOW_PRIVATE_ISSUERS$|REGISTRATION_KEY$|AWS_|AGENTCORE_)/;
 
 /** The environment of mock mode: `base` without the real-system settings, plus the mock's own. */
 export function mockEnv(base = process.env) {
