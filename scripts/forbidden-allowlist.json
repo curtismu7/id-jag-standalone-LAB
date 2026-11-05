@@ -12,10 +12,6 @@
     {
       "host": "local.ping-devops.com",
       "reason": "Comment in deploy/docker-compose.yml only (live-PF wiring, PR #20): documents that extra_hosts resolves the host's dev-loopback origin to the host gateway so the container can reach the owner's local PingFederate. No config default uses it; the real PF_URL comes from the untracked .env."
-    },
-    {
-      "host": "ai-demo.ping-devops.com",
-      "reason": "deploy/se/jwks-curator.yaml: the SE k8s Ingress host for the owner-run resource-as JWKS/curator deployment (commit 764b556). SE manifests name the real SE host by design; nothing in app config defaults to it."
     }
   ],
   "uuids": []

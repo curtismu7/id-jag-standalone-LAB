@@ -28,7 +28,7 @@ const pf = require('./pf-admin');
 const { acmePreflight, acmeVerify } = require('./acme-guard');
 const { args, setting, adminApi, report, writeEnv } = pf;
 
-const ID = { adapter: 'idJagKitAcmeForm', client: 'id-jag-kit-acme', policy: 'idJagKitPolicy' }; // fixed: never the demo's acme-agent, whatever ACME_EXCHANGE_CLIENT_ID says
+const ID = { adapter: args.adapter || 'idJagKitAcmeForm', client: args.client || 'id-jag-kit-acme', policy: args.policy || 'idJagKitPolicy' }; // policy override for a stand-in Acme whose kit policy came from configure-acme-idp.js
 const ADAPTER = 'com.pingidentity.adapters.htmlform.idp.HtmlFormIdpAuthnAdapter';
 const CALLBACK = '/api/id-jag-playground/issuer/callback';
 
