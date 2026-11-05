@@ -13,7 +13,6 @@ import { ORIGINS } from './mock/env.js';
 import { ID_JAG_TYP } from './mock/pf.js';
 import { config, secret } from './config.js';
 import { outboundFetch } from './outbound.js';
-import { AwsV4Signer } from 'aws4fetch';
 import { decodeJwt } from './tokenChecks.js';
 import { childTraceparent, newTraceparent } from './trace/traceparent.js';
 
@@ -513,32 +512,26 @@ export async function liveRun({ subjectToken, scopeOverride }) {
   if (r2.status !== 200 || !r2.data.access_token) { out.refusal = oauthRefusal('leg2', r2); return out; }
   out.redeemed = true;
   out.leg2 = { decoded: view(r2.data.access_token), scope: r2.data.scope };
+  const runtimeToken = r2.data.access_token;
 
   // The runtime hop. With no runtime deployed it refuses (owner-run setup). With one, the
-  // invoke is server-side SigV4: OAuth inbound auth cannot be driven by a bearer-only fetch,
-  // and the ID-JAG must never reach the browser — so the request is signed here, against the
-  // server's AWS credentials, and only the answer's decoded view goes out.
+  // invoke is a plain bearer request (SigV4 and the JWT authorizer are mutually exclusive,
+  // confirmed live): the runtime's authorizer reads the redeemed access token against the
+  // resource-as's single-key JWKS, and the ID-JAG never reaches the browser — the request
+  // leaves the server, only the decoded answer comes back.
   out.stage = 'runtime';
   if (!c.agentCoreRuntimeUrl) {
     out.refusal = { stage: 'runtime', kind: 'not_deployed', error: 'runtime_not_deployed', status: 409, description: LIVE_RUNTIME_MISSING };
     return out;
   }
-  const runtimeHop = { n: 3, label: 'Invoke the AgentCore runtime (SigV4, server-side credentials)', from: 'runner', to: 'AgentCore runtime', method: 'POST', url: c.agentCoreRuntimeUrl,
-    request: { authentication: 'AWS SigV4 (server-side credentials, never shown)', headers: { 'content-type': 'application/json', 'x-amzn-bedrock-agentcore-runtime-session-id': '[session id, >= 33 chars]' },
-      body: { access_token: shownLiveToken(idJag), tool: RUNTIME_TOOL } } };
-  const body = JSON.stringify({ access_token: idJag, tool: RUNTIME_TOOL });
+  const runtimeHop = { n: 3, label: 'Invoke the AgentCore runtime (bearer, server-side)', from: 'runner', to: 'AgentCore runtime', method: 'POST', url: c.agentCoreRuntimeUrl,
+    request: { authentication: 'Bearer (the redeemed access token, server-side only)', headers: { 'content-type': 'application/json', 'x-amzn-bedrock-agentcore-runtime-session-id': '[session id, >= 33 chars]' },
+      body: { access_token: shownLiveToken(runtimeToken), tool: RUNTIME_TOOL } } };
+  const body = JSON.stringify({ access_token: runtimeToken, tool: RUNTIME_TOOL });
   try {
-    const signer = new AwsV4Signer({
-      method: 'POST', url: c.agentCoreRuntimeUrl,
-      headers: { 'content-type': 'application/json', 'x-amzn-bedrock-agentcore-runtime-session-id': 'i'.repeat(40) },
-      body, service: 'bedrock-agentcore', region: c.agentCoreRuntimeRegion,
-      accessKeyId: secret('AWS_ACCESS_KEY_ID'), secretAccessKey: secret('AWS_SECRET_ACCESS_KEY'),
-      ...(secret('AWS_SESSION_TOKEN') ? { sessionToken: secret('AWS_SESSION_TOKEN') } : {}),
-    });
-    const signed = await signer.sign();
     const res = await outboundFetch(c.agentCoreRuntimeUrl, {
       method: 'POST', redirect: 'error', signal: AbortSignal.timeout(20000), body,
-      headers: { 'content-type': 'application/json', accept: 'application/json', ...Object.fromEntries(signed.headers.entries()) },
+      headers: { 'content-type': 'application/json', accept: 'application/json', authorization: `Bearer ${runtimeToken}`, 'x-amzn-bedrock-agentcore-runtime-session-id': 'i'.repeat(40) },
     });
     runtimeHop.status = res.status;
     runtimeHop.response = await res.json().catch(() => ({}));

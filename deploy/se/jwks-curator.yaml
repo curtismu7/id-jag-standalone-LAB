@@ -1,0 +1,99 @@
+# A root-ful discovery + JWKS for the AgentCore runtime's customJWTAuthorizer: AgentCore
+# rejects a path-ful discovery URL, and the resource-as's real issuer has a path. This serves
+# the resource-as's discovery (issuer unchanged — tokens' iss matches) and its JWKS from the
+# ai-demo host's root paths.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: id-jag-jwks-curator
+data:
+  discovery.json: |
+    # the resource-as's discovery document verbatim, with jwks_uri rewritten to
+    # https://ai-demo.ping-devops.com/jwks.json (copy it after every resource-as deploy:
+    # curl -sk https://<ras-host>/resource-as/.well-known/openid-configuration )
+    PLACEHOLDER_DISCOVERY_JSON
+  jwks.json: |
+    # the resource-as's JWKS verbatim (single RS256 key):
+    # curl -sk https://<ras-host>/resource-as/jwks
+    PLACEHOLDER_JWKS_JSON
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: id-jag-jwks-curator
+  labels:
+    app: id-jag-jwks-curator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: id-jag-jwks-curator
+  template:
+    metadata:
+      labels:
+        app: id-jag-jwks-curator
+    spec:
+      containers:
+        - name: curator
+          image: nginx:alpine
+          ports:
+            - name: http
+              containerPort: 80
+          volumeMounts:
+            - name: files
+              mountPath: /usr/share/nginx/html
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: files
+          configMap:
+            name: id-jag-jwks-curator
+            items:
+              - key: discovery.json
+                path: .well-known/openid-configuration
+              - key: jwks.json
+                path: jwks.json
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: id-jag-jwks-curator
+spec:
+  selector:
+    app: id-jag-jwks-curator
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: id-jag-jwks-curator
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx-public
+  rules:
+    - host: ai-demo.ping-devops.com
+      http:
+        paths:
+          - path: /.well-known/openid-configuration
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: id-jag-jwks-curator
+                port:
+                  name: http
+          - path: /jwks.json
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: id-jag-jwks-curator
+                port:
+                  name: http

@@ -221,16 +221,18 @@ Three findings from driving the invoke against the READY runtime:
    answers `403 Authorization method mismatch`; with a non-JWT bearer AgentCore
    falls back to SigV4 and reports the missing SigV4 parameters. A JWT-authed
    runtime takes a plain `Authorization: Bearer <jwt>`.
-3. **`403 OAuth authorization failed: Failed to parse token`** — current
-   blocker. The ID-JAG is a well-formed RS256 JWT whose `kid`/`x5t` match
-   PingFederate's published JWKS, and the same token validates at the
-   resource-as. The suspicion: PingFederate's JWKS publishes the signing key
-   three times (`acme-idjag`, `acme-idjag_RS256` with `alg`, and
-   `acme-idjag-signing`), and the entry the ID-JAG's `kid` selects carries **no
-   `alg`** — which strict JWT key-selection rejects before verification. Two
-   unblock paths: give the resource-as its own DNS name and point the runtime's
-   authorizer at its discovery (one key, `alg` present), or make PingFederate
-   publish only the RS256-tagged key entry.
+3. **`403 OAuth authorization failed: Failed to parse token` / `Invalid
+   Bearer token`** — resolved by isolating AgentCore from PingFederate's
+   multi-key JWKS. Isolation tests (synthetic tokens with controlled headers)
+   showed: unknown `kid` answers `Invalid inbound token` (JWKS fetch works),
+   an `x5t`-matching-but-wrongly-signed token answers `Invalid Bearer token`
+   (the same error the real ID-JAG got) — PF's JWKS publishes the signing key
+   three times, and x5t-matching selects ambiguously. Fix: a curated root-ful
+   discovery + single-key JWKS served from the ai-demo host
+   (`deploy/se/jwks-curator.yaml`), with the runtime validating the leg-2
+   `at+jwt` (iss = the resource-as, one RS256 key). The invoke sends the
+   redeemed access token as a plain bearer — SigV4 and the JWT authorizer are
+   mutually exclusive.
 
 ### Gotchas that already shaped this repo's artifacts
 
