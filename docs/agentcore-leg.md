@@ -210,6 +210,28 @@ them.
 The whoami answer's decoded claims become the leg's proof, the same way legs 1
 and 2 are judged: by what the tokens say, not by a 200.
 
+### Where the invoke stands (2026-11-05)
+
+Three findings from driving the invoke against the READY runtime:
+
+1. **The invoke URL must carry the full runtime ARN** (URL-encoded) —
+   `/runtimes/<runtime-id>/invocations` answers `400 accountID is required when
+   agentRuntimeArn is provided as agentId instead of agentRuntimeArn`.
+2. **SigV4 and the JWT authorizer are mutually exclusive** — sending both
+   answers `403 Authorization method mismatch`; with a non-JWT bearer AgentCore
+   falls back to SigV4 and reports the missing SigV4 parameters. A JWT-authed
+   runtime takes a plain `Authorization: Bearer <jwt>`.
+3. **`403 OAuth authorization failed: Failed to parse token`** — current
+   blocker. The ID-JAG is a well-formed RS256 JWT whose `kid`/`x5t` match
+   PingFederate's published JWKS, and the same token validates at the
+   resource-as. The suspicion: PingFederate's JWKS publishes the signing key
+   three times (`acme-idjag`, `acme-idjag_RS256` with `alg`, and
+   `acme-idjag-signing`), and the entry the ID-JAG's `kid` selects carries **no
+   `alg`** — which strict JWT key-selection rejects before verification. Two
+   unblock paths: give the resource-as its own DNS name and point the runtime's
+   authorizer at its discovery (one key, `alg` present), or make PingFederate
+   publish only the RS256-tagged key entry.
+
 ### Gotchas that already shaped this repo's artifacts
 
 | Symptom | Cause | Fix |
