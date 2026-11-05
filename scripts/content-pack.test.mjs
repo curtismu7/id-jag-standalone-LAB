@@ -32,7 +32,7 @@ test('a commit is recorded only when passed', async () => {
 test('the gateway redeem pack has its card and diagram, and a why-it-matters card that is labelled a draft, not borrowed text', () => {
   const pack = JSON.parse(fs.readFileSync(PACK_PATH, 'utf8'));
   assert.ok(pack.diagrams.some((d) => d.mode === 'gateway-redeem' && d.href === '/diagram/gateway-redeem'));
-  assert.ok(pack.cards.some((c) => c.id === 'gateway-redeem' && /UNVERIFIED on our tenant/.test(c.description)));
+  assert.ok(pack.cards.some((c) => c.id === 'gateway-redeem' && /leg 2 UNVERIFIED on our tenant/.test(c.description)));
   // Section 10 of the feature prompt has no ID-JAG or On-Behalf-Of row; the slide 48 row is Intent, Purpose, Behaviour.
   const why = pack.cards.find((c) => c.id === 'why-it-matters-gateway-redeem');
   assert.ok(why, 'the why-it-matters card is missing');

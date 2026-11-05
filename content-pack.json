@@ -444,7 +444,7 @@
     {
       "id": "gateway-redeem",
       "label": "Gateway redeems the ID-JAG (Ping release claim, mock only)",
-      "description": "The gateway exchanges the caller token (leg 1) and redeems the result at the target app's own issuer (leg 2). Ping release claim (2026-11-02), UNVERIFIED on our tenant.",
+      "description": "The gateway exchanges the caller token (leg 1) and redeems the result at the target app's own issuer (leg 2). Ping release claim (2026-11-02); leg 1 (OBO exchange) measured on our tenant 2026-11-05 (gateway v1.261102), leg 2 UNVERIFIED on our tenant.",
       "group": "try-it",
       "action": {
         "type": "route",

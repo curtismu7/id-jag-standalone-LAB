@@ -277,7 +277,6 @@ Three findings from driving the invoke against the READY runtime:
   can target a PingFederate that lacks the kit's default object names.
 - The k8s `pingfederate-admin` port-forward dies often; kill the stale
   listener before re-establishing.
-
 ## Part 5 — pf-pf proven with a stand-in Acme PingFederate (2026-11-05)
 
 A second PingFederate (`pingfederate-acme` StatefulSet in `ping-devops-cmuir`,

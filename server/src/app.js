@@ -18,6 +18,7 @@ import modeRoutes from './modeRoutes.js';
 import { isMock } from './mode.js';
 import health from './health.js';
 import { hostCheck } from './hostCheck.js';
+import { shelfInfo } from './shelfLink.js';
 
 const DEFAULT_WEB_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
 
@@ -66,6 +67,7 @@ export function createApp({ workspaceResolver = () => DEFAULT_WORKSPACE } = {}) 
 
   if (fs.existsSync(WEB_DIST)) {
     app.use(express.static(WEB_DIST));
+app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
     app.get('*', (_req, res) => res.sendFile(path.join(WEB_DIST, 'index.html')));
   }
   return app;

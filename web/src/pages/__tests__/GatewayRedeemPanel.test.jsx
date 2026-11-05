@@ -62,7 +62,7 @@ describe("the claim and where each name comes from", () => {
   it("states the release claim and that nothing leaves this machine, and tags the swagger names", async () => {
     mount();
     await ready();
-    expect(screen.getByTestId("gr-claim")).toHaveTextContent("Ping release claim (2026-11-02), UNVERIFIED on our tenant");
+    expect(screen.getByTestId("gr-claim")).toHaveTextContent("leg 2 (Redeem) and this page's mocks UNVERIFIED");
     expect(screen.getByTestId("gr-claim")).toHaveTextContent("Only PingFederate supports ID-JAG and DPoP in this lab family");
     const legend = screen.getByTestId("gr-legend");
     expect(legend).toHaveTextContent(SWAGGER);
