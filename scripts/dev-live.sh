@@ -100,9 +100,13 @@ if [ -n "$(get_env AGENTCORE_RUNTIME_URL)" ] && command -v aws >/dev/null 2>&1; 
   profile="${AWS_PROFILE:-agent-toolkit}"
   creds="$(aws configure export-credentials --profile "$profile" --format env 2>/dev/null || true)"
   if [ -n "$creds" ]; then
-    set_env AWS_ACCESS_KEY_ID "$(grep '^AWS_ACCESS_KEY_ID=' <<<"$creds" | cut -d= -f2-)"
-    set_env AWS_SECRET_ACCESS_KEY "$(grep '^AWS_SECRET_ACCESS_KEY=' <<<"$creds" | cut -d= -f2-)"
-    set_env AWS_SESSION_TOKEN "$(grep '^AWS_SESSION_TOKEN=' <<<"$creds" | cut -d= -f2-)"
+    # lines are 'export KEY=value' (or 'KEY=value' on some versions): strip the prefix either way
+    val() { grep -E "^(export )?$2=" <<<"$creds" | head -1 | sed -E "s/^(export )?$2=//" | tr -d '\r'; }
+    set_env AWS_ACCESS_KEY_ID "$(val x AWS_ACCESS_KEY_ID)"
+    set_env AWS_SECRET_ACCESS_KEY "$(val x AWS_SECRET_ACCESS_KEY)"
+    set_env AWS_SESSION_TOKEN "$(val x AWS_SESSION_TOKEN)"
+    # the earlier `source` predates these writes: pick the fresh values up into this shell
+    set -a; source "$env_file"; set +a
   fi
 fi
 
