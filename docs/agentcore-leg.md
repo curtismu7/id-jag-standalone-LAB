@@ -243,3 +243,37 @@ Three findings from driving the invoke against the READY runtime:
 | `invalid_client` at leg 2 | the two sides held different `RESOURCE_AS_CLIENT_SECRET`s | one shared value in the k8s secret and local `.env` |
 | opaque PF `500` on pi.flow completion | no default OIDC policy / no ATM token mapping | engine log says which; both fixed by API |
 | `ParamValidation: list-agent-runtimes invalid choice` | deploy vs control plane split | `aws bedrock-agentcore-control …` for create/update, `aws bedrock-agentcore …` for invoke |
+
+## Part 4 — the gate audit (2026-11-05): every playground mode proven or blocked
+
+| Mode / feature | Verdict | Notes |
+| --- | --- | --- |
+| `pf-as` | ✅ live | sign-in, ID-JAG, redeem, MCP call, 4/4 negative tests, revoke proven |
+| `aws-agentcore` | ✅ live | legs 1–2 + the real runtime; 10/10 mock scenarios |
+| `gateway-redeem` | ✅ mock | 10/10 scenarios |
+| SAML issue | ✅ live | `configure-saml.js --sp=<SP id>` against the SE PF; signed assertion → ID-JAG → redeem → MCP call. The OIDC policy needed `email` (TEXT) and `email_verified` (TEXT true) or app sign-in is refused |
+| `byo` | ✅ live | desktop clients on the SE PF: mcpc signs in (auth code + PKCE) → ID token → ID-JAG (`client_id=id-jag-mcpc`) → redeemed as `id-jag-desktop` (CLIENTS_FILE secret on the deployment) → MCP call |
+| `pf-pf` | ⛔ owner | needs the Acme three-key settings block; `setup-pf-pf.mjs` refuses a loopback Acme by design |
+| xaa.dev | ⛔ owner | needs an xaa.dev registration (4 client secrets) |
+
+### Hard-won facts from the byo/SAML work
+
+- PingFederate 13.1's ID-JAG requested token type is
+  `urn:ietf:params:oauth:token-type:id-jag` — `…id-jag+jwt` is the token's
+  `typ` header, not the exchange URI. The wrong URI answers the misleading
+  `Unable to find ATM, token generation policy instance or SP connection`.
+- `acmeAtm` (Reference ATM) enforces its allowed-clients list at
+  *authorize* time: a client missing from the list answers
+  `The global default access token manager is not available for the selected
+  client and authentication context` — for every client, even ones whose
+  default ATM is that manager. The desktop script's admit step must keep the
+  pre-existing clients.
+- The SE resource-as reads clients from `CLIENTS_FILE`
+  (k8s secret `id-jag-resource-as-clients`, mounted at `/config/clients`);
+  secrets from a secret volume do not hot-reload — `rollout restart` after
+  changing one.
+- `pingfederate/configure-desktop-clients.js` now takes `--sp`, `--atm`,
+  `--oidc`, `--processor`, `--policy`, `--selector`, `--skip-selector` so it
+  can target a PingFederate that lacks the kit's default object names.
+- The k8s `pingfederate-admin` port-forward dies often; kill the stale
+  listener before re-establishing.
