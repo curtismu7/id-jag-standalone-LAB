@@ -36,7 +36,7 @@ const RESOURCE_AS = String(args['resource-as'] || 'http://localhost:4721').repla
 const RESOURCE = String(args.resource || 'http://localhost:4722/mcp');
 const SCOPE = 'read mcp:invoke'; // mcp-sample's scopes
 const RAS_CLIENT = 'id-jag-desktop';
-const ID = { processor: 'idJagKitIdToken', policy: 'idJagKitIdTokenPolicy', sp: 'idJagKitResourceAsSp', selector: 'idJagKitClientSelector', atm: 'idJagKitAtm', oidc: 'idJagKitOidc' };
+const ID = { processor: args.processor || 'idJagKitIdToken', policy: args.policy || 'idJagKitIdTokenPolicy', sp: args.sp || 'idJagKitResourceAsSp', selector: args.selector || 'idJagKitClientSelector', atm: args.atm || 'idJagKitAtm', oidc: args.oidc || 'idJagKitOidc' };
 // Both stay confidential: PingFederate refuses ID-JAGs to public clients ("Public clients are not permitted to
 // request an id-jag token"), so VS Code's IdP setting carries a client secret.
 const CLIENTS = [
@@ -153,7 +153,10 @@ const newSecret = () => crypto.randomBytes(32).toString('base64url');
 
   // Sign in through the kit's PingOne: the kit's client selector and token manager must admit them.
   const sel = await api('GET', `/authenticationSelectors/${ID.selector}`);
-  if (sel.status !== 200) { console.error(`  ${ID.selector} not found: run configure-signin.js first`); process.exit(1); }
+  if (sel.status !== 200) {
+    if (args['skip-selector']) console.log(`  skip ${ID.selector} (not found; sign-in uses this PingFederate's default selector)`);
+    else { console.error(`  ${ID.selector} not found: run configure-signin.js first (or pass --skip-selector)`); process.exit(1); }
+  } else {
   const rows = sel.body.configuration.tables.find((t) => t.name === 'Clients').rows;
   const listed = new Set(rows.map((r) => r.fields.find((f) => f.name === 'Client ID')?.value));
   const addRows = CLIENTS.filter((c) => !listed.has(c.id));
@@ -161,6 +164,7 @@ const newSecret = () => crypto.randomBytes(32).toString('base64url');
     rows.push(...addRows.map((c) => ({ defaultRow: false, fields: [{ name: 'Client ID', value: c.id }] })));
     report(`${ID.selector}: sign in ${addRows.map((c) => c.id).join(', ')} at PingOne`, await api('PUT', `/authenticationSelectors/${ID.selector}`, sel.body));
   } else console.log(`  keep ${ID.selector}`);
+  }
   const atm = await api('GET', `/oauth/accessTokenManagers/${ID.atm}`);
   const allowed = atm.body.accessControlSettings?.allowedClients || [];
   const addAtm = CLIENTS.filter((c) => !allowed.some((a) => a.id === c.id));

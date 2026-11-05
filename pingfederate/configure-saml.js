@@ -27,7 +27,7 @@ const { execFileSync } = require('child_process');
 const pf = require('./pf-admin');
 const { args, setting, report, writeEnv, acceptAll, from } = pf;
 
-const ID = { ca: 'idjagkitsamlca', proc: 'idJagKitSaml', policy: 'idJagKitSamlPolicy', sp: 'idJagKitResourceAsSp', client: 'id-jag-kit-saml' };
+const ID = { ca: 'idjagkitsamlca', proc: 'idJagKitSaml', policy: 'idJagKitSamlPolicy', sp: args.sp || 'idJagKitResourceAsSp', client: 'id-jag-kit-saml' };
 const AUDIENCE = 'idJagKitSamlAud'; // the default SAML_AUDIENCE of the server
 const SAML2 = 'urn:ietf:params:oauth:token-type:saml2';
 const DEFAULT_SCOPE = 'read mcp:invoke'; // mcp-sample's scopes; the SP connection's existing mappings win
