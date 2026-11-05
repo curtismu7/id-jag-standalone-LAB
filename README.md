@@ -4,7 +4,7 @@ A playground, a resource authorization server and a PingFederate setup kit for *
 
 Tier: Demo
 
-Repo: https://github.com/ping-sandbox/id-jag-standalone-LAB
+Repo: https://github.com/curtismu7/id-jag-standalone-LAB
 
 Catalog: C1
 
@@ -25,7 +25,7 @@ The flow: get an ID-JAG from an IdP (RFC 8693 token exchange), check it against 
 Prerequisites: Node 26 or newer (Node 26 is what the tests and CI run on). Docker is needed only for the Docker form.
 
 ```sh
-git clone https://github.com/ping-sandbox/id-jag-standalone-LAB.git
+git clone https://github.com/curtismu7/id-jag-standalone-LAB.git
 cd id-jag-standalone-LAB
 npm ci
 npm run build
@@ -130,7 +130,7 @@ The sections below are the detail behind the ones above.
 ### Setup script (optional, for a live mode)
 
 ```sh
-git clone https://github.com/ping-sandbox/id-jag-standalone-LAB.git && cd id-jag-standalone-LAB
+git clone https://github.com/curtismu7/id-jag-standalone-LAB.git && cd id-jag-standalone-LAB
 npm ci
 npm run setup           # picks a mode, writes .env (never overwrites one), runs doctor, prints what to run next
 npm run build && npm start
