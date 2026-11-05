@@ -58,6 +58,8 @@ function createWorld() {
   return {
     fetch: fetchMock,
     adminSend: pf.adminSend,
+    /** CIMD: the pf instance's document hooks (setCimdSource/resetCimd), or undefined if the pf lacks them. */
+    pfCimd: (source, urls) => pf.setCimdSource?.(source, urls),
     gateway,
     agentcore,
     reset() { pf.reset(); acme.reset(); rs.reset(); resetClients(); gateway.reset(); agentcore.reset(); },

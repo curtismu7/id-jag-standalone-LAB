@@ -11,7 +11,7 @@ import "./AppShell.css";
 const THEME_KEY = "idjag.theme";
 const SPEC_URL = "https://datatracker.ietf.org/doc/draft-ietf-oauth-identity-assertion-authz-grant/";
 // Third item: admin/setup pages, hidden in presenter mode.
-const PAGES = [["/", "Playground"], ["/trusted-idps", "Trusted IdPs", true], ["/guides", "Setup guides", true], ["/inspect", "Inspector"], ["/learn", "Learn"]];
+const PAGES = [["/", "Playground"], ["/trusted-idps", "Trusted IdPs", true], ["/guides", "Setup guides", true], ["/inspect", "Inspector"], ["/cimd", "CIMD tester"], ["/learn", "Learn"]];
 const currentPage = () => {
   const p = window.location.pathname;
   return PAGES.slice(1).find(([href]) => p.startsWith(href))?.[0] || "/";
