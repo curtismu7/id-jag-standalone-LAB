@@ -543,7 +543,7 @@ export async function liveRun({ subjectToken, scopeOverride }) {
     runtimeHop.status = res.status;
     runtimeHop.response = await res.json().catch(() => ({}));
     if (res.status !== 200) {
-      out.refusal = { stage: 'runtime', kind: 'runtime', status: res.status, error: `http_${res.status}`, description: `The AgentCore runtime answered HTTP ${res.status}.` };
+      out.refusal = { stage: 'runtime', kind: 'runtime', status: res.status, error: `http_${res.status}`, description: `The AgentCore runtime answered HTTP ${res.status}: ${JSON.stringify(runtimeHop.response ?? {}).slice(0, 200)}` };
       return out;
     }
     out.runtime = { decoded: runtimeHop.response?.claims ? { claims: runtimeHop.response.claims, header: runtimeHop.response.header } : runtimeHop.response };
