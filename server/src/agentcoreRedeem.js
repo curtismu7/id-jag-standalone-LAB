@@ -13,6 +13,7 @@ import { ORIGINS } from './mock/env.js';
 import { ID_JAG_TYP } from './mock/pf.js';
 import { config, secret } from './config.js';
 import { outboundFetch } from './outbound.js';
+import { AwsV4Signer } from 'aws4fetch';
 import { decodeJwt } from './tokenChecks.js';
 import { childTraceparent, newTraceparent } from './trace/traceparent.js';
 
@@ -427,7 +428,9 @@ export function liveEndpoints(c) {
       TokenURL: c.resourceAsTokenEndpoint,
       ClientID: c.resourceAsClientId,
     },
-    runtime: null, // no live runtime yet: the routes refuse a live run
+    runtime: c.agentCoreRuntimeUrl
+      ? { InvokeURL: c.agentCoreRuntimeUrl, Region: c.agentCoreRuntimeRegion, Tool: RUNTIME_TOOL }
+      : null, // no live runtime: the hop refuses not_deployed
     /** The settings a live run needs, in the order to set them. */
     missing: (secrets) => [
       ['PF_URL', c.pfUrl], ['PF_EXCHANGE_CLIENT_ID', c.pfExchangeClientId],
@@ -511,10 +514,46 @@ export async function liveRun({ subjectToken, scopeOverride }) {
   out.redeemed = true;
   out.leg2 = { decoded: view(r2.data.access_token), scope: r2.data.scope };
 
-  // The runtime hop refuses: no live AgentCore runtime exists yet. The redeemed token is never used.
+  // The runtime hop. With no runtime deployed it refuses (owner-run setup). With one, the
+  // invoke is server-side SigV4: OAuth inbound auth cannot be driven by a bearer-only fetch,
+  // and the ID-JAG must never reach the browser — so the request is signed here, against the
+  // server's AWS credentials, and only the answer's decoded view goes out.
   out.stage = 'runtime';
-  out.refusal = { stage: 'runtime', kind: 'not_deployed', error: 'runtime_not_deployed', status: 409, description: LIVE_RUNTIME_MISSING };
-  return out;
+  if (!c.agentCoreRuntimeUrl) {
+    out.refusal = { stage: 'runtime', kind: 'not_deployed', error: 'runtime_not_deployed', status: 409, description: LIVE_RUNTIME_MISSING };
+    return out;
+  }
+  const runtimeHop = { n: 3, label: 'Invoke the AgentCore runtime (SigV4, server-side credentials)', from: 'runner', to: 'AgentCore runtime', method: 'POST', url: c.agentCoreRuntimeUrl,
+    request: { authentication: 'AWS SigV4 (server-side credentials, never shown)', headers: { 'content-type': 'application/json', 'x-amzn-bedrock-agentcore-runtime-session-id': '[session id, >= 33 chars]' },
+      body: { access_token: shownLiveToken(idJag), tool: RUNTIME_TOOL } } };
+  const body = JSON.stringify({ access_token: idJag, tool: RUNTIME_TOOL });
+  try {
+    const signer = new AwsV4Signer({
+      method: 'POST', url: c.agentCoreRuntimeUrl,
+      headers: { 'content-type': 'application/json', 'x-amzn-bedrock-agentcore-runtime-session-id': 'i'.repeat(40) },
+      body, service: 'bedrock-agentcore', region: c.agentCoreRuntimeRegion,
+      accessKeyId: secret('AWS_ACCESS_KEY_ID'), secretAccessKey: secret('AWS_SECRET_ACCESS_KEY'),
+      ...(secret('AWS_SESSION_TOKEN') ? { sessionToken: secret('AWS_SESSION_TOKEN') } : {}),
+    });
+    const signed = await signer.sign();
+    const res = await outboundFetch(c.agentCoreRuntimeUrl, {
+      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(20000), body,
+      headers: { 'content-type': 'application/json', accept: 'application/json', ...Object.fromEntries(signed.headers.entries()) },
+    });
+    runtimeHop.status = res.status;
+    runtimeHop.response = await res.json().catch(() => ({}));
+    if (res.status !== 200) {
+      out.refusal = { stage: 'runtime', kind: 'runtime', status: res.status, error: `http_${res.status}`, description: `The AgentCore runtime answered HTTP ${res.status}.` };
+      return out;
+    }
+    out.runtime = { decoded: runtimeHop.response?.claims ? { claims: runtimeHop.response.claims, header: runtimeHop.response.header } : runtimeHop.response };
+    out.stage = 'done';
+    out.stopReason = null;
+    return out;
+  } catch (err) {
+    out.refusal = { stage: 'runtime', kind: 'network', error: 'network', description: `Could not reach the AgentCore runtime (${String(err.cause?.code || err.message).slice(0, 120)}).` };
+    return out;
+  }
 }
 
 export const LIVE_RUNTIME_MISSING = 'No live AgentCore runtime is deployed yet (owner-run setup), so the runner stops here: legs 1 and 2 ran for real, the redeemed access token is discarded, and the runtime hop refuses.';

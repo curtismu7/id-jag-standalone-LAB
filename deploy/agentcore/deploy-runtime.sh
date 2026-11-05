@@ -17,7 +17,10 @@ REGION=us-east-2
 NAME="idjag_whoami"
 ROLE_ARN="arn:aws:iam::${ACCOUNT}:role/AmazonBedrockAgentCore-idjag_whoami"
 BUCKET="agentcore-code-${ACCOUNT}-${REGION}"
-DISCOVERY_URL="https://<ras-host>.ping-demo.example.invalid/resource-as/.well-known/oauth-authorization-server"
+# The issuer whose JWTs the runtime accepts. Until the resource-as has its own DNS name
+# (AgentCore rejects a path-ful discovery document), the runtime validates PingFederate's
+# ID-JAGs directly: same discovery, allowedClients = the ID-JAG's client_id claim.
+DISCOVERY_URL="https://<pf-host>.ping-demo.example.invalid/.well-known/openid-configuration"
 ALLOWED_CLIENTS="id-jag-playground"
 ZIP_FILE="${1:-}"
 

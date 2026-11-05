@@ -94,6 +94,18 @@ export PORT="$port_mcp" AS_ISSUER="http://localhost:$port_ras" AS_JWKS_URL="http
 nohup node "$root/mcp-sample/src/index.js" >"/tmp/idjag-dev-mcp.log" 2>&1 &
 echo $! >"/tmp/idjag-dev-mcp.pid"
 
+# The runtime hop signs with the deployer's AWS credentials (AgentCore runtime URL + region come
+# from .env). Session credentials expire: re-materialize them from the AWS profile each start.
+if [ -n "$(get_env AGENTCORE_RUNTIME_URL)" ] && command -v aws >/dev/null 2>&1; then
+  profile="${AWS_PROFILE:-agent-toolkit}"
+  creds="$(aws configure export-credentials --profile "$profile" --format env 2>/dev/null || true)"
+  if [ -n "$creds" ]; then
+    set_env AWS_ACCESS_KEY_ID "$(grep '^AWS_ACCESS_KEY_ID=' <<<"$creds" | cut -d= -f2-)"
+    set_env AWS_SECRET_ACCESS_KEY "$(grep '^AWS_SECRET_ACCESS_KEY=' <<<"$creds" | cut -d= -f2-)"
+    set_env AWS_SESSION_TOKEN "$(grep '^AWS_SESSION_TOKEN=' <<<"$creds" | cut -d= -f2-)"
+  fi
+fi
+
 export PORT="$port_server" APP_ORIGIN="http://localhost:$port_server" \
   RESOURCE_AS_ISSUER="$ras_issuer" \
   RESOURCE_AS_TOKEN_ENDPOINT="$ras_issuer/token" \

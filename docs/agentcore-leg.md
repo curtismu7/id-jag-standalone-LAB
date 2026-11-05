@@ -191,16 +191,24 @@ The name is `idjag_whoami` — runtime names must match
 (shell-exported `AWS_REGION` has overridden `.env` values before and made a
 correct deploy look like an IAM failure).
 
-### After it deploys: wiring the runtime hop
+### After it deploys: wiring the runtime hop (now wired)
 
-`server/src/agentcoreRedeem.js`'s `liveRun()` currently ends after leg 2 with
-the 409. When the runtime exists, set `AGENTCORE_RUNTIME_URL` in `.env` to the
-runtime's invoke endpoint (`https://bedrock-agentcore.us-east-2.amazonaws.com/runtimes/<id>/invocations`)
-and the hop replaces the refusal with a real POST carrying the redeemed access
-token. With OAuth inbound auth, boto3 cannot invoke the runtime — the invoke is
-raw HTTPS with manual SigV4 signing (the code path is prepared for this). The
-whoami answer's decoded claims become the leg's proof, the same way legs 1 and 2
-are judged: by what the tokens say, not by a 200.
+`server/src/agentcoreRedeem.js`'s `liveRun()` now invokes the runtime when
+`AGENTCORE_RUNTIME_URL` is set in `.env` (plus `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`, allowed to invoke the runtime —
+nothing more). The invoke is server-side SigV4 (aws4fetch, service
+`bedrock-agentcore`): OAuth inbound auth cannot be driven by a bearer-only
+fetch, and the ID-JAG must never reach the browser — the request is signed
+here, the answer's decoded view is all that leaves the server. `scripts/dev-live.sh`
+re-materializes the AWS session credentials from the profile on every start:
+they expire, and expired ones answer `403 The security token included in the
+request is invalid` — which looks like IAM misconfiguration but is only a stale
+login (`aws login --profile agent-toolkit` fixes it). A first attempt with empty
+credential variables answers `400`, both collected here so nobody re-derives
+them.
+
+The whoami answer's decoded claims become the leg's proof, the same way legs 1
+and 2 are judged: by what the tokens say, not by a 200.
 
 ### Gotchas that already shaped this repo's artifacts
 
