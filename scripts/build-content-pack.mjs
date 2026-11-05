@@ -56,7 +56,7 @@ export async function buildPack({ commit } = {}) {
     id: 'id-jag',
     title: 'ID-JAG',
     version: '0.1.0',
-    ...(commit ? { source: { repo: 'ping-sandbox/id-jag-standalone-LAB', commit } } : {}),
+    ...(commit ? { source: { repo: 'curtismu7/id-jag-standalone-LAB', commit } } : {}),
     demo: { id: 'id-jag-standalone', name: 'ID-JAG playground', catalog: 'C1', tags: ['mcp', 'pingfederate', 'tokens'] },
     glossary,
     sources,
