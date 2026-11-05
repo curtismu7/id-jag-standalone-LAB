@@ -1,3 +1,4 @@
+import ShelfLink from "./components/ShelfLink.jsx";
 import { useEffect, useState } from "react";
 import { useMe } from "./auth/useMe";
 import { signIn } from "./utils/signIn";
@@ -55,6 +56,7 @@ function Shell({ children }) {
             <button type="submit" className="shell-theme">Sign out</button>
           </form>
         )}
+        <ShelfLink />
         <ModeToggle />
         <PresentToggle />
         <button type="button" className="shell-theme" onClick={flip} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>
