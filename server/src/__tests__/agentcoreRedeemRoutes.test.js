@@ -63,7 +63,7 @@ describe('Live mode: real legs, refusing runtime', () => {
     expect(s.live.redeem.TokenURL).toMatch(/\/token$/);
     expect(s.live.missing).toContain('RESOURCE_AS_CLIENT_SECRET'); // the test env has no resource-as secret
     expect(s.live.runtime).toMatchObject({ deployed: false });
-    expect(s.live.runtime.reason).toMatch(/owner-run setup/);
+    expect(s.live.runtime.reason).toMatch(/No MCP resource server is named/);
     // The mock-only routes still refuse in live mode.
     for (const [method, p, body] of [['put', 'spec', { Exchange: { Scope: 'tools:invoke' } }], ['post', 'run', { scenario: 'happy' }], ['post', 'reset', {}], ['post', 'spec/reset', {}]]) {
       const r = await agent[method](`${AC}/${p}`).set('Origin', ORIGIN).send(body);

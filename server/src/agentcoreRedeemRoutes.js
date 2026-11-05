@@ -34,7 +34,9 @@ router.get('/state', (req, res) => {
       redeem: { TokenURL: ep.redeem.TokenURL, ClientID: ep.redeem.ClientID },
       missing: ep.missing({ pfExchangeClientSecret: secret('PF_EXCHANGE_CLIENT_SECRET'), resourceAsClientSecret: secret('RESOURCE_AS_CLIENT_SECRET') }),
       signedIn: !!(getIssuerSubjectToken(req, 'aws-agentcore') || getIssuerSubjectToken(req, 'pf-as')),
-      runtime: { deployed: false, reason: LIVE_RUNTIME_MISSING },
+      // deployed: the live tool-call leg runs when MCP_URL names the resource server (dev-live's mcp-sample,
+      // or the owner-run AgentCore runtime's MCP endpoint). Unset = the run stops after leg 2.
+      runtime: ep.runtime ? { deployed: true, url: ep.runtime } : { deployed: false, reason: LIVE_RUNTIME_MISSING },
     };
   })();
   return reply(req, res, 200, {

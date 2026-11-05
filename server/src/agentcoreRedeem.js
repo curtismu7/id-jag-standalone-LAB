@@ -427,7 +427,9 @@ export function liveEndpoints(c) {
       TokenURL: c.resourceAsTokenEndpoint,
       ClientID: c.resourceAsClientId,
     },
-    runtime: null, // no live runtime yet: the routes refuse a live run
+    // The live tool-call leg: the MCP resource server the redeemed token names (its aud). Set (dev-live exports
+    // MCP_URL) = a real local MCP server; unset = the runtime hop refuses with runtime_not_deployed.
+    runtime: c.mcpUrl || null,
     /** The settings a live run needs, in the order to set them. */
     missing: (secrets) => [
       ['PF_URL', c.pfUrl], ['PF_EXCHANGE_CLIENT_ID', c.pfExchangeClientId],
@@ -451,7 +453,7 @@ export async function liveRun({ subjectToken, scopeOverride }) {
   const ep = liveEndpoints(c);
   const scope = scopeOverride || c.scope || '';
   const out = { live: true, stage: 'leg1', leg1: null, leg2: null, redeemed: false, refusal: null, runtime: null, backendToken: null,
-    stopReason: LIVE_RUNTIME_MISSING, endpoints: { exchange: { ...ep.exchange, TokenURL: ep.exchange.TokenURL }, redeem: { ...ep.redeem } } };
+    stopReason: ep.runtime ? null : LIVE_RUNTIME_MISSING, endpoints: { exchange: { ...ep.exchange, TokenURL: ep.exchange.TokenURL }, redeem: { ...ep.redeem } } };
 
   if (!subjectToken) {
     out.refusal = { stage: 'leg1', kind: 'session', error: 'sign_in_required', description: 'Sign in at PingFederate first: the pf-as issuer session holds the refresh token this run exchanges.' };
@@ -511,13 +513,39 @@ export async function liveRun({ subjectToken, scopeOverride }) {
   out.redeemed = true;
   out.leg2 = { decoded: view(r2.data.access_token), scope: r2.data.scope };
 
-  // The runtime hop refuses: no live AgentCore runtime exists yet. The redeemed token is never used.
+  // Leg 3: the tool call. The redeemed token's aud IS the resource server (the mcp-sample in the dev-live stack,
+  // a real AgentCore-hosted runtime in the owner-run deployment). The call is a real MCP request carrying the
+  // redeemed token as its only credential - the server verifies it against the resource-as's JWKS.
   out.stage = 'runtime';
-  out.refusal = { stage: 'runtime', kind: 'not_deployed', error: 'runtime_not_deployed', status: 409, description: LIVE_RUNTIME_MISSING };
+  const toolUrl = ep.runtime;
+  if (!toolUrl) {
+    out.refusal = { stage: 'runtime', kind: 'not_deployed', error: 'runtime_not_deployed', status: 409, description: LIVE_RUNTIME_MISSING };
+    return out;
+  }
+  const at = r2.data.access_token;
+  const hop3 = { n: 3, label: 'Leg 3: call the MCP tool server with the redeemed token (Bearer, real)', from: 'runner', to: 'MCP resource server', method: 'POST', url: toolUrl,
+    request: { authentication: 'Bearer [the redeemed access token, never shown]', headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} } } };
+  let r3;
+  try {
+    const res = await outboundFetch(toolUrl, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000), body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+      headers: { 'content-type': 'application/json', accept: 'application/json', authorization: `Bearer ${at}` } });
+    hop3.status = res.status;
+    hop3.response = await res.json().catch(() => ({}));
+    r3 = { status: res.status, data: hop3.response };
+  } catch (err) {
+    out.refusal = { stage: 'runtime', kind: 'network', error: 'network', description: `Could not reach ${toolUrl} (${String(err.cause?.code || err.message).slice(0, 120)})` };
+    return out;
+  }
+  if (r3.status !== 200) {
+    out.refusal = { stage: 'runtime', kind: 'oauth', error: 'tool_call_refused', status: r3.status, description: `The MCP server refused the redeemed token (HTTP ${r3.status}): ${JSON.stringify(r3.data).slice(0, 200)}` };
+    return out;
+  }
+  out.runtime = { tool: toolUrl, tools: (r3.data.result?.tools || []).map((t) => ({ name: t.name, description: t.description })) };
   return out;
 }
 
-export const LIVE_RUNTIME_MISSING = 'No live AgentCore runtime is deployed yet (owner-run setup), so the runner stops here: legs 1 and 2 ran for real, the redeemed access token is discarded, and the runtime hop refuses.';
+export const LIVE_RUNTIME_MISSING = 'No MCP resource server is named (MCP_URL): legs 1 and 2 run for real, then the runner stops - the redeemed access token is discarded and the tool-call hop refuses.';
 
 
 export { CALLER_CLIENT_ID, CALLER_USER, API_AUDIENCE, SCOPES };

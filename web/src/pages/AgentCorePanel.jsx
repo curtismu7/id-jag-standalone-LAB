@@ -244,7 +244,7 @@ export default function AgentCorePanel() {
       </div>
       {!available && (
         <div className="ijp-banner" role="note" data-testid="ac-live-note">
-          <strong>Live: legs 1 and 2 run for real; the runtime hop refuses.</strong>{" "}
+          <strong>Live: the ID-JAG hops run for real.</strong>{" "}
           {state.live && (
             <>
               Leg 1 exchanges your pf-as issuer session's refresh token at <code>{state.live.exchange.TokenURL || "(PF_URL unset)"}</code> (client <code>{state.live.exchange.ClientID || "(unset)"}</code>, ID-JAG aud <code>{state.live.exchange.Audience || "(RESOURCE_AS_ISSUER unset)"}</code>);
@@ -339,19 +339,28 @@ export default function AgentCorePanel() {
         )}
       </Section>
 
-      <Section n={4} title="The runtime runs the tool under the workload identity" note={available ? "The runner invokes the mock runtime with the access token the target issuer minted. The runtime verifies it against its own issuer's keys and resolves the workload identity (wid)." : "Live: this hop refuses. No live AgentCore runtime is deployed yet, so the runner discards the redeemed access token and stops here."}>
+      <Section n={4} title="The runtime runs the tool under the workload identity" note={available ? "The runner invokes the mock runtime with the access token the target issuer minted. The runtime verifies it against its own issuer's keys and resolves the workload identity (wid)." : "Live: the runner calls the MCP resource server the redeemed token names (MCP_URL - the dev-live mcp-sample, or the owner-run AgentCore runtime's MCP endpoint). With no MCP_URL the run stops after leg 2."}>
         {run?.runtime ? (
           <div className="agentcore__result" data-testid="ac-runtime">
-            <p className="ijp-status" data-state={run.runtime.status === 200 ? "ok" : "bad"}>The runtime answered {run.runtime.status}{run.runtime.body?.principal ? `: it sees ${run.runtime.body.principal.sub}${run.runtime.body.principal.act ? `, acting for ${run.runtime.body.principal.act.sub}` : ""}` : ""}{run.runtime.body?.workloadIdentity ? ` · workload identity ${run.runtime.body.workloadIdentity}` : ""}.</p>
-            <Json value={run.runtime.body} />
+            {run.runtime.tools ? (
+              <>
+                <p className="ijp-status" data-state="ok">The MCP tool server answered: the redeemed token authorized the call. {run.runtime.tools.length} tool{run.runtime.tools.length === 1 ? "" : "s"} visible at <code>{run.runtime.tool}</code>.</p>
+                <Json value={run.runtime.tools} />
+              </>
+            ) : (
+              <div className="agentcore__result" data-testid="ac-runtime">
+                <p className="ijp-status" data-state={run.runtime.status === 200 ? "ok" : "bad"}>The runtime answered {run.runtime.status}{run.runtime.body?.principal ? `: it sees ${run.runtime.body.principal.sub}${run.runtime.body.principal.act ? `, acting for ${run.runtime.body.principal.act.sub}` : ""}` : ""}{run.runtime.body?.workloadIdentity ? ` · workload identity ${run.runtime.body.workloadIdentity}` : ""}.</p>
+                <Json value={run.runtime.body} />
+              </div>
+            )}
           </div>
-        ) : run?.live ? <p className="ijp-note" data-testid="ac-live-runtime-note">The live run stops here: {run.refusal?.description || "no live runtime is deployed yet"}.</p> : <p className="ijp-note">Run all three hops to see the runtime's answer.</p>}
+        ) : run?.live ? <p className="ijp-note" data-testid="ac-live-runtime-note">The live run stops here: {run.refusal?.description || "no MCP resource server is named"}.</p> : <p className="ijp-note">Run all three hops to see the runtime's answer.</p>}
         {refusal(refusalAt("runtime"))}
       </Section>
 
       {!available && (
         <Section n={5} title="Live: what a run proves, and what it cannot yet" note="Live mode has no mock scenarios: the mock-only scenarios below are hidden.">
-          <p className="ijp-note">A live run proves: PingFederate issued an ID-JAG from your pf-as session (leg 1), and the kit's resource-as redeemed it and minted an access token (leg 2) — both shown decoded, real tokens never leaving the server. It cannot yet prove the runtime hop: no live AgentCore runtime is deployed, so the redeemed token is discarded and the run answers a refusal at stage <code>runtime</code>.</p>
+          <p className="ijp-note">A live run proves: PingFederate issued an ID-JAG from your pf-as session (leg 1), the kit's resource-as redeemed it and minted an access token (leg 2), and the redeemed token authorized a real MCP tool call (leg 3) — real tokens shown decoded, never leaving the server. Without MCP_URL the run stops after leg 2 at stage <code>runtime</code>.</p>
         </Section>
       )}
 
