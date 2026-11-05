@@ -49,7 +49,7 @@ function adminApi(ns, port) {
   } else {
     base = `https://localhost:${port}/pf-admin-api/v1`;
     user = 'administrator';
-    pw = Buffer.from(execFileSync('kubectl', [...(args.context && args.context !== true ? ['--context', args.context] : []), '-n', ns, 'get', 'secret', 'pingfederate-admin', '-o', 'jsonpath={.data.password}']).toString(), 'base64').toString();
+    pw = process.env.PF_ADMIN_PASSWORD || Buffer.from(execFileSync('kubectl', [...(args.context && args.context !== true ? ['--context', args.context] : []), '-n', ns, 'get', 'secret', args['admin-secret'] || 'pingfederate-admin', '-o', 'jsonpath={.data.password}']).toString(), 'base64').toString();
     agent = new https.Agent({ rejectUnauthorized: false }); // port-forwarded admin API, self-signed
   }
   return (method, p, body) => new Promise((resolve, reject) => {

@@ -56,7 +56,7 @@ function secret(name) {
   process.exit(2);
 }
 
-const adminPw = Buffer.from(execFileSync('kubectl', ['-n', NS, 'get', 'secret', 'pingfederate-admin', '-o', 'jsonpath={.data.password}']).toString(), 'base64').toString();
+const adminPw = process.env.PF_ADMIN_PASSWORD || Buffer.from(execFileSync('kubectl', ['-n', NS, 'get', 'secret', args['admin-secret'] || 'pingfederate-admin', '-o', 'jsonpath={.data.password}']).toString(), 'base64').toString();
 const agent = new https.Agent({ rejectUnauthorized: false }); // port-forwarded admin API, self-signed
 
 function api(method, p, body) {

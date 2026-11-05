@@ -277,3 +277,39 @@ Three findings from driving the invoke against the READY runtime:
   can target a PingFederate that lacks the kit's default object names.
 - The k8s `pingfederate-admin` port-forward dies often; kill the stale
   listener before re-establishing.
+
+## Part 5 — pf-pf proven with a stand-in Acme PingFederate (2026-11-05)
+
+A second PingFederate (`pingfederate-acme` StatefulSet in `ping-devops-cmuir`,
+public at `https://cmuir-pf-acme2.ping-devops.com`) played Acme; the SE
+PingFederate (`cmuir-pf-acme.ping-devops.com`) redeemed. The chain: sign in at
+the stand-in as `acme-user` → Acme issues an ID-JAG addressed to our PF
+(`client_id=id-jag-redeemer`) → our PF redeems it (JWT bearer, EXTENSION grant,
+client `id-jag-redeemer`) → the MCP call returns the tools.
+
+### Booting a fresh PingFederate stand-in (what bit)
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `CONTAINER FAILURE: 06-copy-product-bits.sh` | the PVC needs group 9031 | `securityContext: { fsGroup: 9031, runAsUser: 9031 }` |
+| `license_agreement_not_accepted` forever | the license must be in the PERSISTENT `/opt/out` at first boot | mount `pingfederate-license` at `/opt/in/.../pingfederate.lic` and recreate the PVC so first boot sees it |
+| admin 401 after accepting the agreement manually | the boot hook creates the admin user only when ITS OWN accept returns 200; a manual accept makes the next boot skip it | recreate the PVC and let the hook drive; or POST `/administrativeAccounts` unauthenticated right after accepting |
+| public URL hangs while the engine is fine in-cluster | the ingress must say the backend speaks TLS | `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` (+ force-ssl-redirect, proxy-buffer-size 16k) |
+
+### Config gaps the kit scripts don't set for a remote redeemer
+
+- `configure-acme-idp.js` / `configure-acme-signin.js` /
+  `configure-pf-redeemer.js` now accept `PF_ADMIN_PASSWORD` (or
+  `--admin-secret=<secret name>`), `--policy=`, `--key=`, `--allow-remote`,
+  `--no-restart` — so they can drive a stand-in whose secret name and object
+  ids differ from the local defaults.
+- On the stand-in, `configure-acme-signin.js` must target the kit policy the
+  idp script created (`--policy=acmeIdJagPolicy`); the hardcoded
+  `idJagKitPolicy` does not exist there.
+- The redeemer ATM (`idJagKitRedeemerAtm`) needs `Type Header Value=at+jwt`
+  and `Audience Claim Value=<MCP resource>` — without them the MCP server
+  refuses the token (`typ is "(none)"` / `aud undefined`).
+- Acme's `acmeToPingFed` connection must list the MCP resource in
+  `resourceUris`, or the ID-JAG exchange answers `invalid_target`.
+- PingFederate caches the issuer's JWKS: after creating or changing the IdP
+  connection, restart the redeemer PF (pod delete) before the first redeem.

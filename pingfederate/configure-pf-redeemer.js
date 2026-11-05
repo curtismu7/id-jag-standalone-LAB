@@ -27,9 +27,10 @@ const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const pf = require('./pf-admin');
+const { args } = pf;
 const { connectionFor, connectionMatches } = require('./sync-id-jag-trusted-idps');
 
-const ID = { atm: 'idJagKitRedeemerAtm', idp: 'acme', key: 'idjagkit-signing' };
+const ID = { atm: args.atm || 'idJagKitRedeemerAtm', idp: args.idp || 'acme', key: args.key || 'idjagkit-signing' };
 const IDP_CONNECTION = `idJagKit-${ID.idp}`;
 const JWT_ATM = 'com.pingidentity.pf.access.token.management.plugins.JwtBearerAccessTokenManagementPlugin';
 const DEFAULT_RESOURCE = 'http://localhost:9090/mcp';
@@ -195,14 +196,14 @@ if (require.main === module) {
       client: flag('client') || process.env.PF_REDEEMER_CLIENT_ID || DEFAULT_CLIENT,
       existingSecret: process.env.PF_REDEEMER_CLIENT_SECRET || '', // pf-admin.js has loaded the settings file into the environment
     };
-    if (!/^https:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(o.pfUrl)) { console.error('PF_URL (or --pf) must be this machine\'s PingFederate, like https://127.0.0.1:4732: run npm run setup -- --mode=pf-local first'); process.exit(2); }
+    if (!args['allow-remote'] && !/^https:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(o.pfUrl)) { console.error('PF_URL (or --pf) must be this machine\'s PingFederate, like https://127.0.0.1:4732: run npm run setup -- --mode=pf-local first (or pass --allow-remote for a PingFederate you administer remotely)'); process.exit(2); }
     if (!args.remove && !/^https:\/\/[^/\s]+$/.test(o.acmeUrl.replace(/\/$/, ''))) {
       console.error('ACME_PF_URL is not set: it comes from the Acme owner\'s three-key settings block. Run npm run setup -- --mode=pf-pf --acme-settings=<file>'); process.exit(2);
     }
     await pf.requireIssuer(api, o.pfUrl);
     const dir = flag('backup-dir') || path.join(os.homedir(), '.config', 'demo-kit', 'id-jag-kit', 'backups');
     const deps = {
-      backup: async () => console.log(`  backup saved: ${await saveBackup(api, dir)} (mode 600)`),
+      backup: async () => { try { console.log(`  backup saved: ${await saveBackup(api, dir)} (mode 600)`); } catch (e) { console.log(`  backup skipped (${e.message.split('(')[0].trim()})`); } },
       restart: async () => (args['no-restart'] ? console.log('  --no-restart: restart the PingFederate container yourself before the first redeem') : restartContainer(api, containerName())),
       writeSettings: pf.writeEnv,
       rand: () => crypto.randomBytes(24).toString('base64url'),
