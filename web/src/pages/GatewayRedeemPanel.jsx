@@ -3,13 +3,14 @@ import api from "../services/api";
 import "./GatewayRedeemPanel.css";
 
 // The "gateway-redeem" playground mode: the Privilege MCP gateway exchanges the caller's token (leg 1) and, when a Redeem spec with a
-// TokenURL is set, redeems the result at the target app's own issuer (leg 2). Ping release claim (2026-11-02), UNVERIFIED on our
-// tenant: every request here goes to in-process mocks (the server's /gateway-redeem routes). Every result on this page is what the
-// last run returned; nothing shown as a result is a constant. ClientSecret and PrivateKeyPEM are write-only: the server never sends
-// them back, and the form only ever sends a value you typed.
+// TokenURL is set, redeems the result at the target app's own issuer (leg 2). Leg 1 measured on our tenant 2026-11-05 (gateway
+// v1.261102: "[mcpgw] obo exchange ok …" on a test app with AuthMode obo — see AI-DEMO2-internal/privilege/OBO-REDEEM-VERIFICATION-
+// 2026-11-05.md); leg 2 (Redeem) and every request on THIS page remain UNVERIFIED: everything here goes to in-process mocks (the
+// server's /gateway-redeem routes). Every result on this page is what the last run returned; nothing shown as a result is a constant.
+// ClientSecret and PrivateKeyPEM are write-only: the server never sends them back, and the form only ever sends a value you typed.
 
 const BASE = "/api/id-jag-playground/gateway-redeem";
-export const CLAIM = "Ping release claim (2026-11-02), UNVERIFIED on our tenant";
+export const CLAIM = "Ping release claim (2026-11-02); leg 1 (OBO exchange) measured on our tenant 2026-11-05, leg 2 (Redeem) and this page's mocks UNVERIFIED";
 const SWAGGER = "console swagger name, 2026-10-31, schema only";
 
 // The fields of each leg, in the order the swagger lists them. secret: write-only. kind: how the form draws it.
