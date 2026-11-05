@@ -38,6 +38,12 @@ export function config() {
     mcpUrl: env('MCP_URL'),
     resource: env('ID_JAG_RESOURCE'),
     scope: env('ID_JAG_SCOPE'),
+    // The live AgentCore runtime (owner-deployed). Unset = the runtime hop refuses not_deployed.
+    // The invoke is server-side SigV4 (OAuth inbound auth means boto3-style service calls cannot
+    // reach it, and the ID-JAG must never reach the browser), so the server needs AWS credentials
+    // allowed to invoke this runtime — nothing more.
+    agentCoreRuntimeUrl: noSlash(env('AGENTCORE_RUNTIME_URL')),
+    agentCoreRuntimeRegion: env('AGENTCORE_RUNTIME_REGION', 'us-east-2'),
     ...demoConfig(runtimeEnv()),
   };
 }

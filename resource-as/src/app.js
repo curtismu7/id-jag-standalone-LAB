@@ -179,6 +179,11 @@ export function createHandler({
   return async function handle(req, res) {
     const { pathname } = new URL(req.url, 'http://localhost');
     if (req.method === 'GET' && pathname === '/.well-known/oauth-authorization-server') return send(res, 200, metadata);
+    // OIDC discovery alias: verifiers that require the openid-configuration path (AWS AgentCore's
+    // customJWTAuthorizer) get the same document with the fields OIDC discovery requires filled in.
+    if (req.method === 'GET' && pathname === '/.well-known/openid-configuration') {
+      return send(res, 200, { ...metadata, response_types_supported: ['id_token'], subject_types_supported: ['public'], id_token_signing_alg_values_supported: ['RS256'] });
+    }
     if (req.method === 'GET' && pathname === '/jwks') return send(res, 200, jwks);
     if (pathname === '/authorize') {
       return send(res, 400, { error: 'unsupported_response_type', error_description: `this authorization server only redeems ID-JAGs (${JWT_BEARER_GRANT} at /token)` });

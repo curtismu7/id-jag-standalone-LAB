@@ -250,7 +250,9 @@ export default function AgentCorePanel() {
               Leg 1 exchanges your pf-as issuer session's refresh token at <code>{state.live.exchange.TokenURL || "(PF_URL unset)"}</code> (client <code>{state.live.exchange.ClientID || "(unset)"}</code>, ID-JAG aud <code>{state.live.exchange.Audience || "(RESOURCE_AS_ISSUER unset)"}</code>);
               leg 2 redeems the ID-JAG at the kit's resource-as <code>{state.live.redeem.TokenURL || "(unset)"}</code> (client <code>{state.live.redeem.ClientID || "(unset)"}</code>).
               {state.live.missing.length > 0 && <> Still missing: <strong>{state.live.missing.join(", ")}</strong>.</>}
-              {state.live.runtime && <> Runtime: {state.live.runtime.reason}</>}
+              {state.live.runtime?.deployed
+                ? <> Runtime: <code>{state.live.runtime.InvokeURL}</code> ({state.live.runtime.Region}) — the run invokes it with the ID-JAG via server-side SigV4.</>
+                : <> Runtime: {state.live.runtime?.reason}</>}
               {!state.live.signedIn && state.live.missing.length === 0 && <> Sign in at PingFederate first (step 1 of this page uses the pf-as sign-in).</>}
             </>
           )}
@@ -270,11 +272,19 @@ export default function AgentCorePanel() {
         {error && <div className="ijp-banner ijp-banner--error" role="alert">{error}</div>}
         {run && run.verdict && <Verdict run={run} />}
         {run?.live && (
-          <p className="ijp-status" data-state={run.redeemed ? "ok" : "bad"} data-testid="ac-live-result">
-            Live run: {run.redeemed
-              ? "leg 1 issued a real ID-JAG and leg 2 redeemed it for real (both decoded below); the runtime hop refused, so the redeemed access token was discarded."
-              : `refused at ${run.refusal?.stage ?? "?"} (${run.refusal?.error ?? "unknown"}).`}
+          <p className="ijp-status" data-state={run.stage === "done" ? "ok" : run.redeemed ? "warn" : "bad"} data-testid="ac-live-result">
+            Live run: {run.stage === "done"
+              ? "the runtime answered — its decoded identity is below."
+              : run.redeemed
+                ? "leg 1 issued a real ID-JAG and leg 2 redeemed it for real (both decoded below); the runtime hop refused, so the redeemed access token was discarded."
+                : `refused at ${run.refusal?.stage ?? "?"} (${run.refusal?.error ?? "unknown"}).`}
           </p>
+        )}
+        {run?.runtime && (
+          <div className="agentcore__result" data-testid="ac-runtime">
+            <h4>The runtime's answer, decoded <span className="ijp-cite">({run.live ? "the real AgentCore runtime idjag_whoami" : "the mock runtime"})</span></h4>
+            <Json value={run.runtime.decoded ?? run.runtime} />
+          </div>
         )}
         {run?.callerToken && <details className="agentcore__hop"><summary>The caller token (mock-issued, shown raw)</summary><Json value={run.callerToken.decoded} /></details>}
       </Section>
