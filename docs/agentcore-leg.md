@@ -312,3 +312,21 @@ client `id-jag-redeemer`) → the MCP call returns the tools.
   `resourceUris`, or the ID-JAG exchange answers `invalid_target`.
 - PingFederate caches the issuer's JWKS: after creating or changing the IdP
   connection, restart the redeemer PF (pod delete) before the first redeem.
+
+### Recurring failure modes hit on 2026-11-06 (demouser work)
+
+- The `acmeAtm` allowed-clients list regresses: any later PUT built from a
+  stale copy rewrites it. Re-add the client(s) via the admin API and prefer
+  read-modify-write against a FRESH GET every time.
+- The PingFederate ADMIN account locked (`account_locked`) and then
+  `invalid_credentials` — the lock persists in the data store across pod
+  restarts, and the boot hook skips admin creation because the license
+  agreement is already accepted. Recovery: set
+  `license-agreement-accepted=false` in
+  `data/config-store/com.pingidentity.page.Login.xml`, move away
+  `data/pingfederate-admin-user.xml`, set
+  `CREATE_INITIAL_ADMIN_USER=true` on the container, restart — the hook
+  accepts the agreement and recreates the admin with
+  `PING_IDENTITY_PASSWORD`; accept any remaining agreement prompt after boot.
+- Deleting and recreating an OAuth client keeps its config but any client in
+  an ATM's restricted list must be re-admitted.
