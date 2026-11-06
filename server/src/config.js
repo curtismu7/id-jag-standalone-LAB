@@ -22,6 +22,10 @@ export function config() {
     host: env('HOST'),
     port: Number(env('PORT', '4720')),
     appOrigin: noSlash(env('APP_ORIGIN', 'http://localhost:4720')),
+    // Optional second front door (family lab-proxy). When a request arrives through it (X-Forwarded-Host set):
+    // proxyOrigin (bare, no path) is the browser Origin for CSRF; proxyBase (e.g. /id-jag-kit) prefixes OAuth redirect URIs.
+    proxyOrigin: noSlash(env('PROXY_ORIGIN')),
+    proxyBase: noSlash(env('PROXY_BASE')),
     dataDir: env('DATA_DIR', '.data'),
     // The PingFederate that issues ID-JAGs (pf-as mode) and redeems them (pf-pf and byo modes).
     pfUrl: noSlash(env('PF_URL', 'https://pf.example.invalid')),

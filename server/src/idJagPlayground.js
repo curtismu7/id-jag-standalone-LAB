@@ -28,6 +28,7 @@ import { mockSigninProblem } from './mockSignin.js';
 import { getIssuerSubjectToken } from './issuerSession.js';
 import { mountInterop } from './interop.js';
 import { outboundFetch } from './outbound.js';
+import { requestBase, requestOrigin } from './requestOrigin.js';
 import * as trustedIdps from './trustedIdps.js';
 import { SPEC, decodeJwt, inspect, issuerKeyCheck, scopeList, trimSlash } from './tokenChecks.js';
 import { piFlowHandlers } from './auth/piFlow.js';
@@ -44,8 +45,9 @@ export { decodeJwt, inspect };
 
 const router = express.Router();
 router.use(express.json());
-// Every write acts on the caller's tokens or the registry: same-origin only (CSRF).
-router.use((req, res, next) => (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.get('origin') !== config().appOrigin
+// Every write acts on the caller's tokens or the registry: same-origin only (CSRF). Dual-homing: a page served
+// through the lab-proxy has the proxy's Origin (requestOrigin.js).
+router.use((req, res, next) => (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.get('origin') !== requestOrigin(req)
   ? res.status(403).json({ error: 'invalid_origin' }) : next()));
 
 const ID_JAG_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:id-jag';
@@ -669,17 +671,17 @@ router.get('/preflight', async (req, res) => {
 
 // Same-origin relative path only: no //host, no /\host (browsers read a backslash as a slash), printable ASCII.
 const safeReturnTo = (p) => (typeof p === 'string' && /^\/(?![/\\])[!-~]*$/.test(p) ? p : '/');
-const issuerRedirectUri = () => `${config().appOrigin}/api/id-jag-playground/issuer/callback`;
+const issuerRedirectUri = (req) => `${requestBase(req)}/api/id-jag-playground/issuer/callback`;
 
 /** The pending issuer login (kept in the session) and the authorize URL for it. Shared with the pi.flow driver. */
-function issuerAuthorizeRequest(mode, returnTo) {
+function issuerAuthorizeRequest(mode, returnTo, req) {
   const s = settings(mode);
   const verifier = crypto.randomBytes(32).toString('base64url');
   const state = crypto.randomBytes(16).toString('hex');
   const login = { mode, state, verifier, returnTo: safeReturnTo(returnTo), at: Date.now() };
   const url = new URL(s.idp.authorizationEndpoint);
   url.search = new URLSearchParams({
-    response_type: 'code', client_id: s.idp.exchangeClientId, redirect_uri: issuerRedirectUri(),
+    response_type: 'code', client_id: s.idp.exchangeClientId, redirect_uri: issuerRedirectUri(req),
     scope: mode === 'pf-pf' ? 'offline_access' : 'openid profile email offline_access', state, // the outside Acme PingFederate defines no OIDC scopes or policy
     code_challenge: crypto.createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256',
   }).toString();
@@ -698,7 +700,7 @@ const issuerFlow = piFlowHandlers({
     if (mode === 'byo') return { fail: [409, { error: 'byo_mode', message: 'Your IdP issues the ID-JAG: no sign-in here.' }] };
     const keys = missing(mode);
     if (keys.length) return { fail: [409, { error: 'not_configured', missing: keys }] };
-    const p = issuerAuthorizeRequest(mode, req.query.return_to);
+    const p = issuerAuthorizeRequest(mode, req.query.return_to, req);
     p.url.searchParams.set('prompt', 'login');
     return p;
   },
@@ -716,7 +718,7 @@ router.get('/issuer/callback', async (req, res) => {
   const s = settings(pending.mode);
   try {
     const r = await postForm(s.idp.tokenEndpoint, new URLSearchParams({
-      grant_type: 'authorization_code', code: String(req.query.code), redirect_uri: issuerRedirectUri(), code_verifier: pending.verifier,
+      grant_type: 'authorization_code', code: String(req.query.code), redirect_uri: issuerRedirectUri(req), code_verifier: pending.verifier,
     }), { Authorization: basic(s.idp.exchangeClientId, issuerSecret(pending.mode)) });
     if (r.status !== 200 || !r.data?.refresh_token) {
       return req.session.save(() => res.redirect(`${back}?issuer_error=${encodeURIComponent(r.data?.error || `http_${r.status}`)}`));
@@ -865,7 +867,7 @@ router.post('/byo/inspect', async (req, res) => {
 
 const XAA_ISSUER = 'https://idp.xaa.dev';
 const TOKEN_EXCHANGE = 'urn:ietf:params:oauth:grant-type:token-exchange';
-const xaaRedirectUri = () => `${config().appOrigin}/api/id-jag-playground/xaa/callback`;
+const xaaRedirectUri = (req) => `${requestBase(req)}/api/id-jag-playground/xaa/callback`;
 const xaaClient = () => ({ client_id: secret('XAA_DEV_IDP_CLIENT_ID'), client_secret: secret('XAA_DEV_IDP_CLIENT_SECRET') });
 /** The registry entry for IdenX, any status (issuers are unique in the registry). */
 const xaaEntry = () => trustedIdps.list().find((e) => e.issuer === XAA_ISSUER) || null;
@@ -913,7 +915,7 @@ router.get('/xaa/login', async (req, res) => {
   const u = new URL(d.authorization_endpoint);
   // prompt=consent: an OpenID Provider grants offline_access (the refresh token we exchange) only with it (OIDC Core §11).
   u.search = new URLSearchParams({
-    response_type: 'code', client_id: secret('XAA_DEV_IDP_CLIENT_ID'), redirect_uri: xaaRedirectUri(),
+    response_type: 'code', client_id: secret('XAA_DEV_IDP_CLIENT_ID'), redirect_uri: xaaRedirectUri(req),
     scope: 'openid profile email offline_access', prompt: 'consent', state, nonce,
     code_challenge: crypto.createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256',
   }).toString();
@@ -930,7 +932,7 @@ router.get('/xaa/callback', async (req, res) => {
   try {
     const d = await xaaDiscovery();
     const r = await postForm(d.token_endpoint, new URLSearchParams({ // client_secret_post
-      grant_type: 'authorization_code', code: String(req.query.code), redirect_uri: xaaRedirectUri(), code_verifier: pending.verifier, ...xaaClient(),
+      grant_type: 'authorization_code', code: String(req.query.code), redirect_uri: xaaRedirectUri(req), code_verifier: pending.verifier, ...xaaClient(),
     }));
     if (r.status !== 200 || !r.data?.id_token) return done(`xaa_error=${encodeURIComponent(r.data?.error || `http_${r.status}`)}`);
     let claims;

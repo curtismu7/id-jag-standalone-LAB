@@ -360,3 +360,27 @@ to the resource AS. Any other path on that host (bare `/jwks`,
 The playground's `/as-events` bug fixed on 2026-11-06 was exactly this trap:
 deriving the events URL from the token endpoint's ORIGIN dropped the
 `/resource-as` path.
+
+### Dual-homing: the kit serves through the family lab-proxy too (2026-11-06)
+
+The kit answers on BOTH doors:
+
+- direct: `http://localhost:4720` (what the real-client guides and dev-live use)
+- lab-proxy: `https://local.ping-devops.com:8443/id-jag-kit/` (family standard, owner rule)
+
+Mechanics (server/src/requestOrigin.js): a request through the proxy carries
+`X-Forwarded-Host`; the server then uses `PROXY_ORIGIN` (bare origin) for
+CSRF/same-origin checks and `PROXY_ORIGIN`+`PROXY_BASE` (`/id-jag-kit`) for
+every OAuth redirect URI. `.env` sets both plus
+`ALLOWED_HOSTS=id-jag-kit.local.ping-devops.com,local.ping-devops.com`.
+
+PingFederate clients must register BOTH redirect URIs (localhost and the
+proxy path) for `id-jag-kit-acme` and any app-level client:
+
+- `https://local.ping-devops.com:8443/id-jag-kit/api/id-jag-playground/issuer/callback`
+- `https://local.ping-devops.com:8443/id-jag-kit/auth/callback`
+
+The lab-proxy entry (`shared/lab-proxy/nginx.conf` in the meta-repo) maps
+`/id-jag-kit/` to `host.docker.internal:4720` with the forwarded headers and
+sets the `lab` cookie, so the SPA's absolute `/api` and `/assets` requests
+keep landing on this kit.
