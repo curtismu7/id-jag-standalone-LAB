@@ -384,3 +384,44 @@ The lab-proxy entry (`shared/lab-proxy/nginx.conf` in the meta-repo) maps
 `/id-jag-kit/` to `host.docker.internal:4720` with the forwarded headers and
 sets the `lab` cookie, so the SPA's absolute `/api` and `/assets` requests
 keep landing on this kit.
+
+### PingOne as the user directory (2026-11-06, owner decision: ALL use cases)
+
+Both kit PingFederates now validate passwords against the banking PingOne
+environment (`01d89b06…`) through the PingOne (P14C) data store + PCV, the
+same connector family AI-DEMO2's other PF instances use. The local
+`acmeUsers`/`idjagpcv` rows are retired (still configured, unused).
+
+Pieces, all scriptable:
+
+- PingOne gateway `8fd16217…` ("AI Demo PF Directory Connection", roles
+  Identity Data Admin + Environment Admin) — one credential per PF:
+  `POST /v1/environments/{env}/gateways/{id}/credentials` →
+  `POST /pf-admin-api/v1/pingOneConnections {name, credential}`
+  (connection names cannot contain hyphens).
+- Data store: `POST /dataStores` with `type: CUSTOM`, plugin
+  `…datastore.p14c.PingOneForCustomersDataStore`, field
+  `PingOne Environment = <connectionId>|<envId>`.
+- PCV: `POST /passwordCredentialValidators` with plugin
+  `…pcvs.p14c.PingOneForCustomersPCV`, field `PingOne For Customers
+  Datastore = <dsId>`, Username Attribute `username`.
+- Adapters: swap the HTML form adapters' "Credential Validators" table row
+  to the new PCV (`idjagform`, `idJagKitAcmeForm` on both PFs).
+
+Gotchas that cost an hour:
+
+- Creating a user with an inline `password` in the POST body does NOT set
+  it. Passwords must be set explicitly:
+  `PUT /v1/environments/{env}/users/{id}/password`,
+  Content-Type `application/vnd.pingidentity.password.set+json`, body
+  `{"value":"…"}`. The PCV then answers PingOne's 400 `NO_PASSWORD` as a
+  credential failure — enable DEBUG on `com.pingidentity.plugins` in the
+  engine's log4j2.xml to see the wire call.
+- POST /applications needs `protocol` and `enabled` set or validation
+  fails; minting a secret for another app needs org-level grants the env
+  workers lack (not needed here — the connection credential carries the
+  authority).
+
+Kit users live in the "Sample Users" population: `demouser@pingidentity.com`,
+`acme-user@pingidentity.com` (same password as before, kept for demo
+continuity).
