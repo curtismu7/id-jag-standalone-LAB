@@ -425,3 +425,25 @@ Gotchas that cost an hour:
 Kit users live in the "Sample Users" population: `demouser@pingidentity.com`,
 `acme-user@pingidentity.com` (same password as before, kept for demo
 continuity).
+
+### Standalone-lab audit after the PingOne directory switch (2026-11-06)
+
+Swept all 62 standalone labs for PingFederate user sign-ins. Only three hit
+the kit's PFs, and only one is exposed:
+
+- **worker-demo-LAB** — its real-sign-in client is `privilege-demo-signin`
+  on the SE PF (`http://localhost:6700/callback`), which rides `idjagform`
+  → now the PingOne PCV. Its compose form runs MODE=local with no PF env
+  (offline runtime, unaffected); the exposure is a local `npm run dev`
+  with `.env` pointing at `cmuir-pf-acme`. Its personas
+  (`eli,gwen,ben,cora,priya`) now exist as
+  `<persona>@pingidentity.com` / `DemoUser!2026` in the Sample Users
+  population, so any persona can sign in. `eli` verified COMPLETED via
+  the PCV.
+- privilege-demo-LAB — runs MODE=mock (in-process sign-in); unaffected.
+- cimd-LAB, ping-services-stub-LAB — no real-PF user sign-in (stub/local
+  PF); unaffected.
+
+Rule of thumb going forward: anyone signing into `cmuir-pf-acme` needs a
+PingOne user in env `01d89b06…` — the local validator rows are no longer
+consulted.
