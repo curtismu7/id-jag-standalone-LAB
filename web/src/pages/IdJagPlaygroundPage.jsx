@@ -143,10 +143,22 @@ function Fields({ value, name }) {
   }
   if (TIME_CLAIMS.has(name) && typeof value === "number") return <span>{value} <span className="ijp-cite">({new Date(value * 1000).toLocaleString()})</span></span>;
   // Server-held secrets arrive as bracketed placeholders (e.g. "[your session token, never sent to the browser]");
-  // show them as masked tokens, not plain strings.
+  // show them as masked tokens with a show/hide eye, not plain strings.
   const s = String(value);
-  if (s.startsWith("[") && s.endsWith("]")) return <span className="ijp-masked" title={s}>●●●●●●●● <span className="ijp-masked__why">{s.slice(1, -1)}</span></span>;
+  if (s.startsWith("[") && s.endsWith("]")) return <MaskedValue text={s.slice(1, -1)} title={s} />;
   return <span>{s}</span>;
+}
+
+/** A masked placeholder value with an eye to reveal why it is hidden (the value itself never leaves the server). */
+function MaskedValue({ text, title }) {
+  const [shown, setShown] = useState(false);
+  return (
+    <span className={`ijp-masked${shown ? " is-shown" : ""}`}>
+      <button type="button" className="ijp-masked__eye" aria-pressed={shown} aria-label={shown ? "Hide why the value is held back" : "Show why the value is held back"}
+        title={shown ? "Hide" : "Show"} onClick={() => setShown((v) => !v)}>{shown ? "🔓" : "🔐"}</button>
+      {" "}<span className="ijp-masked__why">{shown ? text : "held back — never sent to the browser"}</span>
+    </span>
+  );
 }
 
 function Data({ value }) {
