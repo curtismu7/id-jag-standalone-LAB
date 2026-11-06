@@ -447,3 +447,22 @@ the kit's PFs, and only one is exposed:
 Rule of thumb going forward: anyone signing into `cmuir-pf-acme` needs a
 PingOne user in env `01d89b06…` — the local validator rows are no longer
 consulted.
+
+### JWKS freshness after every resource-as deploy (2026-11-06)
+
+The resource-as regenerates its signing key on re-deploy. Its JWKS is served
+in three places that MUST agree:
+
+- `https://id-jag.ai-demo.ping-devops.com/resource-as/jwks` (the AS itself)
+- `https://ai-demo.ping-devops.com/jwks.json` (root path, for AgentCore's
+  customJWTAuthorizer — served by the `id-jag-jwks-curator` deployment from
+  the ConfigMap of the same name)
+- the `jwks_uri` inside the curator's `discovery.json` (root, path-ful
+  discovery is rejected by AgentCore)
+
+After ANY resource-as deploy, refresh the curator ConfigMap from the live
+endpoints (discovery with `jwks_uri` rewritten to the root path, JWKS
+verbatim) and `rollout restart deploy/id-jag-jwks-curator`. A stale curator
+serves the old kid and AgentCore rejects every new access token. Verify by
+comparing the `kid` of a freshly redeemed access token against
+`/jwks.json`.
