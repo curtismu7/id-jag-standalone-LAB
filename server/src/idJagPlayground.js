@@ -480,11 +480,13 @@ async function preflight(req, step) {
   const c = config();
   const here = originOf(req.query.origin);
 
-  // Every POST must carry Origin = APP_ORIGIN (CSRF check): a page on another host fails every action.
-  add('origin', 'This page is on APP_ORIGIN', !here ? 'warn' : here === c.appOrigin ? 'pass' : 'fail',
-    !here ? 'Could not tell which host this page is on.' : here === c.appOrigin ? here
+  // Every POST must carry Origin = the page's expected origin (CSRF check): a page on another host fails every action.
+  // Dual-homing: the page may sit on APP_ORIGIN directly or on PROXY_ORIGIN through the lab-proxy.
+  const expected = here === c.proxyOrigin ? c.proxyOrigin : c.appOrigin;
+  add('origin', 'This page is on the app origin', !here ? 'warn' : here === expected ? 'pass' : 'fail',
+    !here ? 'Could not tell which host this page is on.' : here === expected ? here
       : `This page is on ${here}, but APP_ORIGIN is ${c.appOrigin}: the server refuses every action from this page (invalid_origin).`,
-    `Open ${c.appOrigin}, or set APP_ORIGIN=${here || 'this page\'s origin'} in .env and restart the server.`);
+    `Open ${expected}, or set APP_ORIGIN=${here || 'this page\'s origin'} in .env and restart the server.`);
 
   if (step === 'mode') {
     const target = String(req.query.mode || '');
