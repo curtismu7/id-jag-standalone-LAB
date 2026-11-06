@@ -344,3 +344,19 @@ stand-in Acme). Two deliberate changes make it work:
   and remove the domain when the demo user no longer needs a public inbox.
   Nothing in the kit sends mail; the inbox is only relevant if a flow ever
   does (IdenX's verification code is demo-mode, no email).
+
+### Resource AS URLs on the SE host (2026-11-06)
+
+The SE ingress only routes `/resource-as/...` on `id-jag.ai-demo.ping-devops.com`
+to the resource AS. Any other path on that host (bare `/jwks`,
+`/.well-known/oauth-authorization-server`) hits the default backend → nginx
+503. That looks like an attack block but is just "no route". The real URLs
+(the issuer lives under a path, RFC 8414 style):
+
+- metadata: `https://id-jag.ai-demo.ping-devops.com/resource-as/.well-known/oauth-authorization-server`
+- JWKS: `https://id-jag.ai-demo.ping-devops.com/resource-as/jwks`
+- events page: `https://id-jag.ai-demo.ping-devops.com/resource-as/`
+
+The playground's `/as-events` bug fixed on 2026-11-06 was exactly this trap:
+deriving the events URL from the token endpoint's ORIGIN dropped the
+`/resource-as` path.
