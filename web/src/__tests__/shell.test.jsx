@@ -30,7 +30,7 @@ describe("app shell", () => {
     localStorage.setItem("idjag.theme", "light");
     render(<AppShell><p>child</p></AppShell>);
     expect(document.documentElement.dataset.theme).toBe("light");
-    fireEvent.click(screen.getByRole("button", { name: "Switch to dark theme" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Theme" }), { target: { value: "dark" } });
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(localStorage.getItem("idjag.theme")).toBe("dark");
     expect(screen.getByRole("link", { name: "Playground" })).toHaveAttribute("aria-current", "page");
