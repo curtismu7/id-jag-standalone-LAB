@@ -6,14 +6,14 @@
 # Admin credentials are written only to ~/.config/demo-kit/provisioning.json (mode 600), never to the shared .env.
 # Environment overrides: PF_ADMIN_PORT (4731), PF_ENGINE_PORT (4732), PF_CONTAINER (id-jag-kit-pf for a new install; an
 #   existing container named pingfederate-lab, from an earlier version of this kit, is found and reused, never recreated),
-#   PF_IMAGE (pingidentity/pingfederate:13.1.3-latest, the version the shared Acme PingFederate runs), PF_LICENSE_FILE (~/Documents/pingfederate.lic),
+#   PF_IMAGE (pingidentity/pingfederate:13.1.3-latest, the version the shared Acme PingFederate runs), PF_LICENSE_FILE (~/.config/demo-kit/pingfederate.lic),
 #   PF_SERVER_PROFILE_URL and PF_SERVER_PROFILE_PATH (Ping getting-started profile), PF_ACCEPT_EULA=YES to skip the prompt.
 set -u
 
 ADMIN_PORT="${PF_ADMIN_PORT:-4731}"
 ENGINE_PORT="${PF_ENGINE_PORT:-4732}"
 IMAGE="${PF_IMAGE:-pingidentity/pingfederate:13.1.3-latest}"
-LICENSE="${PF_LICENSE_FILE:-$HOME/Documents/pingfederate.lic}"
+LICENSE="${PF_LICENSE_FILE:-$HOME/.config/demo-kit/pingfederate.lic}"
 # Ping's public "getting-started" server profile creates the first administrator from PING_IDENTITY_PASSWORD.
 # Without a profile a fresh PingFederate shows a setup wizard and has no admin account yet.
 PROFILE_URL="${PF_SERVER_PROFILE_URL:-https://github.com/pingidentity/pingidentity-server-profiles.git}"

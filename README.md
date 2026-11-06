@@ -160,7 +160,7 @@ One command sets this app up against a PingFederate on your own machine, install
 npm run setup -- --mode=pf-local --users=you@pingone.com
 ```
 
-- **You need** Docker (OrbStack) running, and your `pingfederate.lic` at `~/Documents/pingfederate.lic` (or set `PF_LICENSE_FILE`). The license file comes from the owner; it is never committed.
+- **You need** Docker (OrbStack) running, and your `pingfederate.lic` at `~/.config/demo-kit/pingfederate.lic` (or set `PF_LICENSE_FILE`). The license file comes from the owner; it is never committed.
 - **YES.** If nothing answers on port 4731 the script installs the official PingFederate image in Docker, bound to `127.0.0.1` only, and asks you to type `YES`. Typing YES accepts Ping's terms for the image and PingFederate's in-product license agreement. Nothing is accepted for you; `PF_ACCEPT_EULA=YES` in your own environment is the only way to skip the question.
 - **Login.** The local install uses the official image's documented default administrator login (see the PingFederate image documentation). It is for `127.0.0.1` only; change it for anything else. The login is saved to `~/.config/demo-kit/provisioning.json` (mode 600) and nowhere else. It is never written to the settings file, printed, or put on a command line: setup hands it to the configure scripts through their environment.
 - **Container.** A new install is the container `id-jag-kit-pf`, image `pingidentity/pingfederate:13.1.3-latest` (the version the shared Acme PingFederate runs). An existing container named `pingfederate-lab`, from an earlier version of this kit, is found and reused, not recreated. `PF_CONTAINER` and `PF_IMAGE` override both.
