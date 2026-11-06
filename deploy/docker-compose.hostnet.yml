@@ -1,0 +1,15 @@
+# Test override: host networking so 127.0.0.1:<host ports> are the HOST's ports
+# (needed when PF_URL points at a host-published loopback PingFederate).
+services:
+  id-jag:
+    network_mode: host
+    ports: !reset []
+    extra_hosts: !reset []
+  resource-as:
+    network_mode: host
+    ports: !reset []
+    extra_hosts: !reset []
+  mcp-sample:
+    network_mode: host
+    ports: !reset []
+    extra_hosts: !reset []

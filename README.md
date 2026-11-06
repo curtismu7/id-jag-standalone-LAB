@@ -107,6 +107,58 @@ npm test
 
 On Node 26 a good run is 1579 tests: web 532, server 810, resource-as 74, mcp-sample 24 and scripts 139. `check-css.sh` (in the AI-DEMO-Standalone repo) and `npm run check:forbidden` should also pass. Under heavy machine load a timing-based test can time out; rerun that file alone to confirm.
 
+## PingFederate instances this kit has been verified against (2026-11-04)
+
+Both live topologies were tested end to end in a real browser. The PingFederate-side
+objects they rely on are listed here so the next person does not have to rediscover them.
+Client secrets and the acme-user password live in `~/.config/demo-kit/provisioning.json`
+(`pingfederate.idJagKitClientSecret`, `pingfederateSe.*`), never in this repo.
+
+### pf-as mode against the shared local PingFederate (`https://127.0.0.1:4732`)
+
+- OAuth client `id-jag-kit`: grants AUTHORIZATION_CODE + REFRESH_TOKEN + TOKEN_EXCHANGE,
+  redirect URIs for `localhost:4720`/`127.0.0.1:4720` (auth/callback and issuer/callback),
+  scopes openid/offline_access, Authentication API (pi.flow) enabled.
+- The runtime serves a self-signed cert (`CN=127.0.0.1`, O=ID-JAG Kit (local)); set
+  `PF_CA_FILE` to that certificate (deploy/pf-rootCA.pem) — a CA file of the mkcert root
+  does NOT verify this chain.
+- `npm run setup -- --mode=pf-pf` configured the redeemer half on this PF: client
+  `id-jag-redeemer` (EXTENSION grant), JWT access token manager `idJagKitRedeemerAtm`
+  (signing key `idjagkit-signing`), scopes `read` and `mcp:invoke`.
+- Two manual fixes applied to `idJagKitRedeemerAtm` after setup: **Type Header Value**
+  set to `at+jwt` (empty by default, the kit's MCP server refuses tokens without typ)
+  and **Audience Claim Value** set to the MCP resource URL (the MCP checks `aud`).
+
+### pf-pf mode against the SE Kubernetes PingFederate (`https://cmuir-pf-acme.ping-devops.com`, the owner's SE namespace)
+
+- OAuth client `id-jag-kit-acme`: redirect URIs for `localhost:18080` and
+  `localhost:4720` (issuer/callback) plus `localhost:18080/auth/callback`; scopes widened
+  to `openid offline_access` (profile/email are not defined on that PF); secret reset.
+- OAuth client `acme-agent` (RESOURCE_OWNER_CREDENTIALS + TOKEN_EXCHANGE): secret reset
+  (kept for the ROPC fallback path).
+- SP connection `acmeToResourceAs` re-pointed from the kit's original
+  `http://localhost:19080` to this machine's redeemer: entityId
+  `https://127.0.0.1:4732`, processor mapping `acmeIdJagPolicy`, client_id claim
+  `id-jag-redeemer` (must equal the redeemer client on the redeeming PF), resource
+  `http://localhost:19090/mcp`.
+- The kit's MCP server runs on **19090** in this topology (`PF_RESOURCE` and
+  `MCP_URL=http://localhost:19090/mcp`) because that is the resource the SE connection
+  trusts, and it must trust the redeeming PF's keys: start it with
+  `AS_ISSUER=https://127.0.0.1:4732 AS_JWKS_URL=http://127.0.0.1:9080/jwks`
+  (9080 is a plain-http mirror of the PF's `/pf/JWKS`, needed because the MCP process
+  cannot add a CA for the self-signed PF cert).
+- SE admin credentials: k8s secret `pingfederate-admin` in the namespace, read via
+  kubectl port-forward (`svc/pingfederate-admin 29999:9999`), basic auth as
+  `administrator`. Admin API paths that differ from older docs: SP connections are
+  `/idp/spConnections`, IdP connections `/sp/idpConnections`; there is no
+  `/connections` or `/oauth/scopes` endpoint on 13.1.3.
+
+### Known password state
+
+- The AI-DEMO2 PingFederate (`localhost:9999`) admin password no longer matches
+  `Reset-Temp-Pass-2026` (rotated): its console is not reachable by scripts until the
+  owner re-issues it.
+
 ## Troubleshooting
 
 - **The sign-in dialog says mock sign-in is off.** Start with `ALLOW_MOCK_SIGNIN=1 npm start`, and do not open the app through a proxy or on a non-loopback address.
