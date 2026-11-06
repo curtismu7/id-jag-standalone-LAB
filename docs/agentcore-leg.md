@@ -330,3 +330,17 @@ client `id-jag-redeemer`) → the MCP call returns the tools.
   `PING_IDENTITY_PASSWORD`; accept any remaining agreement prompt after boot.
 - Deleting and recreating an OAuth client keeps its config but any client in
   an ATM's restricted list must be re-admitted.
+
+### Demo user and the mailinator domain exception (2026-11-06)
+
+`demouser@mailinator.com` / `DemoUser!2026` signs in everywhere (app, SE PF,
+stand-in Acme). Two deliberate changes make it work:
+
+- the validator rows use **email-shaped usernames** and the OIDC policy maps
+  `email` ← `TOKEN.username` (the old static `TEXT` mapping gave every user
+  the same email);
+- `.env` adds `mailinator.com` to `ALLOWED_EMAIL_DOMAINS` — a visible
+  weakening of the "only Ping identities" gate; mention it in the talk track,
+  and remove the domain when the demo user no longer needs a public inbox.
+  Nothing in the kit sends mail; the inbox is only relevant if a flow ever
+  does (IdenX's verification code is demo-mode, no email).
