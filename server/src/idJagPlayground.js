@@ -403,8 +403,11 @@ router.get('/as-events', async (req, res) => {
     return res.json({ available: false, reason: "This mode redeems at PingFederate, not at the kit's resource AS." });
   }
   try {
-    // Fixed base: the configured token endpoint's origin, never a caller-supplied URL.
-    const r = await outboundFetch(`${new URL(config().resourceAsTokenEndpoint).origin}/events`, { signal: AbortSignal.timeout(4000) });
+    // Fixed base: the configured token endpoint with its last segment dropped (…/token → …), never a caller-supplied URL.
+    // `.origin` alone is wrong for an issuer that lives under a path (e.g. https://host/resource-as/token).
+    const te = new URL(config().resourceAsTokenEndpoint);
+    te.pathname = te.pathname.replace(/\/[^/]*$/, '').replace(/\/$/, '') || '/';
+    const r = await outboundFetch(`${te.toString().replace(/\/$/, '')}/events`, { signal: AbortSignal.timeout(4000) });
     if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
     const events = (await r.json()).events;
     const jti = decodeJwt(req.session?.idJagPlayground?.idJag)?.claims?.jti;

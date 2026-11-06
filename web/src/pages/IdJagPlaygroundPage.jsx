@@ -142,7 +142,11 @@ function Fields({ value, name }) {
     );
   }
   if (TIME_CLAIMS.has(name) && typeof value === "number") return <span>{value} <span className="ijp-cite">({new Date(value * 1000).toLocaleString()})</span></span>;
-  return <span>{String(value)}</span>;
+  // Server-held secrets arrive as bracketed placeholders (e.g. "[your session token, never sent to the browser]");
+  // show them as masked tokens, not plain strings.
+  const s = String(value);
+  if (s.startsWith("[") && s.endsWith("]")) return <span className="ijp-masked" title={s}>●●●●●●●● <span className="ijp-masked__why">{s.slice(1, -1)}</span></span>;
+  return <span>{s}</span>;
 }
 
 function Data({ value }) {
@@ -1040,7 +1044,7 @@ export default function IdJagPlaygroundPage() {
           {(ownAs || isMock) && (
             <p className="ijp-note" data-testid="ijp-as-link">
               {ownAs && config?.resourceAs?.issuer
-                ? <a href={`${config.resourceAs.issuer.replace(/\/$/, "")}/`} target="_blank" rel="noopener noreferrer">Open the resource AS ↗</a>
+                ? <a className="ijp-extbtn" href={`${config.resourceAs.issuer.replace(/\/$/, "")}/`} target="_blank" rel="noopener noreferrer">Open the resource AS ↗</a>
                 : "Open the resource AS ↗ (not available in mock mode)."}
               {" "}It lists every redemption it accepted or refused, live.
             </p>
