@@ -191,7 +191,9 @@ describe('createRouter', () => {
     const boxes = [];
     for (let r = 0; r < 10; r++) for (let c = 0; c < 10; c++) boxes.push({ x: 40 + c * 295, y: 40 + r * 245, w: 140, h: 80 });
     const router = createRouter({ obstacles: boxes });
-    const t0 = performance.now();
+    // CPU time of this process, not wall-clock: on a loaded machine the test is descheduled for seconds at a time, and
+    // performance.now() would charge that waiting to the router (the 6000 ms bound failed at 7400 ms on a busy host).
+    const cpu0 = process.cpuUsage();
     let okCount = 0, allOrthogonal = true;
     for (let k = 0; k < 70; k++) {
       const a = boxes[(k * 7) % 100], b = boxes[(k * 13 + 5) % 100];
@@ -199,10 +201,11 @@ describe('createRouter', () => {
       const { ok, pts } = router.route({ start: { x: a.x + a.w, y: a.y + a.h / 2 }, end: { x: b.x, y: b.y + b.h / 2 }, startDir: 'r', endDir: 'l' });
       if (ok) { okCount += 1; allOrthogonal = allOrthogonal && orthogonal(pts); }
     }
-    const ms = performance.now() - t0;
+    const { user, system } = process.cpuUsage(cpu0);
+    const ms = (user + system) / 1000;
     expect(okCount).toBeGreaterThanOrEqual(65);
     expect(allOrthogonal).toBe(true);
-    // Smoke test with a generous bound (the target is ~400 ms). It must not fail on a busy machine, but an
+    // Smoke test with a generous bound on CPU time (the target is ~400 ms). It must not fail on a busy machine, but an
     // algorithmic regression (seconds, not hundreds of milliseconds) still trips it. The correctness checks above
     // are the real assertions.
     expect(ms).toBeLessThan(6000);
