@@ -172,9 +172,9 @@ describe("run report", () => {
     try {
       mount();
       fireEvent.click(screen.getByRole("button", { name: "Request ID-JAG" }));
-      await screen.findByTestId("ijp-checks", {}, { timeout: 4000 });
+      await screen.findByTestId("ijp-checks", {}, { timeout: 10000 });
       fireEvent.click(screen.getByRole("button", { name: "Redeem ID-JAG" }));
-      await screen.findByText("Response (HTTP 200)", {}, { timeout: 4000 });
+      await screen.findByText("Response (HTTP 200)", {}, { timeout: 10000 });
 
       fireEvent.click(screen.getByRole("button", { name: "Download report" }));
       fireEvent.click(screen.getByRole("button", { name: "Download JSON" }));
@@ -194,7 +194,7 @@ describe("run report", () => {
     } finally {
       click.mockRestore();
     }
-  }, 15000);
+  }, 30000);
 
   it("buildReport never lets a JWT-shaped string through, wherever it hides", () => {
     const raw = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJl";

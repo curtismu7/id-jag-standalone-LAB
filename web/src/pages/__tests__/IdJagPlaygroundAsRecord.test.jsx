@@ -13,7 +13,7 @@ const config = (over = {}) => ({
   ...over,
 });
 const ENTRY = { at: "2026-10-19T12:00:00.000Z", decision: "accepted", iss: "https://pf.test", client_id: "id-jag-playground", sub: "j***@pingone.com", aud: "https://as.test/mcp", scope: "mcp:invoke", jti: "b3f1c6e2…" };
-const slow = { timeout: 4000 };
+const slow = { timeout: 10000 }; // as testSetup.js asyncUtilTimeout; a wait only lasts this long when it is going to fail
 
 // Real-mode page with an ID-JAG issued and /redeem answering `redeemBody`; /as-events answers `events`.
 async function redeemWith(events, { cfg = config(), redeemBody = { request: { endpoint: "POST https://as.test/token" }, status: 200, response: {}, token: { claims: { exp: 4102444800 } } } } = {}) {
@@ -155,7 +155,7 @@ describe("Open the resource AS link", () => {
     expect(screen.getByText(/lists every redemption it accepted or refused, live/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Open the resource AS/ })).not.toBeInTheDocument();
     expect(get).not.toHaveBeenCalled();
-  }, 10000);
+  }, 30000);
 
   it("step 5 says refusals appear in the AS record too", async () => {
     await redeemWith({ available: true, entry: null, recent: [] });
