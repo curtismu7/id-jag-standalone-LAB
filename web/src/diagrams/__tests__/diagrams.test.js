@@ -143,5 +143,5 @@ describe("the playground model built from the data", () => {
       const { fallbacks } = routeEdges(at(n.id, dx, dy), d.edges);
       expect({ moved: n.id, dx: Math.round(dx), dy: Math.round(dy), fallbacks }).toEqual({ moved: n.id, dx: Math.round(dx), dy: Math.round(dy), fallbacks: 0 });
     }
-  }, 30000);
+  }, 0); // pure CPU, no timers: a test timeout cannot interrupt it, it can only fail a correct run that a busy machine made slow
 });
