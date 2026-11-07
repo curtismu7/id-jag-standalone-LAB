@@ -6,6 +6,7 @@ import { assignHandles, toPlaygroundModel } from "../playgroundModel";
 import { PLAYGROUND_DIAGRAMS } from "../../utils/idJagPlaygroundDiagrams";
 import { routeEdges } from "../../utils/idJagPlaygroundRouting";
 import { READABLE_MIN_ZOOM } from "../../pages/IdJagPlaygroundDiagramPage";
+import { SWEEP_TIMEOUT_MS } from "../../testTimeouts";
 
 // vitest runs with the web package as its working directory (npm test -w web, or from web/)
 const dir = `${path.resolve(process.cwd(), "..", "diagrams")}/`;
@@ -143,5 +144,5 @@ describe("the playground model built from the data", () => {
       const { fallbacks } = routeEdges(at(n.id, dx, dy), d.edges);
       expect({ moved: n.id, dx: Math.round(dx), dy: Math.round(dy), fallbacks }).toEqual({ moved: n.id, dx: Math.round(dx), dy: Math.round(dy), fallbacks: 0 });
     }
-  }, 0); // pure CPU, no timers: a test timeout cannot interrupt it, it can only fail a correct run that a busy machine made slow
+  }, SWEEP_TIMEOUT_MS); // pure CPU: see SWEEP_TIMEOUT_MS
 });

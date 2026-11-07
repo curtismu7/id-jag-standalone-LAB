@@ -7,6 +7,7 @@ vi.mock("../../services/api", () => ({ default: { get, post, put: vi.fn(), delet
 
 import IdJagPlaygroundPage from "../IdJagPlaygroundPage";
 import { buildReport } from "../../utils/runReport";
+import { pressWhenEnabled } from "./pressWhenEnabled";
 
 const JWT_SHAPED = /eyJ[\w-]*\.[\w-]+\.[\w-]+/;
 const now = () => Math.floor(Date.now() / 1000);
@@ -44,7 +45,7 @@ describe("preflight before every button", () => {
       { id: "signed-in", label: "Signed in at PingFederate (issuer)", status: "fail", detail: "No sign-in at this mode's issuer.", fix: "Click the sign-in button in step 1." },
     ] };
     mount();
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     const panel = await screen.findByTestId("ijp-preflight");
     expect(panel).toHaveTextContent("Pre-flight: fix this first, nothing was sent");
     expect(panel).toHaveTextContent("Click the sign-in button in step 1.");
@@ -54,7 +55,7 @@ describe("preflight before every button", () => {
     expect(Object.fromEntries(q)).toEqual({ step: "issue", mode: "pf-as", origin: window.location.origin });
 
     preflight = { ok: true, checks: [] };
-    fireEvent.click(within(panel).getByRole("button", { name: "Re-check" }));
+    await pressWhenEnabled("Re-check", within(panel));
     expect(await screen.findByText("Pre-flight: All checks pass. Run the step again.")).toBeInTheDocument();
     expect(preflightCalls().at(-1).get("fresh")).toBe("1");
   });
@@ -63,7 +64,7 @@ describe("preflight before every button", () => {
     preflight = { ok: true, checks: [{ id: "lifetime", label: "ID-JAG lifetime is 5 minutes or less", status: "warn", detail: "3600 s", fix: "Lower it." }] };
     post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/issue") ? issued("read") : { checks: [] } }));
     mount();
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     expect(await screen.findByText("Pre-flight: warnings (sent anyway)")).toBeInTheDocument();
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/id-jag-playground/issue", {}));
   });
@@ -74,13 +75,13 @@ describe("step 3: scope list and lifetime clock", () => {
     mount();
     post.mockImplementation((url) => Promise.resolve({ status: 200, data: url.endsWith("/issue") ? issued("openid read mcp:invoke")
       : url.endsWith("/inspect") ? { checks: [] } : redeemed }));
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     const select = await screen.findByLabelText("Scope to request");
     await waitFor(() => expect(select).toBeEnabled());
     expect([...select.options].map((o) => o.textContent)).toEqual(["All scopes in this ID-JAG (recommended)", "read", "mcp:invoke"]);
     expect(screen.getByTestId("ijp-life-idjag")).toHaveTextContent(/ID-JAG: [45]:\d\d left/);
 
-    fireEvent.click(screen.getByRole("button", { name: "Redeem ID-JAG" }));
+    await pressWhenEnabled("Redeem ID-JAG");
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/id-jag-playground/redeem", {}, expect.anything()));
     expect(preflightCalls().at(-1).has("scope")).toBe(false);
     const life = await screen.findByTestId("ijp-life-idjag");
@@ -90,12 +91,12 @@ describe("step 3: scope list and lifetime clock", () => {
     expect(life).not.toHaveClass("is-expired");
 
     fireEvent.change(select, { target: { value: "mcp:invoke" } });
-    fireEvent.click(screen.getByRole("button", { name: "Redeem ID-JAG" }));
+    await pressWhenEnabled("Redeem ID-JAG");
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/id-jag-playground/redeem", { scope: "mcp:invoke" }, expect.anything()));
     expect(preflightCalls().at(-1).get("scope")).toBe("mcp:invoke");
 
     post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/issue") ? issued("read") : { checks: [] } }));
-    fireEvent.click(screen.getByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     await waitFor(() => expect([...screen.getByLabelText("Scope to request").options].map((o) => o.value)).toEqual(["", "read"]));
     expect(screen.getByLabelText("Scope to request")).toHaveValue("");
   });
@@ -105,9 +106,9 @@ describe("step 3: scope list and lifetime clock", () => {
     post.mockImplementation((url) => Promise.resolve(url.endsWith("/redeem")
       ? { status: 400, data: { error: "scope_not_in_id_jag", message: "The ID-JAG does not grant admin." } }
       : { data: url.endsWith("/issue") ? issued("read") : { checks: [] } }));
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     await waitFor(() => expect(screen.getByRole("button", { name: "Redeem ID-JAG" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "Redeem ID-JAG" }));
+    await pressWhenEnabled("Redeem ID-JAG");
     expect(await screen.findByText("scope_not_in_id_jag")).toBeInTheDocument();
     expect(screen.getByText(/Pick a scope the ID-JAG carries/)).toBeInTheDocument();
   });
@@ -120,11 +121,11 @@ describe("step 4: Results panel", () => {
       if (url.endsWith("/call")) return callReply(body);
       return Promise.resolve({ status: 200, data: url.endsWith("/issue") ? issued("read") : url.endsWith("/inspect") ? { checks: [] } : redeemed });
     });
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     await waitFor(() => expect(screen.getByRole("button", { name: "Redeem ID-JAG" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "Redeem ID-JAG" }));
+    await pressWhenEnabled("Redeem ID-JAG");
     await screen.findByText("Response (HTTP 200)");
-    fireEvent.click(screen.getByRole("button", { name: "List tools this token can see" }));
+    await pressWhenEnabled("List tools this token can see");
     return screen.findByTestId("ijp-results");
   }
 
@@ -171,9 +172,9 @@ describe("run report", () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function () { names.push(this.download); });
     try {
       mount();
-      fireEvent.click(screen.getByRole("button", { name: "Request ID-JAG" }));
+      await pressWhenEnabled("Request ID-JAG");
       await screen.findByTestId("ijp-checks", {}, { timeout: 10000 });
-      fireEvent.click(screen.getByRole("button", { name: "Redeem ID-JAG" }));
+      await pressWhenEnabled("Redeem ID-JAG");
       await screen.findByText("Response (HTTP 200)", {}, { timeout: 10000 });
 
       fireEvent.click(screen.getByRole("button", { name: "Download report" }));

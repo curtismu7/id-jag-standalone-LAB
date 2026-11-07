@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES, stepParts } from "../idJagPlaygroundDiagrams";
 import { routeEdges } from "../idJagPlaygroundRouting";
 import { BADGE, badgeSpots, labelRect, pillSizes, placeLabels, stripLabel } from "../idJagLabelPlacement";
+import { SWEEP_TIMEOUT_MS } from "../../testTimeouts";
 
 const P = (x, y) => ({ x, y });
 const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -156,7 +157,7 @@ describe("placeLabels", () => {
       }
       expect(tight, "the sweep includes gaps too narrow for the badge").toBeGreaterThan(10);
       expect(worst).toEqual([]);
-    }, 0); // pure CPU, no timers: a test timeout cannot interrupt it, it can only fail a correct run that a busy machine made slow
+    }, SWEEP_TIMEOUT_MS); // pure CPU: see SWEEP_TIMEOUT_MS
   });
 
   // The finer placement (spots at the middle of every run, a cost that follows how far the badge reaches into a box) is for ONE case only: a badge alone
@@ -240,7 +241,7 @@ describe("placeLabels", () => {
       }
       expect(rows.length).toBe(count);
       expect(createHash("sha256").update(JSON.stringify(rows)).digest("hex")).toBe(hash);
-    }, 0);
+    }, SWEEP_TIMEOUT_MS);
   });
 
   // Each of these pins one boundary of the finer pass or of the tiers, at a scene found by searching for one where moving that boundary changes the result.

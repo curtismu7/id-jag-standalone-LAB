@@ -4,6 +4,7 @@ import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES, stepParts } from "../idJ
 import { routeEdges } from "../idJagPlaygroundRouting";
 import { READABLE_MIN_ZOOM } from "../../pages/IdJagPlaygroundDiagramPage";
 import { BADGE, labelRect, placeLabels } from "../idJagLabelPlacement";
+import { SWEEP_TIMEOUT_MS } from "../../testTimeouts";
 
 const hit = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 /** Give the event loop a turn, so a long sweep does not starve the test runner's messages to its worker (vitest drops the run on a 60 s reply timeout). */
@@ -66,5 +67,5 @@ describe("after a box is dragged, no badge or shown words sit on a box", () => {
     expect(judged).toBeGreaterThan(checked * 5);
     expect(unrouted, "the drags include ones that leave an arrow with no route, or this test pins nothing about them").toBeGreaterThan(0);
     expect(bad).toEqual([]);
-  }, 0); // pure CPU, no timers: a test timeout cannot interrupt it, it can only fail a correct run that a busy machine made slow
+  }, SWEEP_TIMEOUT_MS); // CPU sweep that yields to the event loop (turn()), so this limit does fire on a real hang
 });

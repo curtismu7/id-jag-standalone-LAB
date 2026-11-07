@@ -4,6 +4,7 @@ const { get, post } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("../../services/api", () => ({ default: { get, post, put: vi.fn(), delete: vi.fn() } }));
 
 import IdJagPlaygroundPage from "../IdJagPlaygroundPage";
+import { pressWhenEnabled } from "./pressWhenEnabled";
 
 const config = (over = {}) => ({
   mode: "pf-as", signedIn: true,
@@ -26,7 +27,7 @@ async function redeemWith(events, { cfg = config(), redeemBody = { request: { en
   post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/redeem") ? redeemBody
     : url.endsWith("/issue") ? { request: {}, response: {}, token: { header: {}, claims: { exp: 4102444800, scope: "mcp:invoke" } } } : { checks: [] } }));
   render(<IdJagPlaygroundPage />);
-  fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+  await pressWhenEnabled("Request ID-JAG");
   const redeem = screen.getByRole("button", { name: "Redeem ID-JAG" });
   await waitFor(() => expect(redeem).toBeEnabled());
   fireEvent.click(redeem);
@@ -119,7 +120,7 @@ describe("what the resource AS recorded", () => {
     await screen.findByTestId("ijp-as-record", {}, slow);
     const calls = () => get.mock.calls.filter(([u]) => String(u).endsWith("/as-events")).length;
     const before = calls();
-    fireEvent.click(await screen.findByRole("button", { name: "Run all" }));
+    await pressWhenEnabled("Run all");
     await waitFor(() => expect(calls()).toBeGreaterThan(before), slow);
   });
 });
@@ -145,7 +146,7 @@ describe("Open the resource AS link", () => {
   it("mock: a clearly marked sample record and the sentence without a working link", async () => {
     localStorage.setItem("idjag.playground.mode", "mock");
     render(<IdJagPlaygroundPage />);
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     const redeem = screen.getByRole("button", { name: "Redeem ID-JAG" });
     await waitFor(() => expect(redeem).toBeEnabled());
     fireEvent.click(redeem);

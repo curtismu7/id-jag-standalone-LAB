@@ -4,6 +4,7 @@ const { get, post, put, del } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(),
 vi.mock("../../services/api", () => ({ default: { get, post, put, delete: del } }));
 
 import IdJagPlaygroundPage, { STEP_TERMS } from "../IdJagPlaygroundPage";
+import { pressWhenEnabled } from "./pressWhenEnabled";
 import terms from "../../data/terms.json";
 
 const config = (over = {}) => ({
@@ -79,7 +80,7 @@ describe("ID-JAG playground page", () => {
       ? { request: { endpoint: "POST https://pf.test/as/token.oauth2", body: { grant_type: "urn:ietf:params:oauth:grant-type:token-exchange", subject_token: "[your session token]", client_id: "id-jag-kit" } },
           response: { issued_token_type: "urn:ietf:params:oauth:token-type:id-jag" }, token: { header: { typ: "oauth-id-jag+jwt" }, claims: { client_id: "id-jag-kit" } } }
       : { checks: [] } }));
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     const tabs = await screen.findByRole("tablist", { name: "Get an ID-JAG from PingFederate" });
     expect(within(tabs).getAllByRole("tab").map((t) => t.textContent)).toEqual(["Request", "Response", "Decoded", "Code"]);
     fireEvent.click(within(tabs).getByRole("tab", { name: "Code" }));
@@ -105,7 +106,7 @@ describe("ID-JAG playground page", () => {
       retry: { request: { endpoint: "POST https://pf.test/as/token.oauth2", body: { grant_type: "urn:ietf:params:oauth:grant-type:token-exchange", client_id: "id-jag-kit" } }, status: 400, error: "invalid_grant" },
       proved: true,
     } : {} }));
-    fireEvent.click(await screen.findByRole("button", { name: "Revoke and retry" }));
+    await pressWhenEnabled("Revoke and retry");
     expect(await screen.findByText("Proved: PingFederate refused a new ID-JAG (invalid_grant)")).toBeInTheDocument();
     expect(screen.getByRole("tablist", { name: "Revoke the refresh token" })).toBeInTheDocument();
     expect(screen.getByRole("tablist", { name: "Ask for a new ID-JAG with it" })).toBeInTheDocument();
@@ -219,7 +220,7 @@ describe("ID-JAG playground page", () => {
 
   it("a real SAML run shows step 2 as the assertion (decoded and redacted XML) then the exchange", async () => {
     mountSaml();
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     expect(await screen.findByRole("heading", { name: "Trade the SAML assertion for an ID-JAG" })).toBeInTheDocument();
     const assertion = await screen.findByRole("tablist", { name: "The SAML assertion" });
     expect(within(assertion).getAllByRole("tab").map((t) => t.textContent)).toEqual(["Decoded", "XML (redacted)"]);
@@ -262,7 +263,7 @@ describe("ID-JAG playground page", () => {
     expect(await screen.findByRole("heading", { name: "Get an ID-JAG from PingFederate" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "OIDC" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "SAML" })).toHaveAttribute("aria-pressed", "false");
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/id-jag-playground/issue", {}));
     expect(post).not.toHaveBeenCalledWith("/api/id-jag-playground/issue", { protocol: "saml" });
     expect(get.mock.calls.some(([u]) => u.includes("protocol=saml"))).toBe(false);
@@ -271,7 +272,7 @@ describe("ID-JAG playground page", () => {
   it("a SAML run refused with sign_in_required tells the user to sign in to the app, not the issuer", async () => {
     mountSaml();
     post.mockRejectedValue({ response: { data: { error: "sign_in_required" } } });
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     expect(await screen.findByText(/Sign in to this app first/)).toBeInTheDocument();
     expect(screen.queryByText(/Sign in at the issuer first/)).not.toBeInTheDocument();
   });
@@ -292,7 +293,7 @@ describe("ID-JAG playground page", () => {
 
   it("switching a real SAML run back to OIDC clears it", async () => {
     mountSaml();
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     await screen.findByRole("tablist", { name: "The SAML assertion" });
     await screen.findByTestId("ijp-checks");
     fireEvent.click(screen.getByRole("button", { name: "OIDC" }));
@@ -372,7 +373,7 @@ describe("ID-JAG playground page", () => {
     post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/issue")
       ? { request: { endpoint: "POST https://pf.test/as/token.oauth2", body: { grant_type: "x" } }, response: {}, token: { header: {}, claims: { client_id: "c" } } }
       : { checks: [] } }));
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     await screen.findByRole("tablist", { name: "Get an ID-JAG from PingFederate" });
     await screen.findByTestId("ijp-checks");
     fireEvent.click(screen.getByRole("button", { name: "OIDC" }));
@@ -384,7 +385,7 @@ describe("ID-JAG playground page", () => {
     post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/revoke")
       ? { control: { request: { endpoint: "POST https://pf.test/as/token.oauth2", body: { grant_type: "x" } }, status: 400, error: "invalid_request" }, proved: false }
       : {} }));
-    fireEvent.click(await screen.findByRole("button", { name: "Revoke and retry" }));
+    await pressWhenEnabled("Revoke and retry");
     expect(await screen.findByText("Not proved: the exchange already fails before revoking (invalid_request), so nothing was revoked.")).toBeInTheDocument();
     expect(screen.getByRole("tablist", { name: "Control: ask for an ID-JAG before revoking" })).toBeInTheDocument();
     expect(screen.queryByRole("tablist", { name: "Revoke the refresh token" })).not.toBeInTheDocument();
@@ -423,7 +424,7 @@ describe("ID-JAG playground page", () => {
     }));
     expect(await screen.findByTestId("ijp-start-over")).toBeDisabled(); // nothing to clear yet
     expect(screen.queryByTestId("ijp-start-over-step3")).toBeNull();
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     await screen.findByTestId("ijp-checks");
     expect(screen.getByTestId("ijp-start-over-step3")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("ijp-start-over"));
@@ -443,7 +444,7 @@ describe("ID-JAG playground page", () => {
             { id: "lifetime", label: "Lifetime", status: "warn", expected: "<= 300s", actual: "3600s", rule: "4.1" },
           ] },
     }));
-    fireEvent.click(await screen.findByRole("button", { name: "Request ID-JAG" }));
+    await pressWhenEnabled("Request ID-JAG");
     const table = await screen.findByTestId("ijp-checks");
     expect(table).toHaveTextContent("Spec check: 1 of 2 pass");
     expect(table).toHaveTextContent("Header typ");
