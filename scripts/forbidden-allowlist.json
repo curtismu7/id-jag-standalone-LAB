@@ -16,6 +16,22 @@
     {
       "host": "cmuir-pf-acme.ping-devops.com",
       "reason": "README live-verification section (PR #22): documents the SE Kubernetes PingFederate the pf-pf mode was verified against. The runtime PF_URL still comes from the untracked .env; no config default uses this host."
+    },
+    {
+      "host": "ai-demo.ping-devops.com",
+      "reason": "Root host of the hosted AI-DEMO platform on the SE cluster. Named in deploy/se/jwks-curator.yaml (an Ingress host that must be the real host for the manifest to work) and its comments. No config default uses it."
+    },
+    {
+      "host": "id-jag.ai-demo.ping-devops.com",
+      "reason": "Hosted ID-JAG host on the SE cluster. Named in deploy/se/jwks-curator.yaml and docs/agentcore-leg.md, where the manifest and runbook must show the real host. No config default uses it."
+    },
+    {
+      "host": "cmuir-pf-acme2.ping-devops.com",
+      "reason": "Second SE PingFederate the agentcore-leg runbook was verified against (docs/agentcore-leg.md). The runtime URL still comes from the untracked .env."
+    },
+    {
+      "host": "id-jag-kit.local.ping-devops.com",
+      "reason": "Local dev-loopback host of the id-jag-kit named in docs/agentcore-leg.md. Resolves only on the owner machine."
     }
   ],
   "uuids": []

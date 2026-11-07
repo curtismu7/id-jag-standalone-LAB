@@ -1,7 +1,7 @@
 # A root-ful discovery + JWKS for the AgentCore runtime's customJWTAuthorizer: AgentCore
 # rejects a path-ful discovery URL, and the resource-as's real issuer has a path. This serves
 # the resource-as's discovery (issuer unchanged — tokens' iss matches) and its JWKS from the
-# root host's root paths.
+# ai-demo host's root paths.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,7 +9,7 @@ metadata:
 data:
   discovery.json: |
     # the resource-as's discovery document verbatim, with jwks_uri rewritten to
-    # https://<root-host>.ping-demo.example.invalid/jwks.json (copy it after every resource-as deploy:
+    # https://ai-demo.ping-devops.com/jwks.json (copy it after every resource-as deploy:
     # curl -sk https://<ras-host>/resource-as/.well-known/openid-configuration )
     PLACEHOLDER_DISCOVERY_JSON
   jwks.json: |
@@ -80,7 +80,7 @@ metadata:
 spec:
   ingressClassName: nginx-public
   rules:
-    - host: <root-host>.ping-demo.example.invalid
+    - host: ai-demo.ping-devops.com
       http:
         paths:
           - path: /.well-known/openid-configuration
