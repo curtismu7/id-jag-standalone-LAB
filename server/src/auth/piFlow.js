@@ -11,6 +11,7 @@ import express from 'express';
 import { config } from '../config.js';
 import { mockSigninProblem } from '../mockSignin.js';
 import { outboundFetch } from '../outbound.js';
+import { requestBase } from '../requestOrigin.js';
 import { authorizeRequest, discover, missingConfig, oidcConfig, sameOrigin } from './oidc.js';
 
 const FLOW_ID = /^[A-Za-z0-9_-]{6,64}$/;
@@ -109,7 +110,7 @@ export function piFlowHandlers({ kind, key, redirectUri, prepare }) {
         console.warn(`[${config().slug}] pi.flow completed with a missing code or a state mismatch`);
         return end(502, { error: 'pi_flow_failed' });
       }
-      const to = new URL(redirectUri());
+      const to = new URL(redirectUri(req));
       to.searchParams.set('code', a.code);
       to.searchParams.set('state', a.state);
       tries.delete(f.flowId);
@@ -125,7 +126,7 @@ export function piFlowHandlers({ kind, key, redirectUri, prepare }) {
 export const appHandlers = piFlowHandlers({
   kind: 'app',
   key: 'oidcLogin',
-  redirectUri: () => oidcConfig().redirectUri,
+  redirectUri: (req) => oidcConfig().redirectUri || `${requestBase(req)}/auth/callback`,
   async prepare(req) {
     const blocked = mockSigninProblem(req);
     if (blocked) return { fail: [blocked.status, { error: blocked.error, message: blocked.message }] };
@@ -139,7 +140,7 @@ export const appHandlers = piFlowHandlers({
       console.warn(`[${config().slug}] OIDC discovery failed: ${err.message}`);
       return { fail: [502, { error: 'pi_flow_unavailable' }] };
     }
-    return authorizeRequest(c, meta, req.query.return_to);
+    return authorizeRequest(c, meta, req.query.return_to, req);
   },
 });
 

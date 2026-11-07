@@ -10,6 +10,7 @@ import { PresentBar, PresentProvider, PresentToggle } from "./present/PresentMod
 import "./AppShell.css";
 
 const THEME_KEY = "idjag.theme";
+const THEMES = [["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]];
 const SPEC_URL = "https://datatracker.ietf.org/doc/draft-ietf-oauth-identity-assertion-authz-grant/";
 // Third item: admin/setup pages, hidden in presenter mode.
 const PAGES = [["/", "Playground"], ["/trusted-idps", "Trusted IdPs", true], ["/guides", "Setup guides", true], ["/inspect", "Inspector"], ["/cimd", "CIMD tester"], ["/learn", "Learn"]];
@@ -20,7 +21,7 @@ const currentPage = () => {
 
 function initialTheme() {
   try { const t = localStorage.getItem(THEME_KEY); if (t === "light" || t === "dark") return t; } catch { /* storage blocked */ }
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "auto";
 }
 
 /** Brand frame: Core Dark bar, Ping Red rule, page nav, signed-in user, theme switch. */
@@ -29,10 +30,9 @@ function Shell({ children }) {
   const me = useMe();
   const customer = useCustomer();
   const here = currentPage();
-  useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
-  const flip = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    try { localStorage.setItem(THEME_KEY, next); } catch { /* not remembered */ }
+  useEffect(() => { if (theme === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme; }, [theme]);
+  const pickTheme = (next) => {
+    try { if (next === "auto") localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, next); } catch { /* not remembered */ }
     setTheme(next);
   };
 
@@ -59,9 +59,11 @@ function Shell({ children }) {
         <ShelfLink />
         <ModeToggle />
         <PresentToggle />
-        <button type="button" className="shell-theme" onClick={flip} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>
-          {theme === "dark" ? "Light" : "Dark"}
-        </button>
+        <label className="shell-theme">Theme
+          <select value={theme} onChange={(e) => pickTheme(e.target.value)} aria-label="Theme">
+            {THEMES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+          </select>
+        </label>
         {me === null && <button type="button" className="shell-theme shell-signin" onClick={() => signIn()}>Sign in</button>}
       </header>
       <ModeBanner />

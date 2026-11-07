@@ -485,6 +485,13 @@ describe('GET /as-events', () => {
     expect(fetchMock.mock.calls[0][1].signal).toBeDefined();
   });
 
+  it('keeps the issuer path when the token endpoint lives under one (…/resource-as/token → …/resource-as/events)', async () => {
+    fetchMock.mockResolvedValue(reply(200, { events: EVENTS() }));
+    await setEnv({ ...PF_AS_ENV, RESOURCE_AS_TOKEN_ENDPOINT: 'https://as.example.com/resource-as/token' });
+    await get(pfAs());
+    expect(fetchMock.mock.calls[0][0]).toBe('https://as.example.com/resource-as/events');
+  });
+
   it('matches the newest event by the ID-JAG jti prefix and returns the 5 newest', async () => {
     const events = [{ jti: 'zzzzzzzz…', client_id: 'other' }, { jti: 'abcdefgh…', client_id: 'mine' }, { jti: 'abcdefgh…', client_id: 'older' }, ...EVENTS(4)];
     fetchMock.mockResolvedValue(reply(200, { events }));

@@ -12,6 +12,7 @@ import { config } from '../config.js';
 import { runtimeEnv } from '../mode.js';
 import { outboundFetch } from '../outbound.js';
 import { allowedDomains, checkEmail } from './emailRules.js';
+import { requestBase, requestOrigin } from '../requestOrigin.js';
 
 const BASE_SCOPES = ['openid', 'profile', 'email', 'offline_access'];
 const LOGIN_TTL_MS = 10 * 60 * 1000;
@@ -28,7 +29,7 @@ export function oidcConfig() {
     clientSecret: env('OIDC_CLIENT_SECRET') || (ownClient ? '' : env('PF_EXCHANGE_CLIENT_SECRET')),
     privateKey: env('OIDC_PRIVATE_KEY_JWT'), // PEM (\n escapes allowed) or a path to a PEM file
     privateKeyKid: env('OIDC_PRIVATE_KEY_KID'),
-    redirectUri: env('OIDC_REDIRECT_URI') || `${c.appOrigin}/auth/callback`,
+    redirectUri: env('OIDC_REDIRECT_URI'), // per request when unset (requestOrigin.js): APP_ORIGIN or the lab-proxy's
     scope: [...new Set([...BASE_SCOPES, ...env('OIDC_EXTRA_SCOPES').split(/\s+/).filter(Boolean)])].join(' '),
     adminClaim: env('ADMIN_CLAIM') || 'groups',
     adminClaimValue: c.adminGroup,
@@ -72,8 +73,10 @@ async function clientAssertion(c, audience) {
     .sign(key);
 }
 
-async function redeemCode(c, meta, code, verifier) {
-  const form = new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: c.redirectUri, code_verifier: verifier });
+const redirectFor = (c, req) => c.redirectUri || `${requestBase(req)}/auth/callback`;
+
+async function redeemCode(c, meta, code, verifier, req) {
+  const form = new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: redirectFor(c, req), code_verifier: verifier });
   const headers = { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' };
   if (c.privateKey) {
     form.set('client_id', c.clientId);
@@ -123,7 +126,7 @@ h1{margin-top:0;font-size:1.4rem}a{color:#aa0005;font-weight:600}
 /** Only a same-origin relative path: no //host, no /\host, no scheme, printable ASCII. */
 const safeReturnTo = (p) => (typeof p === 'string' && /^\/(?![/\\])[!-~]*$/.test(p) ? p : '/');
 
-export const sameOrigin = (req, res, next) => (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.get('origin') !== config().appOrigin
+export const sameOrigin = (req, res, next) => (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.get('origin') !== requestOrigin(req)
   ? res.status(403).json({ error: 'invalid_origin' }) : next());
 export const requireUser = (req, res, next) => (req.session?.user?.email ? next() : res.status(401).json({ error: 'sign_in_required' }));
 export const requireAdmin = (req, res, next) => {
@@ -132,11 +135,11 @@ export const requireAdmin = (req, res, next) => {
 };
 
 /** The pending login state (kept in the session) and the authorize URL for it. Shared with the pi.flow driver. */
-export function authorizeRequest(c, meta, returnTo) {
+export function authorizeRequest(c, meta, returnTo, req) {
   const login = { state: rand(), nonce: rand(), verifier: rand(32), returnTo: safeReturnTo(returnTo), at: Date.now() };
   const url = new URL(meta.authorization_endpoint);
   url.search = new URLSearchParams({
-    response_type: 'code', client_id: c.clientId, redirect_uri: c.redirectUri, scope: c.scope,
+    response_type: 'code', client_id: c.clientId, redirect_uri: redirectFor(c, req), scope: c.scope,
     state: login.state, nonce: login.nonce,
     code_challenge: crypto.createHash('sha256').update(login.verifier).digest('base64url'), code_challenge_method: 'S256',
   }).toString();
@@ -163,7 +166,7 @@ router.get('/auth/callback', async (req, res) => {
   let claims;
   try {
     const meta = await discover(c.issuer);
-    tokens = await redeemCode(c, meta, req.query.code, pending.verifier);
+    tokens = await redeemCode(c, meta, req.query.code, pending.verifier, req);
     claims = await validateIdToken(c, meta, tokens.id_token, pending.nonce);
   } catch (err) {
     return failed(err.code || err.message); // jose messages name the failed check, never the token

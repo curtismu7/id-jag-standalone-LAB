@@ -312,3 +312,157 @@ client `id-jag-redeemer`) → the MCP call returns the tools.
   `resourceUris`, or the ID-JAG exchange answers `invalid_target`.
 - PingFederate caches the issuer's JWKS: after creating or changing the IdP
   connection, restart the redeemer PF (pod delete) before the first redeem.
+
+### Recurring failure modes hit on 2026-11-06 (demouser work)
+
+- The `acmeAtm` allowed-clients list regresses: any later PUT built from a
+  stale copy rewrites it. Re-add the client(s) via the admin API and prefer
+  read-modify-write against a FRESH GET every time.
+- The PingFederate ADMIN account locked (`account_locked`) and then
+  `invalid_credentials` — the lock persists in the data store across pod
+  restarts, and the boot hook skips admin creation because the license
+  agreement is already accepted. Recovery: set
+  `license-agreement-accepted=false` in
+  `data/config-store/com.pingidentity.page.Login.xml`, move away
+  `data/pingfederate-admin-user.xml`, set
+  `CREATE_INITIAL_ADMIN_USER=true` on the container, restart — the hook
+  accepts the agreement and recreates the admin with
+  `PING_IDENTITY_PASSWORD`; accept any remaining agreement prompt after boot.
+- Deleting and recreating an OAuth client keeps its config but any client in
+  an ATM's restricted list must be re-admitted.
+
+### Demo user and the mailinator domain exception (2026-11-06)
+
+`demouser@mailinator.com` / `DemoUser!2026` signs in everywhere (app, SE PF,
+stand-in Acme). Two deliberate changes make it work:
+
+- the validator rows use **email-shaped usernames** and the OIDC policy maps
+  `email` ← `TOKEN.username` (the old static `TEXT` mapping gave every user
+  the same email);
+- `.env` adds `mailinator.com` to `ALLOWED_EMAIL_DOMAINS` — a visible
+  weakening of the "only Ping identities" gate; mention it in the talk track,
+  and remove the domain when the demo user no longer needs a public inbox.
+  Nothing in the kit sends mail; the inbox is only relevant if a flow ever
+  does (IdenX's verification code is demo-mode, no email).
+
+### Resource AS URLs on the SE host (2026-11-06)
+
+The SE ingress only routes `/resource-as/...` on `id-jag.ai-demo.ping-devops.com`
+to the resource AS. Any other path on that host (bare `/jwks`,
+`/.well-known/oauth-authorization-server`) hits the default backend → nginx
+503. That looks like an attack block but is just "no route". The real URLs
+(the issuer lives under a path, RFC 8414 style):
+
+- metadata: `https://id-jag.ai-demo.ping-devops.com/resource-as/.well-known/oauth-authorization-server`
+- JWKS: `https://id-jag.ai-demo.ping-devops.com/resource-as/jwks`
+- events page: `https://id-jag.ai-demo.ping-devops.com/resource-as/`
+
+The playground's `/as-events` bug fixed on 2026-11-06 was exactly this trap:
+deriving the events URL from the token endpoint's ORIGIN dropped the
+`/resource-as` path.
+
+### Dual-homing: the kit serves through the family lab-proxy too (2026-11-06)
+
+The kit answers on BOTH doors:
+
+- direct: `http://localhost:4720` (what the real-client guides and dev-live use)
+- lab-proxy: `https://local.ping-devops.com:8443/id-jag-kit/` (family standard, owner rule)
+
+Mechanics (server/src/requestOrigin.js): a request through the proxy carries
+`X-Forwarded-Host`; the server then uses `PROXY_ORIGIN` (bare origin) for
+CSRF/same-origin checks and `PROXY_ORIGIN`+`PROXY_BASE` (`/id-jag-kit`) for
+every OAuth redirect URI. `.env` sets both plus
+`ALLOWED_HOSTS=id-jag-kit.local.ping-devops.com,local.ping-devops.com`.
+
+PingFederate clients must register BOTH redirect URIs (localhost and the
+proxy path) for `id-jag-kit-acme` and any app-level client:
+
+- `https://local.ping-devops.com:8443/id-jag-kit/api/id-jag-playground/issuer/callback`
+- `https://local.ping-devops.com:8443/id-jag-kit/auth/callback`
+
+The lab-proxy entry (`shared/lab-proxy/nginx.conf` in the meta-repo) maps
+`/id-jag-kit/` to `host.docker.internal:4720` with the forwarded headers and
+sets the `lab` cookie, so the SPA's absolute `/api` and `/assets` requests
+keep landing on this kit.
+
+### PingOne as the user directory (2026-11-06, owner decision: ALL use cases)
+
+Both kit PingFederates now validate passwords against the banking PingOne
+environment (`01d89b06…`) through the PingOne (P14C) data store + PCV, the
+same connector family AI-DEMO2's other PF instances use. The local
+`acmeUsers`/`idjagpcv` rows are retired (still configured, unused).
+
+Pieces, all scriptable:
+
+- PingOne gateway `8fd16217…` ("AI Demo PF Directory Connection", roles
+  Identity Data Admin + Environment Admin) — one credential per PF:
+  `POST /v1/environments/{env}/gateways/{id}/credentials` →
+  `POST /pf-admin-api/v1/pingOneConnections {name, credential}`
+  (connection names cannot contain hyphens).
+- Data store: `POST /dataStores` with `type: CUSTOM`, plugin
+  `…datastore.p14c.PingOneForCustomersDataStore`, field
+  `PingOne Environment = <connectionId>|<envId>`.
+- PCV: `POST /passwordCredentialValidators` with plugin
+  `…pcvs.p14c.PingOneForCustomersPCV`, field `PingOne For Customers
+  Datastore = <dsId>`, Username Attribute `username`.
+- Adapters: swap the HTML form adapters' "Credential Validators" table row
+  to the new PCV (`idjagform`, `idJagKitAcmeForm` on both PFs).
+
+Gotchas that cost an hour:
+
+- Creating a user with an inline `password` in the POST body does NOT set
+  it. Passwords must be set explicitly:
+  `PUT /v1/environments/{env}/users/{id}/password`,
+  Content-Type `application/vnd.pingidentity.password.set+json`, body
+  `{"value":"…"}`. The PCV then answers PingOne's 400 `NO_PASSWORD` as a
+  credential failure — enable DEBUG on `com.pingidentity.plugins` in the
+  engine's log4j2.xml to see the wire call.
+- POST /applications needs `protocol` and `enabled` set or validation
+  fails; minting a secret for another app needs org-level grants the env
+  workers lack (not needed here — the connection credential carries the
+  authority).
+
+Kit users live in the "Sample Users" population: `demouser@pingidentity.com`,
+`acme-user@pingidentity.com` (same password as before, kept for demo
+continuity).
+
+### Standalone-lab audit after the PingOne directory switch (2026-11-06)
+
+Swept all 62 standalone labs for PingFederate user sign-ins. Only three hit
+the kit's PFs, and only one is exposed:
+
+- **worker-demo-LAB** — its real-sign-in client is `privilege-demo-signin`
+  on the SE PF (`http://localhost:6700/callback`), which rides `idjagform`
+  → now the PingOne PCV. Its compose form runs MODE=local with no PF env
+  (offline runtime, unaffected); the exposure is a local `npm run dev`
+  with `.env` pointing at `cmuir-pf-acme`. Its personas
+  (`eli,gwen,ben,cora,priya`) now exist as
+  `<persona>@pingidentity.com` / `DemoUser!2026` in the Sample Users
+  population, so any persona can sign in. `eli` verified COMPLETED via
+  the PCV.
+- privilege-demo-LAB — runs MODE=mock (in-process sign-in); unaffected.
+- cimd-LAB, ping-services-stub-LAB — no real-PF user sign-in (stub/local
+  PF); unaffected.
+
+Rule of thumb going forward: anyone signing into `cmuir-pf-acme` needs a
+PingOne user in env `01d89b06…` — the local validator rows are no longer
+consulted.
+
+### JWKS freshness after every resource-as deploy (2026-11-06)
+
+The resource-as regenerates its signing key on re-deploy. Its JWKS is served
+in three places that MUST agree:
+
+- `https://id-jag.ai-demo.ping-devops.com/resource-as/jwks` (the AS itself)
+- `https://ai-demo.ping-devops.com/jwks.json` (root path, for AgentCore's
+  customJWTAuthorizer — served by the `id-jag-jwks-curator` deployment from
+  the ConfigMap of the same name)
+- the `jwks_uri` inside the curator's `discovery.json` (root, path-ful
+  discovery is rejected by AgentCore)
+
+After ANY resource-as deploy, refresh the curator ConfigMap from the live
+endpoints (discovery with `jwks_uri` rewritten to the root path, JWKS
+verbatim) and `rollout restart deploy/id-jag-jwks-curator`. A stale curator
+serves the old kid and AgentCore rejects every new access token. Verify by
+comparing the `kid` of a freshly redeemed access token against
+`/jwks.json`.
