@@ -228,7 +228,7 @@ Three findings from driving the invoke against the READY runtime:
    an `x5t`-matching-but-wrongly-signed token answers `Invalid Bearer token`
    (the same error the real ID-JAG got) — PF's JWKS publishes the signing key
    three times, and x5t-matching selects ambiguously. Fix: a curated root-ful
-   discovery + single-key JWKS served from the ai-demo host
+   discovery + single-key JWKS served from the root host
    (`deploy/se/jwks-curator.yaml`), with the runtime validating the leg-2
    `at+jwt` (iss = the resource-as, one RS256 key). The invoke sends the
    redeemed access token as a plain bearer — SigV4 and the JWT authorizer are
@@ -279,8 +279,8 @@ Three findings from driving the invoke against the READY runtime:
   listener before re-establishing.
 ## Part 5 — pf-pf proven with a stand-in Acme PingFederate (2026-11-05)
 
-A second PingFederate (`pingfederate-acme` StatefulSet in `ping-devops-cmuir`,
-public at `https://cmuir-pf-acme2.ping-devops.com`) played Acme; the SE
+A second PingFederate (`pingfederate-acme` StatefulSet in `<namespace>`,
+public at `https://<acme-pf-host>.ping-demo.example.invalid`) played Acme; the SE
 PingFederate (`cmuir-pf-acme.ping-devops.com`) redeemed. The chain: sign in at
 the stand-in as `acme-user` → Acme issues an ID-JAG addressed to our PF
 (`client_id=id-jag-redeemer`) → our PF redeems it (JWT bearer, EXTENSION grant,
@@ -347,15 +347,15 @@ stand-in Acme). Two deliberate changes make it work:
 
 ### Resource AS URLs on the SE host (2026-11-06)
 
-The SE ingress only routes `/resource-as/...` on `id-jag.ai-demo.ping-devops.com`
+The SE ingress only routes `/resource-as/...` on `<ras-host>.ping-demo.example.invalid`
 to the resource AS. Any other path on that host (bare `/jwks`,
 `/.well-known/oauth-authorization-server`) hits the default backend → nginx
 503. That looks like an attack block but is just "no route". The real URLs
 (the issuer lives under a path, RFC 8414 style):
 
-- metadata: `https://id-jag.ai-demo.ping-devops.com/resource-as/.well-known/oauth-authorization-server`
-- JWKS: `https://id-jag.ai-demo.ping-devops.com/resource-as/jwks`
-- events page: `https://id-jag.ai-demo.ping-devops.com/resource-as/`
+- metadata: `https://<ras-host>.ping-demo.example.invalid/resource-as/.well-known/oauth-authorization-server`
+- JWKS: `https://<ras-host>.ping-demo.example.invalid/resource-as/jwks`
+- events page: `https://<ras-host>.ping-demo.example.invalid/resource-as/`
 
 The playground's `/as-events` bug fixed on 2026-11-06 was exactly this trap:
 deriving the events URL from the token endpoint's ORIGIN dropped the
@@ -372,7 +372,7 @@ Mechanics (server/src/requestOrigin.js): a request through the proxy carries
 `X-Forwarded-Host`; the server then uses `PROXY_ORIGIN` (bare origin) for
 CSRF/same-origin checks and `PROXY_ORIGIN`+`PROXY_BASE` (`/id-jag-kit`) for
 every OAuth redirect URI. `.env` sets both plus
-`ALLOWED_HOSTS=id-jag-kit.local.ping-devops.com,local.ping-devops.com`.
+`ALLOWED_HOSTS=<kit-name>.local.ping-devops.com,local.ping-devops.com`.
 
 PingFederate clients must register BOTH redirect URIs (localhost and the
 proxy path) for `id-jag-kit-acme` and any app-level client:
@@ -453,8 +453,8 @@ consulted.
 The resource-as regenerates its signing key on re-deploy. Its JWKS is served
 in three places that MUST agree:
 
-- `https://id-jag.ai-demo.ping-devops.com/resource-as/jwks` (the AS itself)
-- `https://ai-demo.ping-devops.com/jwks.json` (root path, for AgentCore's
+- `https://<ras-host>.ping-demo.example.invalid/resource-as/jwks` (the AS itself)
+- `https://<root-host>.ping-demo.example.invalid/jwks.json` (root path, for AgentCore's
   customJWTAuthorizer — served by the `id-jag-jwks-curator` deployment from
   the ConfigMap of the same name)
 - the `jwks_uri` inside the curator's `discovery.json` (root, path-ful

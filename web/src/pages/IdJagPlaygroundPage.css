@@ -183,7 +183,7 @@
 
 /* Server-held secrets shown as masked tokens, not plain strings. */
 .ijp-masked { display: inline-block; padding: 0.05rem 0.5rem; border: 1px solid var(--th-border); border-radius: 4px; background: var(--th-bg-page); font-family: var(--font-mono); font-size: var(--font-size-2xs); }
-.ijp-masked__why { font-family: inherit; color: var(--th-text-muted); font-style: italic; margin-left: 0.25rem; }
+.ijp-masked__why { font-family: inherit; color: var(--th-text-muted); margin-left: 0.25rem; }
 
 /* "Open the resource AS" is an action, not prose: an external-link button. */
 a.ijp-extbtn { display: inline-block; padding: 0.3rem 0.8rem; margin: 0.25rem 0; border: 1px solid var(--th-border); border-radius: 6px; background: var(--th-bg-page); color: var(--th-text); font-weight: 600; text-decoration: none; box-shadow: 0 1px 2px var(--th-shadow); }
