@@ -20,7 +20,7 @@ function mount(cfg) {
   return render(<IdJagPlaygroundPage />);
 }
 
-const slow = { timeout: 4000 };
+const slow = { timeout: 10000 }; // as testSetup.js asyncUtilTimeout; a wait only lasts this long when it is going to fail
 let fetchSpy;
 
 beforeEach(() => {
@@ -474,7 +474,7 @@ describe("ID-JAG playground page", () => {
     expect(screen.getAllByText("acme").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Run all" }));
-    await waitFor(() => expect(screen.getAllByText(/^✅ refused/)).toHaveLength(4), { timeout: 4000 });
+    await waitFor(() => expect(screen.getAllByText(/^✅ refused/)).toHaveLength(4), { timeout: 10000 });
     expect(screen.getByText(/invalid_client/, { selector: ".ijp-result" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "REST API" }));
@@ -488,7 +488,7 @@ describe("ID-JAG playground page", () => {
     expect(get).not.toHaveBeenCalled();
     expect(post).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
-  }, 15000);
+  }, 30000);
 
   it("Form | JSON toggle switches how data renders", async () => {
     localStorage.setItem("idjag.playground.mode", "mock");
@@ -669,7 +669,7 @@ describe("ID-JAG playground page", () => {
     expect(get).not.toHaveBeenCalled();
     expect(post).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
-  }, 10000);
+  }, 30000);
 
   it("Trusted IdPs: admin adds, edits and deletes (with an in-page confirm)", async () => {
     mountWith(config({ publicEndpoints: ENDPOINTS }), { idps: [IDP], canManage: true });

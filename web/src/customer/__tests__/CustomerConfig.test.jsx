@@ -26,7 +26,9 @@ describe("customer config in the shell", () => {
     render(<AppShell><p>child</p></AppShell>);
     expect(await screen.findByText("Northwind Bank")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Ping Identity" })).toBeInTheDocument();
-    expect(root().getPropertyValue("--ping-red")).toBe("#0b6bcb");
+    // The name is painted by the render; the brand variables are set by a passive effect that React flushes afterwards.
+    // Wait for the effect's own result: asserting right after the text appears raced it, and lost when the machine was busy.
+    await waitFor(() => expect(root().getPropertyValue("--ping-red")).toBe("#0b6bcb"));
     expect(root().getPropertyValue("--brand-header")).toContain("#0a2540");
   });
 
