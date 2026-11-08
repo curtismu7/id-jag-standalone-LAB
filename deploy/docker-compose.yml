@@ -19,6 +19,7 @@ x-env-file: &env-file
 
 services:
   id-jag:
+    restart: unless-stopped
     build:
       context: ..
       dockerfile: Dockerfile
@@ -49,6 +50,7 @@ services:
       - "local.ping-devops.com:host-gateway"
 
   resource-as:
+    restart: unless-stopped
     build:
       context: ..
       dockerfile: deploy/service.Dockerfile
@@ -69,6 +71,7 @@ services:
       - resource-as-data:/data
 
   mcp-sample:
+    restart: unless-stopped
     build:
       context: ..
       dockerfile: deploy/service.Dockerfile
