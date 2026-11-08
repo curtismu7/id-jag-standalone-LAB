@@ -27,6 +27,7 @@ services:
     env_file: *env-file
     environment:
       PORT: "4720"
+      SHELF_URL: ${SHELF_URL:-http://127.0.0.1:4400}
       DATA_DIR: /data
       # Live-PF TLS: the local PF serves a mkcert cert; trust the bundled root CA.
       NODE_EXTRA_CA_CERTS: /app/deploy/pf-rootCA.pem

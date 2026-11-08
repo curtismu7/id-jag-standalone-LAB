@@ -63,11 +63,11 @@ export function createApp({ workspaceResolver = () => DEFAULT_WORKSPACE } = {}) 
     app.use(mount, ...(singleTenant ? [requireDefaultWorkspace] : []), ...(level === 'admin' ? [requireAdmin] : level === 'user' ? [requireUser] : []), router);
   }
   app.get('/api/customer-config', (_req, res) => res.set('Cache-Control', 'no-store').json(customerConfig()));
+  app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button; before the /api 404 and outside the web-dist check
   app.use('/api', (_req, res) => res.status(404).json({ error: 'not_found' }));
 
   if (fs.existsSync(WEB_DIST)) {
     app.use(express.static(WEB_DIST));
-app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
     app.get('*', (_req, res) => res.sendFile(path.join(WEB_DIST, 'index.html')));
   }
   return app;
