@@ -28,7 +28,7 @@ import { mockSigninProblem } from './mockSignin.js';
 import { getIssuerSubjectToken } from './issuerSession.js';
 import { mountInterop } from './interop.js';
 import { outboundFetch } from './outbound.js';
-import { requestBase, requestOrigin } from './requestOrigin.js';
+import { isSameOrigin, requestBase } from './requestOrigin.js';
 import * as trustedIdps from './trustedIdps.js';
 import { SPEC, decodeJwt, inspect, issuerKeyCheck, scopeList, trimSlash } from './tokenChecks.js';
 import { piFlowHandlers } from './auth/piFlow.js';
@@ -47,7 +47,7 @@ const router = express.Router();
 router.use(express.json());
 // Every write acts on the caller's tokens or the registry: same-origin only (CSRF). Dual-homing: a page served
 // through the lab-proxy has the proxy's Origin (requestOrigin.js).
-router.use((req, res, next) => (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.get('origin') !== requestOrigin(req)
+router.use((req, res, next) => (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !isSameOrigin(req)
   ? res.status(403).json({ error: 'invalid_origin' }) : next()));
 
 const ID_JAG_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:id-jag';

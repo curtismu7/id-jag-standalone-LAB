@@ -31,3 +31,54 @@ export function requestBase(req) {
   const c = config();
   return viaProxy(req) ? `${c.proxyOrigin}${c.proxyBase}` : c.appOrigin;
 }
+
+// Family same-origin write rule (reference: token-workbench-LAB server/src/safety.js). A write's Origin is accepted when it is:
+//   - this app's own origin as above (requestOrigin: APP_ORIGIN direct, PROXY_ORIGIN through the proxy), or
+//   - a loopback http origin identical to a loopback Host (http://127.0.0.1:4720 on Host 127.0.0.1:4720), or
+//   - on a LAB_ALLOWED_HOSTS Host on this app's port only: exactly `${X-Forwarded-Proto}://${X-Forwarded-Host}`.
+// Forwarded headers count on no other Host. Anything else is cross-origin.
+const parseHostHeader = (raw) => {
+  const h = String(raw ?? '').trim().toLowerCase();
+  if (!/^(\[::1\]|[a-z0-9.-]+)(:\d{1,5})?$/.test(h)) return null;
+  const i = h.lastIndexOf(':');
+  return i > h.lastIndexOf(']') ? { name: h.slice(0, i), port: h.slice(i + 1), host: h } : { name: h, port: '', host: h };
+};
+const isLoopbackName = (name) => name === 'localhost' || name === '[::1]' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(name);
+
+/** True when Host is a LAB_ALLOWED_HOSTS name (never loopback) carrying this app's own port. */
+export function isLabHost(hostHeader) {
+  const h = parseHostHeader(hostHeader);
+  const c = config();
+  return !!h && !isLoopbackName(h.name) && c.labAllowedHosts.includes(h.name) && h.port === String(c.port);
+}
+
+export function isSameOrigin(req) {
+  const origin = req.headers.origin;
+  if (typeof origin !== 'string' || origin === '') return false;
+  if (origin === requestOrigin(req)) return true;
+  const h = parseHostHeader(req.headers.host);
+  if (!h) return false;
+  if (isLabHost(req.headers.host)) {
+    const xfh = String(req.headers['x-forwarded-host'] ?? '').trim().toLowerCase();
+    const xfp = String(req.headers['x-forwarded-proto'] ?? '').trim().toLowerCase();
+    return xfh !== '' && (xfp === 'https' || xfp === 'http') && origin === `${xfp}://${xfh}`;
+  }
+  if (!isLoopbackName(h.name)) return false;
+  try {
+    const u = new URL(origin);
+    return u.protocol === 'http:' && isLoopbackName(u.hostname) && u.host === h.host && origin === u.origin;
+  } catch { return false; }
+}
+
+const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+/** Global write guard, mounted right after the Host check: a cross-site write, or one whose Origin is not same-origin, is 403
+ *  before routing. A write without Origin is not a browser cross-site request and passes here (as token-workbench); the routes
+ *  that act on the session or the registry still require a same-origin Origin themselves (sameOrigin in auth/oidc.js). */
+export function sameOriginWrites() {
+  return (req, res, next) => {
+    if (READ_METHODS.has(req.method)) return next();
+    const crossSite = String(req.headers['sec-fetch-site'] ?? '').toLowerCase() === 'cross-site';
+    if (crossSite || (req.headers.origin !== undefined && !isSameOrigin(req))) return res.status(403).json({ error: 'invalid_origin' });
+    return next();
+  };
+}
