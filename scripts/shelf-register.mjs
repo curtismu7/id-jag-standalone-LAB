@@ -4,7 +4,8 @@
 //   - Reads <app>/docs/shelf-entry.json.
 //   - Finds the shelf: SHELF_DATA_DIR, else a demo-shelf-LAB (or older demo-shelf) checkout beside the app.
 //   - On the shelf already (seed data/demos.json or .data/demos.local.json, matched by id): does nothing.
-//   - Not there: appends the entry to .data/demos.local.json (git-ignored).
+//   - Not there: appends the entry to .data/demos.local.json (git-ignored), stamped with addedAt = now (ISO timestamp)
+//     unless the entry already carries one. Entries already on the shelf are never touched, so their addedAt never moves.
 //   - No shelf found, SHELF_AUTOREGISTER=0, or anything goes wrong: logs one line and exits 0. It never blocks a start.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -56,7 +57,7 @@ function fixCompose(entry, appRoot, demoRoot) {
   return { ...entry, composeFile: path.relative(demoRoot, inApp) };
 }
 
-export function registerOnShelf({ appRoot, env = process.env, log = console.log }) {
+export function registerOnShelf({ appRoot, env = process.env, log = console.log, now = () => new Date() }) {
   if (env.SHELF_AUTOREGISTER === '0') return 'disabled';
   const entryFile = path.join(appRoot, 'docs', 'shelf-entry.json');
   if (!fs.existsSync(entryFile)) return 'no-entry';
@@ -92,7 +93,7 @@ export function registerOnShelf({ appRoot, env = process.env, log = console.log 
     if (!Array.isArray(doc.demos)) doc.demos = [];
   }
   const demoRoot = env.SHELF_DEMO_ROOT ? path.resolve(env.SHELF_DEMO_ROOT) : path.dirname(shelf.root);
-  doc.demos.push(fixCompose(entry, appRoot, demoRoot));
+  doc.demos.push({ ...fixCompose(entry, appRoot, demoRoot), addedAt: entry.addedAt ?? now().toISOString() });
   fs.mkdirSync(shelf.dataDir, { recursive: true });
   const tmp = `${local}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, `${JSON.stringify(doc, null, 2)}\n`);
