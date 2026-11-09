@@ -6,7 +6,8 @@
 // Direct requests use APP_ORIGIN (which may itself carry no path; the kit is served at /).
 import { config } from './config.js';
 
-function viaProxy(req) {
+/** True when the request came through the lab-proxy: Host is a LAB_ALLOWED_HOSTS name and the forwarded host/proto match PROXY_ORIGIN. */
+export function viaProxy(req) {
   const c = config();
   if (!c.proxyOrigin) return false;
   const host = String(req.headers.host ?? '').replace(/:\d+$/, '').trim().toLowerCase();

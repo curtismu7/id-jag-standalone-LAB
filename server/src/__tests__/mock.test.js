@@ -6,6 +6,8 @@ import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app.js';
 import { MOCK_USER, ORIGINS } from '../mock/env.js';
+import { allowedHosts } from '../hostCheck.js';
+import { mockSigninProblem } from '../mockSignin.js';
 import { netguard } from '../outbound.js';
 import { API, ORIGIN, expectNoRealCalls, post, signInApp, signInIssuer, useMockMode } from './mockHelpers.js';
 
@@ -158,6 +160,96 @@ describe('mock mode sign-in', () => {
       expect(r.body.message).toMatch(message);
     }
     expect(netguard.stats().mock).toBe(0); // refused before any call
+  });
+
+  describe('behind the lab-proxy (LAB_ALLOWED_HOSTS)', () => {
+    const LAB_HOST = 'kit.lab.example';
+    const PROXY_ORIGIN = 'https://front.example:8443';
+    const fwd = { 'X-Forwarded-Host': 'front.example:8443', 'X-Forwarded-Proto': 'https', 'X-Forwarded-For': '203.0.113.9' };
+    const proxied = (host = `${LAB_HOST}:4720`, extra = {}) => ({ Host: host, ...fwd, ...extra });
+    const arrange = (list = LAB_HOST) => {
+      vi.stubEnv('LAB_ALLOWED_HOSTS', list);
+      vi.stubEnv('PROXY_ORIGIN', PROXY_ORIGIN);
+      vi.stubEnv('PROXY_BASE', '/id-jag-kit');
+    };
+    const URLS = ['/auth/pi-flow/start', `${API}/issuer/pi-flow/start`];
+    // The guard itself, on a bare request: some Hosts never reach it through the app (the Host check answers 403 first).
+    const guard = (headers) => {
+      const h = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
+      return mockSigninProblem({ headers: h, get: (n) => h[n.toLowerCase()] });
+    };
+    const refused = async (headers) => {
+      expect(guard(headers), JSON.stringify(headers)).toMatchObject({ status: 409, error: 'mock_signin_disabled', message: expect.stringMatching(/proxy/) });
+      if (!allowedHosts().has(String(headers.Host).replace(/:\d+$/, '').toLowerCase())) return; // the Host check refuses it before the guard
+      for (const url of URLS) {
+        const r = await request(createApp()).get(url).set(headers);
+        expect([url, r.status, r.body.error]).toEqual([url, 409, 'mock_signin_disabled']);
+        expect(r.body.message).toMatch(/proxy/);
+      }
+    };
+
+    it('a listed Host with valid forwarded headers signs in: start, credentials (proxy Origin) and callback', async () => {
+      arrange();
+      const h = proxied();
+      const agent = request.agent(createApp());
+      await agent.get('/auth/pi-flow/start').set(h).expect(200);
+      const r = await agent.post('/auth/pi-flow/credentials').set(h).set('Origin', PROXY_ORIGIN)
+        .send({ username: MOCK_USER.username, password: MOCK_USER.password }).expect(200);
+      const to = new URL(r.body.redirectTo);
+      expect(to.origin + to.pathname.slice(0, '/id-jag-kit'.length)).toBe(`${PROXY_ORIGIN}/id-jag-kit`); // the redirect URI carries the proxy origin and base
+      await agent.get((to.pathname + to.search).replace(/^\/id-jag-kit/, '')).set(h).expect(302); // the proxy strips the base path
+      expect((await agent.get('/api/me').set(h).expect(200)).body).toMatchObject({ email: MOCK_USER.username });
+      await agent.post(`${API}/mode`).set(h).set('Origin', PROXY_ORIGIN).send({ mode: 'pf-as' }).expect(200);
+      await agent.get(`${API}/issuer/pi-flow/start`).set(h).expect(200); // the playground's issuer sign-in passes the same guard
+    });
+
+    it('is still refused for a listed Host when the forwarded proto is wrong', async () => {
+      arrange();
+      await refused(proxied(undefined, { 'X-Forwarded-Proto': 'http' }));
+    });
+
+    it('is refused on a loopback Host carrying forwarded headers, even when the list is set (and even when the list names loopback)', async () => {
+      arrange();
+      for (const host of ['localhost:4720', '127.0.0.1:4720', '[::1]:4720']) await refused(proxied(host));
+      arrange('127.0.0.1,localhost');
+      for (const host of ['localhost:4720', '127.0.0.1:4720']) await refused(proxied(host));
+    });
+
+    it('is refused on an unlisted Host with forwarded headers', async () => {
+      arrange();
+      for (const host of ['other.example:4720', `x.${LAB_HOST}`]) await refused(proxied(host));
+    });
+
+    it('is refused when the forwarded host is not the PROXY_ORIGIN host', async () => {
+      arrange();
+      for (const fh of ['evil.example', 'front.example:9999', '']) await refused(proxied(undefined, { 'X-Forwarded-Host': fh }));
+    });
+
+    it('is refused when only some other forwarded header is sent (no forwarded host), or when the list or PROXY_ORIGIN is unset', async () => {
+      arrange();
+      await refused({ Host: `${LAB_HOST}:4720`, 'X-Forwarded-For': '203.0.113.9' });
+      arrange('');
+      await refused(proxied());
+      arrange();
+      vi.stubEnv('PROXY_ORIGIN', '');
+      await refused(proxied());
+    });
+
+    it('is refused behind the proxy when TRUST_PROXY is set', async () => {
+      arrange();
+      vi.stubEnv('TRUST_PROXY', '1');
+      await refused(proxied());
+    });
+
+    it('the guard itself lets a listed Host with valid forwarded headers through', () => {
+      arrange();
+      expect(guard(proxied())).toBeNull();
+    });
+
+    it('a listed Host without forwarded headers is allowed on the loopback-published listener (the direct name)', async () => {
+      arrange();
+      await request(createApp()).get('/auth/pi-flow/start').set('Host', `${LAB_HOST}:4720`).expect(200);
+    });
   });
 
   it('is allowed when the container listens wide but the port is published on loopback only (LAB_PUBLISH=loopback)', async () => {
