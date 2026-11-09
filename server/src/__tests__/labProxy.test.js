@@ -46,9 +46,10 @@ describe('LAB_ALLOWED_HOSTS parsing', () => {
 
 describe('Host check', () => {
   const get = (host) => request(createApp()).get('/api/health').set('Host', host);
-  it('answers the LAB_ALLOWED_HOSTS name (any port), and still refuses an unlisted name', async () => {
+  it('answers the LAB_ALLOWED_HOSTS name on this app port only, and still refuses an unlisted name', async () => {
     expect((await get(`${LAB_HOST}:4720`)).status).toBe(200);
-    expect((await get(LAB_HOST.toUpperCase())).status).toBe(200);
+    expect((await get(`${LAB_HOST.toUpperCase()}:4720`)).status).toBe(200);
+    for (const h of [LAB_HOST, `${LAB_HOST}:4721`, `${LAB_HOST}:8443`]) expect([h, (await get(h)).status]).toEqual([h, 403]);
     const bad = await get('other.example:4720');
     expect([bad.status, bad.body.error]).toEqual([403, 'invalid_host']);
     expect((await get(`x.${LAB_HOST}`)).status).toBe(403);
@@ -113,5 +114,37 @@ describe('same-origin writes through the app', () => {
   it.each(MODE_PATHS)('%s: direct use on localhost keeps working with APP_ORIGIN', async (path) => {
     const r = await post(path, { host: 'localhost:4720', origin: 'http://localhost:4720' });
     expect([path, r.status]).toEqual([path, 200]);
+  });
+});
+
+describe('global same-origin write guard (before routing)', () => {
+  const write = (path, headers) => request(createApp()).post(path).set(headers).send({});
+  const UNGUARDED = ['/api/cimd/tester/probe', '/api/no-such-route']; // routes with no write check of their own
+  it('refuses a foreign Origin before any route, on the lab Host and on loopback', async () => {
+    for (const path of UNGUARDED) {
+      for (const headers of [proxied(`${LAB_HOST}:4720`, { origin: 'https://evil.example' }), { host: '127.0.0.1:4720', origin: 'https://evil.example' }]) {
+        const r = await write(path, headers);
+        expect([path, r.status, r.body.error]).toEqual([path, 403, 'invalid_origin']);
+      }
+    }
+  });
+  it('refuses Sec-Fetch-Site: cross-site, and the proxy origin on a loopback Host', async () => {
+    expect((await write('/api/no-such-route', { host: '127.0.0.1:4720', 'sec-fetch-site': 'cross-site' })).status).toBe(403);
+    expect((await write('/api/no-such-route', proxied('127.0.0.1:4720', { origin: PROXY_ORIGIN }))).status).toBe(403);
+  });
+  it('lets the launcher, a loopback page and a no-Origin caller through to routing', async () => {
+    expect((await write('/api/no-such-route', proxied(`${LAB_HOST}:4720`, { origin: PROXY_ORIGIN }))).status).toBe(404);
+    expect((await write('/api/no-such-route', { host: '127.0.0.1:4720', origin: 'http://127.0.0.1:4720' })).status).toBe(404);
+    expect((await write('/api/no-such-route', { host: '127.0.0.1:4720' })).status).toBe(404);
+  });
+  it('a loopback page on 127.0.0.1 can write (Origin identical to Host), not only APP_ORIGIN', async () => {
+    const r = await request(createApp()).post('/api/mode').set({ host: '127.0.0.1:4720', origin: 'http://127.0.0.1:4720' }).send({ mode: 'mock' });
+    expect(r.status).toBe(200);
+    const off = await request(createApp()).post('/api/mode').set({ host: '127.0.0.1:4720', origin: 'http://127.0.0.1:4799' }).send({ mode: 'mock' });
+    expect(off.status).toBe(403);
+  });
+  it('routes that act on the session still need an Origin of their own (no-Origin write refused there)', async () => {
+    const r = await request(createApp()).post('/api/mode').set({ host: '127.0.0.1:4720' }).send({ mode: 'mock' });
+    expect([r.status, r.body.error]).toEqual([403, 'invalid_origin']);
   });
 });

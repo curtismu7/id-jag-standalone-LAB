@@ -8,7 +8,7 @@ import * as trustedIdps from './trustedIdps.js';
 import { describeAssertion } from './saml.js';
 import { SPEC, decodeJwt, inspect, verifySignature } from './tokenChecks.js';
 import { probe } from './idJagPlayground.js';
-import { requestOrigin } from './requestOrigin.js';
+import { isSameOrigin } from './requestOrigin.js';
 import { outboundFetch } from './outbound.js';
 
 const router = express.Router();
@@ -122,7 +122,7 @@ router.post('/decode', async (req, res) => {
     // The ID-JAG the playground's issue route minted into THIS session (never one taken from the request). Same-origin only
     // (CSRF, as the playground's writes). It stays server-side unless the user asks to reveal it; never cached, never logged.
     res.set('Cache-Control', 'no-store');
-    if (req.get('origin') !== requestOrigin(req)) return res.status(403).json({ error: 'invalid_origin' });
+    if (!isSameOrigin(req)) return res.status(403).json({ error: 'invalid_origin' });
     const held = req.session?.idJagPlayground?.idJag;
     if (typeof held !== 'string') return res.status(409).json({ error: 'no_session_id_jag', message: 'No ID-JAG has been issued in this session yet.' });
     return res.json(req.body.reveal === true ? { token: held } : await checkToken(held));

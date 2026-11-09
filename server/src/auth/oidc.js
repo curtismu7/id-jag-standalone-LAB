@@ -12,7 +12,7 @@ import { config } from '../config.js';
 import { runtimeEnv } from '../mode.js';
 import { outboundFetch } from '../outbound.js';
 import { allowedDomains, checkEmail } from './emailRules.js';
-import { requestBase, requestOrigin } from '../requestOrigin.js';
+import { isSameOrigin, requestBase } from '../requestOrigin.js';
 
 const BASE_SCOPES = ['openid', 'profile', 'email', 'offline_access'];
 const LOGIN_TTL_MS = 10 * 60 * 1000;
@@ -126,7 +126,7 @@ h1{margin-top:0;font-size:1.4rem}a{color:#aa0005;font-weight:600}
 /** Only a same-origin relative path: no //host, no /\host, no scheme, printable ASCII. */
 const safeReturnTo = (p) => (typeof p === 'string' && /^\/(?![/\\])[!-~]*$/.test(p) ? p : '/');
 
-export const sameOrigin = (req, res, next) => (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.get('origin') !== requestOrigin(req)
+export const sameOrigin = (req, res, next) => (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !isSameOrigin(req)
   ? res.status(403).json({ error: 'invalid_origin' }) : next());
 export const requireUser = (req, res, next) => (req.session?.user?.email ? next() : res.status(401).json({ error: 'sign_in_required' }));
 export const requireAdmin = (req, res, next) => {
