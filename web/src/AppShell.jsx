@@ -1,4 +1,7 @@
 import ShelfLink from "./components/ShelfLink.jsx";
+// Opened from Customer Agent LAB (UC-LEARN8, UC-LEARN9, UC25 and UC40 route here): strip + header Back only. Those use cases are
+// the whole playground, not one of its settings, so nothing is preselected.
+import ReturnLink from "./return-link/ReturnLink.jsx";
 import { useEffect, useState } from "react";
 import { useMe } from "./auth/useMe";
 import { signIn } from "./utils/signIn";
@@ -56,6 +59,7 @@ function Shell({ children }) {
             <button type="submit" className="shell-theme">Sign out</button>
           </form>
         )}
+        <ReturnLink app="id-jag-standalone" variant="header" />
         <ShelfLink />
         <ModeToggle />
         <PresentToggle />
@@ -67,6 +71,7 @@ function Shell({ children }) {
         {me === null && <button type="button" className="shell-theme shell-signin" onClick={() => signIn()}>Sign in</button>}
       </header>
       <ModeBanner />
+      <ReturnLink app="id-jag-standalone" />
       <ClaimBanner />
       <PresentBar />
       {children}
