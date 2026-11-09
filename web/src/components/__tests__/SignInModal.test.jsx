@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import SignInModal from "../SignInModal";
 import { signIn, signInIssuer } from "../../utils/signIn";
 
@@ -209,6 +209,16 @@ describe("SignInModal", () => {
     fill("ada", "pw");
     fireEvent.submit(screen.getByLabelText("Username").closest("form"));
     act(() => { signIn("/back"); });
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it("is framed by the shared FloatingDialog (movable title bar, no pop-out) and Escape still closes it", async () => {
+    await open();
+    const d = screen.getByRole("dialog");
+    expect(within(d).getByTestId("fd-titlebar")).toHaveTextContent("Sign in");
+    expect(within(d).queryByRole("button", { name: "Pop out to a new window" })).toBeNull();
+    fireEvent.keyDown(screen.getByLabelText("Username"), { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(assign).not.toHaveBeenCalled();
   });
 

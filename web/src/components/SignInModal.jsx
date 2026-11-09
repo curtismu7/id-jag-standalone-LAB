@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAppMode } from "../mode/ModeContext";
+import FloatingDialog from "../floating-dialog/FloatingDialog";
 import "./SignInModal.css";
 
 const ENDPOINTS = {
@@ -71,11 +72,10 @@ export default function SignInModal() {
   useEffect(() => { if (flow) userRef.current?.focus(); }, [flow]);
   useEffect(() => { if (notice) closeRef.current?.focus(); }, [notice]);
 
-  // Escape cancels and Tab stays inside the dialog, wherever focus currently is.
+  // Tab stays inside the dialog, wherever focus currently is. Escape (from anywhere on the page) is FloatingDialog's onClose.
   useEffect(() => {
     if (!flow && !notice) return undefined;
     const onKey = (e) => {
-      if (e.key === "Escape") return close();
       if (e.key !== "Tab") return undefined;
       const els = dialogRef.current.querySelectorAll("input, button");
       const first = els[0];
@@ -114,24 +114,27 @@ export default function SignInModal() {
     }
   };
 
+  // The frame is the shared FloatingDialog (movable, resizable, modal). Pop-out is off: the pi.flow form's focus, Tab trap and
+  // the relative "Request one" link all belong to this page, so a separate window would break the sign-in.
+  const frame = (body) => (
+    <FloatingDialog isOpen onClose={close} title="Sign in" closeAriaLabel="Close sign-in" footer={null} disablePopOut
+      defaultWidth={400} defaultHeight={null} minHeight={200}>
+      <div className="signin-dialog" ref={dialogRef}>{body}</div>
+    </FloatingDialog>
+  );
   if (notice) {
-    return (
-      <div className="signin-backdrop">
-        <div className="signin-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="signin-title">
-          <h2 id="signin-title">Sign in</h2>
-          <p className="signin-error" role="alert">{notice}</p>
-          <div className="signin-actions">
-            <button type="button" className="signin-cancel" ref={closeRef} onClick={close}>Close</button>
-          </div>
+    return frame(
+      <>
+        <p className="signin-error" role="alert">{notice}</p>
+        <div className="signin-actions">
+          <button type="button" className="signin-cancel" ref={closeRef} onClick={close}>Close</button>
         </div>
-      </div>
+      </>,
     );
   }
   if (!flow) return null;
-  return (
-    <div className="signin-backdrop">
-      <div className="signin-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="signin-title">
-        <h2 id="signin-title">Sign in</h2>
+  return frame(
+    <>
         <form onSubmit={submit}>
           <label htmlFor="signin-user">Username</label>
           <input id="signin-user" ref={userRef} value={username} onChange={(e) => setUsername(e.target.value)}
@@ -151,7 +154,6 @@ export default function SignInModal() {
           </div>
         </form>
         <p className="signin-register">No account? <a href="/register">Request one</a></p>
-      </div>
-    </div>
+    </>,
   );
 }
