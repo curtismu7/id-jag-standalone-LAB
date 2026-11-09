@@ -371,8 +371,11 @@ The kit answers on BOTH doors:
 Mechanics (server/src/requestOrigin.js): a request through the proxy carries
 `X-Forwarded-Host`; the server then uses `PROXY_ORIGIN` (bare origin) for
 CSRF/same-origin checks and `PROXY_ORIGIN`+`PROXY_BASE` (`/id-jag-kit`) for
-every OAuth redirect URI. `.env` sets both plus
-`ALLOWED_HOSTS=<kit-name>.local.ping-devops.com,local.ping-devops.com`.
+every OAuth redirect URI. The forwarded headers are believed only on a request
+whose `Host` is a `LAB_ALLOWED_HOSTS` name (loopback does not count); that name
+is also answered by the Host check. The Docker compose file sets
+`LAB_ALLOWED_HOSTS=id-jag-kit.local.ping-devops.com`, `PROXY_ORIGIN` and
+`PROXY_BASE`; for a host-run server put the same three in `.env`.
 
 PingFederate clients must register BOTH redirect URIs (localhost and the
 proxy path) for `id-jag-kit-acme` and any app-level client:

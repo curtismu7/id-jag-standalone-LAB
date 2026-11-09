@@ -16,6 +16,10 @@
     {
       "host": "cmuir-pf-acme.ping-devops.com",
       "reason": "README live-verification section (PR #22): documents the SE Kubernetes PingFederate the pf-pf mode was verified against. The runtime PF_URL still comes from the untracked .env; no config default uses this host."
+    },
+    {
+      "host": "id-jag-kit.local.ping-devops.com",
+      "reason": "The Host name the family lab-proxy sends to this lab (shared/lab-proxy/nginx.conf in AI-DEMO-Standalone). It is the LAB_ALLOWED_HOSTS default in deploy/docker-compose.yml and is named in .env.example, README and docs/agentcore-leg.md. It resolves to this machine through the shared /etc/hosts entry; no tenant or customer is behind it."
     }
   ],
   "uuids": []

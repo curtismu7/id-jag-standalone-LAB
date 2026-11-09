@@ -49,6 +49,7 @@ Keys this app uses (the full list, with defaults, is in [Configuration](#configu
 | `MODE` | optional | `mock` or `live`. Unset: `live` when `PF_URL`, `PF_EXCHANGE_CLIENT_ID` and `PF_EXCHANGE_CLIENT_SECRET` are set (an existing install stays live), otherwise `mock`. The header switch saves its choice in `DATA_DIR/mode.json`, which wins |
 | `ALLOW_MOCK_SIGNIN` | optional | `1` turns on the built-in demo account in Mock mode (Docker sets it) |
 | `PORT`, `HOST`, `APP_ORIGIN`, `DATA_DIR` | optional | Where the server listens, its browser origin, where it keeps data |
+| `LAB_ALLOWED_HOSTS`, `PROXY_ORIGIN`, `PROXY_BASE` | optional | Serving behind the lab-proxy: the Host name it sends (no port), its browser origin, its entry path. Forwarded headers count only on a listed Host. Docker sets them |
 | `SESSION_SECRET` | optional | Signs the session cookie; random per start if unset |
 | `PF_URL` | live only | The issuer and redeeming PingFederate |
 | `PF_EXCHANGE_CLIENT_ID`, `PF_EXCHANGE_CLIENT_SECRET` | live only | The sign-in and token-exchange client at `PF_URL` |
