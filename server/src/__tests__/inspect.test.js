@@ -171,6 +171,16 @@ describe('/api/inspect', () => {
     expect(fetchMock.mock.calls.every(([u]) => String(u).includes('.well-known'))).toBe(true);
   });
 
+  it('reads the resource AS over the token endpoint origin, not the browser-facing issuer (Docker: localhost is this container)', async () => {
+    vi.stubEnv('RESOURCE_AS_ISSUER', 'http://localhost:4721');
+    vi.stubEnv('RESOURCE_AS_TOKEN_ENDPOINT', 'http://resource-as:9080/token');
+    fetchMock.mockResolvedValue({ status: 200, json: async () => ({ issuer: 'x' }) });
+    await request(app()).get('/api/inspect/discovery');
+    const urls = fetchMock.mock.calls.map(([u]) => String(u));
+    expect(urls).toContain('http://resource-as:9080/.well-known/oauth-authorization-server');
+    expect(urls.some((u) => u.startsWith('http://localhost:4721'))).toBe(false);
+  });
+
   it('shows a backend that is down as an error, not a crash', async () => {
     fetchMock.mockRejectedValue(new Error('boom'));
     const r = await request(app()).get('/api/inspect/discovery');
