@@ -15,13 +15,12 @@ tree_count=$(printf '%s' "$tree" | grep -c . || true)
 echo "tracked files with an AI-attribution credit: $tree_count"
 if [ "$tree_count" != "0" ]; then printf '%s\n' "$tree" | sed 's/^/  /'; status=1; fi
 
-# One merged commit on main carries a Co-authored-by trailer that GitHub added for the owner's own account when it squashed
-# PR #3 (not an AI credit). History is not rewritten, so that one full sha is skipped; any other commit is still checked.
-skip_sha="b701d1d4c34d998acf6fbc50652615ba002a0ad4"
+self_coauthor='^[C]o-authored-by:[^<]*<([0-9]+\+)?curtismu7@users\.noreply\.github\.com>[[:space:]]*$'
 bad=0
 for h in $(git log --all --since="$rule_date" --format=%H 2>/dev/null); do
-  [ "$h" = "$skip_sha" ] && continue
-  if git log -1 --format=%B "$h" | grep -qiE "$pat"; then bad=$((bad+1)); echo "  commit ${h:0:7}"; fi
+  # A Co-authored-by naming the owner's own GitHub noreply address is not an AI credit: GitHub's squash merge adds one when a
+  # commit's author name differs from the profile name. Any other Co-Authored-By (e.g. an AI) still fails.
+  if git log -1 --format=%B "$h" | grep -viE "$self_coauthor" | grep -qiE "$pat"; then bad=$((bad+1)); echo "  commit ${h:0:7}"; fi
 done
 echo "commits since $rule_date with an AI-attribution credit: $bad"
 [ "$bad" != "0" ] && status=1
