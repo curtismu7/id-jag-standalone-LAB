@@ -130,7 +130,7 @@ Client secrets and the acme-user password live in `~/.config/demo-kit/provisioni
   set to `at+jwt` (empty by default, the kit's MCP server refuses tokens without typ)
   and **Audience Claim Value** set to the MCP resource URL (the MCP checks `aud`).
 
-### pf-pf mode against the SE Kubernetes PingFederate (`https://cmuir-pf-acme.ping-devops.com`, the owner's SE namespace)
+### pf-pf mode against the SE Kubernetes PingFederate (the owner's SE namespace)
 
 - OAuth client `id-jag-kit-acme`: redirect URIs for `localhost:18080` and
   `localhost:4720` (issuer/callback) plus `localhost:18080/auth/callback`; scopes widened
