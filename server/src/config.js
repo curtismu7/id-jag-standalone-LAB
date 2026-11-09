@@ -7,6 +7,10 @@ import { runtimeEnv } from './mode.js';
 const env = (k, fallback = '') => String(runtimeEnv()[k] ?? '').trim() || fallback;
 const noSlash = (u) => u.replace(/\/$/, '');
 
+// A bare DNS name (letters, digits, dots, hyphens). Entries with a port, a scheme, a path or anything else are dropped.
+const HOST_NAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
+export const labAllowedHosts = (raw) => [...new Set(String(raw ?? '').split(',').map((h) => h.trim().toLowerCase()).filter((h) => HOST_NAME.test(h)))];
+
 // The demo layer (demo/index.js) supplies its own keys; app.js registers it so this file imports no demo code.
 let demoConfig = () => ({});
 export const useDemoConfig = (fn) => { demoConfig = fn; };
@@ -26,6 +30,9 @@ export function config() {
     // proxyOrigin (bare, no path) is the browser Origin for CSRF; proxyBase (e.g. /id-jag-kit) prefixes OAuth redirect URIs.
     proxyOrigin: noSlash(env('PROXY_ORIGIN')),
     proxyBase: noSlash(env('PROXY_BASE')),
+    // LAB_ALLOWED_HOSTS (family rule): the Host names the lab-proxy sends, comma-separated, no ports. Loopback always works.
+    // Unset = loopback only (plus APP_ORIGIN's host and ALLOWED_HOSTS). Only these Hosts may use the forwarded headers.
+    labAllowedHosts: labAllowedHosts(env('LAB_ALLOWED_HOSTS')),
     dataDir: env('DATA_DIR', '.data'),
     // The PingFederate that issues ID-JAGs (pf-as mode) and redeems them (pf-pf and byo modes).
     pfUrl: noSlash(env('PF_URL', 'https://pf.example.invalid')),

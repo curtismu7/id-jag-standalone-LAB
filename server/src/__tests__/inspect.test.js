@@ -141,6 +141,16 @@ describe('/api/inspect', () => {
       }
     });
 
+    it('behind the lab-proxy it takes the proxy origin on a LAB_ALLOWED_HOSTS Host, and only there', async () => {
+      vi.stubEnv('LAB_ALLOWED_HOSTS', 'kit.lab.example');
+      vi.stubEnv('PROXY_ORIGIN', 'https://front.example:8443');
+      const a = withSession({ idJag: idJag() });
+      const via = (host, origin) => request(a).post('/api/inspect/decode').set({ host, origin, 'x-forwarded-host': 'front.example:8443', 'x-forwarded-proto': 'https' }).send({ fromSession: true });
+      expect((await via('kit.lab.example:4720', 'https://front.example:8443')).status).toBe(200);
+      expect((await via('kit.lab.example:4720', 'https://evil.test')).status).toBe(403);
+      expect((await via('localhost:4720', 'https://front.example:8443')).status).toBe(403);
+    });
+
     it('does not log the token', async () => {
       const spies = ['log', 'info', 'warn', 'error', 'debug'].map((m) => vi.spyOn(console, m).mockImplementation(() => {}));
       const t = idJag();

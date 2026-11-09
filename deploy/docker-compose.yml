@@ -38,6 +38,11 @@ services:
       ALLOWED_HOSTS: id-jag
       ALLOW_MOCK_SIGNIN: ${ALLOW_MOCK_SIGNIN:-1}
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:${HOST_PORT:-4720}}
+      # Behind the lab-proxy (https://local.ping-devops.com:8443/id-jag-kit/): the proxy's Host for this lab, its browser origin and
+      # entry path. Direct http://localhost use is unchanged; the forwarded headers count only on the LAB_ALLOWED_HOSTS Host.
+      LAB_ALLOWED_HOSTS: ${LAB_ALLOWED_HOSTS:-id-jag-kit.local.ping-devops.com}
+      PROXY_ORIGIN: ${PROXY_ORIGIN:-https://local.ping-devops.com:8443}
+      PROXY_BASE: ${PROXY_BASE:-/id-jag-kit}
       RESOURCE_AS_ISSUER: *as-issuer
       RESOURCE_AS_TOKEN_ENDPOINT: http://resource-as:9080/token
       ID_JAG_RESOURCE: *mcp-resource

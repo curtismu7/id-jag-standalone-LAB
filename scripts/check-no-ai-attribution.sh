@@ -15,8 +15,12 @@ tree_count=$(printf '%s' "$tree" | grep -c . || true)
 echo "tracked files with an AI-attribution credit: $tree_count"
 if [ "$tree_count" != "0" ]; then printf '%s\n' "$tree" | sed 's/^/  /'; status=1; fi
 
+# One merged commit on main carries a Co-authored-by trailer that GitHub added for the owner's own account when it squashed
+# PR #3 (not an AI credit). History is not rewritten, so that one full sha is skipped; any other commit is still checked.
+skip_sha="b701d1d4c34d998acf6fbc50652615ba002a0ad4"
 bad=0
 for h in $(git log --all --since="$rule_date" --format=%H 2>/dev/null); do
+  [ "$h" = "$skip_sha" ] && continue
   if git log -1 --format=%B "$h" | grep -qiE "$pat"; then bad=$((bad+1)); echo "  commit ${h:0:7}"; fi
 done
 echo "commits since $rule_date with an AI-attribution credit: $bad"
