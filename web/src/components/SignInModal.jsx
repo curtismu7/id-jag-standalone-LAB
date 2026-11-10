@@ -58,7 +58,8 @@ export default function SignInModal() {
         const data = await r.json().catch(() => null);
         if (g !== gen.current) return;
         if (!r.ok || !data?.flowId) return fail(messageFor(data));
-        setFlow({ kind, returnTo });
+        if (typeof data.loginHint === "string") setUsername(data.loginHint); // issuer sign-in: the app user's username (login_hint)
+        setFlow({ kind, returnTo, hinted: typeof data.loginHint === "string" });
       } catch {
         if (g === gen.current) fail("Could not reach the server. Close this and try again.");
       } finally {
@@ -69,7 +70,7 @@ export default function SignInModal() {
     return () => window.removeEventListener("idjag:signin", onSignIn);
   }, []);
 
-  useEffect(() => { if (flow) userRef.current?.focus(); }, [flow]);
+  useEffect(() => { if (flow) (flow.hinted ? passRef : userRef).current?.focus(); }, [flow]);
   useEffect(() => { if (notice) closeRef.current?.focus(); }, [notice]);
 
   // Tab stays inside the dialog, wherever focus currently is. Escape (from anywhere on the page) is FloatingDialog's onClose.

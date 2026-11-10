@@ -488,7 +488,7 @@ The kit signs in by pi.flow only. These limits are documented, not fixed; the mo
 - **L4** `configure-acme-signin.js` sets Acme's default authentication source only when none exists.
 - **L5** In byo mode there is no issuer sign-in: the playground answers 409 `byo_mode` and the modal shows it.
 - **L6** At most 8 attempts per flow and a 5-minute flow lifetime, counted in an in-process map (per instance).
-- **L7** `prompt=login` is appended to the issuer's authorize request; whether pi.flow honours it is unverified.
+- **L7** `prompt=login` is appended to the issuer's authorize request; whether pi.flow honours it is unverified. Both pi.flow sign-ins (app and issuer) send `login_hint` and the modal pre-fills Username with it (PingFederate's pi.flow does not pre-fill anything itself). The hint is the app user's `preferred_username` when the issuer sign-in has one, else the username last signed in with: after a COMPLETED sign-in the server saves it to `login-hint.json` in the data volume (per workspace, mode 600, username only, never the password). Delete that file to forget it.
 - **L8** After `COMPLETED` the browser goes to this app's own `/auth/callback` or `/issuer/callback` with `code` and `state` (same origin, not an IdP redirect).
 
 | Route (under `/api/id-jag-playground/trusted-idps`) | Who | What |

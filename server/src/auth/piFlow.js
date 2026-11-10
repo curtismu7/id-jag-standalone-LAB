@@ -12,6 +12,7 @@ import { config } from '../config.js';
 import { mockSigninProblem } from '../mockSignin.js';
 import { outboundFetch } from '../outbound.js';
 import { requestBase } from '../requestOrigin.js';
+import { readHint, saveHint } from './loginHint.js';
 import { authorizeRequest, discover, missingConfig, oidcConfig, sameOrigin } from './oidc.js';
 
 const FLOW_ID = /^[A-Za-z0-9_-]{6,64}$/;
@@ -41,6 +42,9 @@ export function piFlowHandlers({ kind, key, redirectUri, prepare }) {
     const p = await prepare(req);
     if (p.fail) return res.status(p.fail[0]).json(p.fail[1]);
     p.url.searchParams.set('response_mode', 'pi.flow');
+    // login_hint: a source the kind already knows (the issuer sign-in sends the app user's name), else the username last signed in with.
+    p.hint ||= readHint() || undefined;
+    if (p.hint) p.url.searchParams.set('login_hint', p.hint);
     req.session[key] = p.login;
     // The cap is per session per TTL window: a restart inside the window keeps the count.
     const prev = req.session.piFlow;
@@ -62,7 +66,7 @@ export function piFlowHandlers({ kind, key, redirectUri, prepare }) {
     }
     tries.set(body.id, { n: attempts, at: Date.now() });
     req.session.piFlow = { kind, flowId: body.id, cookies: jar, startedAt: Date.now(), origin: p.url.origin, attempts };
-    return saveThen(req, res, 200, { flowId: body.id, status: body.status });
+    return saveThen(req, res, 200, { flowId: body.id, status: body.status, ...(p.hint && { loginHint: p.hint }) });
   }
 
   async function credentials(req, res) {
@@ -115,6 +119,7 @@ export function piFlowHandlers({ kind, key, redirectUri, prepare }) {
       to.searchParams.set('state', a.state);
       tries.delete(f.flowId);
       delete req.session.piFlow;
+      saveHint(username); // the next sign-in, on either form, starts with it
       return saveThen(req, res, 200, { redirectTo: to.toString() });
     }
     return end(200, { fallback: true, status: String(data?.status || '').slice(0, 64) });

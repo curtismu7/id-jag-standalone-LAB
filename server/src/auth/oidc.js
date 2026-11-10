@@ -177,6 +177,8 @@ router.get('/auth/callback', async (req, res) => {
     return page(res, 403, 'You cannot sign in to this app', refusal.message);
   }
   const user = { sub: claims.sub, email: claims.email.toLowerCase(), name: String(claims.name || claims.email), isAdmin: isAdmin(c, claims) };
+  // The issuer sign-in sends this as login_hint and pre-fills it (idJagPlayground.js).
+  if (typeof claims.preferred_username === 'string' && /^[ -~]{1,256}$/.test(claims.preferred_username)) user.username = claims.preferred_username;
   return req.session.regenerate((err) => {
     if (err) return failed('session regenerate failed');
     req.session.user = user;
