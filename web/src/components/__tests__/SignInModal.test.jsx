@@ -71,6 +71,15 @@ describe("SignInModal", () => {
     expect(f.mock.calls[0][0]).toBe("/api/id-jag-playground/issuer/pi-flow/start?return_to=%2Fback");
   });
 
+  it("pre-fills the login_hint username and puts focus in Password", async () => {
+    stubFetch(reply(200, { flowId: "flow-123", status: "USERNAME_PASSWORD_REQUIRED", loginHint: "demouser" }));
+    render(<SignInModal />);
+    act(() => { signInIssuer("/back"); });
+    await screen.findByRole("dialog");
+    expect(screen.getByLabelText("Username")).toHaveValue("demouser");
+    expect(screen.getByLabelText("Password")).toHaveFocus();
+  });
+
   it("is an accessible modal dialog with focus in Username", async () => {
     await open();
     const d = screen.getByRole("dialog");

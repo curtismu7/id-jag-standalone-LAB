@@ -62,7 +62,7 @@ export function piFlowHandlers({ kind, key, redirectUri, prepare }) {
     }
     tries.set(body.id, { n: attempts, at: Date.now() });
     req.session.piFlow = { kind, flowId: body.id, cookies: jar, startedAt: Date.now(), origin: p.url.origin, attempts };
-    return saveThen(req, res, 200, { flowId: body.id, status: body.status });
+    return saveThen(req, res, 200, { flowId: body.id, status: body.status, ...(p.hint && { loginHint: p.hint }) });
   }
 
   async function credentials(req, res) {

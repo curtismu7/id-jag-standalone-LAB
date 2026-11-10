@@ -21,6 +21,7 @@ function testApp() {
   const app = express();
   app.use(session({ name: 'demo.sid', secret: 'test-session-secret', resave: false, saveUninitialized: false }));
   app.get('/probe/mode/:m', (req, res) => { req.session.idJagPlaygroundMode = req.params.m; res.end(); });
+  app.get('/probe/user/:u', (req, res) => { req.session.user = { sub: 's1', email: 'u@example.com', username: req.params.u }; res.end(); });
   app.get('/probe', (req, res) => res.json({
     oidcLogin: !!req.session.oidcLogin, issuerLogin: !!req.session.idJagIssuerLogin, flow: !!req.session.piFlow,
     state: req.session.oidcLogin?.state || req.session.idJagIssuerLogin?.state,
@@ -286,6 +287,20 @@ describe('issuer start preconditions', () => {
     expect(res.status).toBe(409);
     expect(res.body.error).toBe('byo_mode');
     expect(startCall()).toBeUndefined();
+  });
+
+  it('sends the app user\'s username as login_hint and returns it for the form; none without one', async () => {
+    const agent = request.agent(testApp());
+    await agent.get('/probe/mode/pf-as');
+    await agent.get('/probe/user/demouser');
+    const res = await agent.get(`${start}?return_to=/`);
+    expect(res.body).toEqual({ flowId: 'flow_1234', status: 'USERNAME_PASSWORD_REQUIRED', loginHint: 'demouser' });
+    expect(new URL(startCall()[0]).searchParams.get('login_hint')).toBe('demouser');
+    fetchMock.mockClear();
+    const anon = request.agent(testApp());
+    await anon.get('/probe/mode/pf-as');
+    expect((await anon.get(`${start}?return_to=/`)).body.loginHint).toBeUndefined();
+    expect(new URL(startCall()[0]).searchParams.has('login_hint')).toBe(false);
   });
 
   it('409 not_configured when the mode lacks settings', async () => {

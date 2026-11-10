@@ -704,6 +704,9 @@ const issuerFlow = piFlowHandlers({
     if (keys.length) return { fail: [409, { error: 'not_configured', missing: keys }] };
     const p = issuerAuthorizeRequest(mode, req.query.return_to, req);
     p.url.searchParams.set('prompt', 'login');
+    // login_hint: the username of the user signed in to this app, so the issuer sign-in asks only for the password.
+    const hint = req.session?.user?.username;
+    if (hint) { p.url.searchParams.set('login_hint', hint); p.hint = hint; }
     return p;
   },
 });
