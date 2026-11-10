@@ -73,8 +73,14 @@ services:
       ACCEPTED_RESOURCES: *mcp-resource
       # Whom to trust: the playground's Trusted IdPs registry (plus PF_URL once pf-as is configured).
       TRUSTED_IDPS_REGISTRY_URL: http://id-jag:4720/api/id-jag-playground/trusted-idps/registry
+      # pf-as: it fetches the issuer PingFederate's signing keys (PF_URL/pf/JWKS) to verify the ID-JAG, so it needs the same
+      # route and the same bundled root CA as the id-jag service. PF_CA_FILE is the in-container path (the .env value is a host path).
+      PF_CA_FILE: /app/deploy/pf-rootCA.pem
     volumes:
       - resource-as-data:/data
+      - ./pf-rootCA.pem:/app/deploy/pf-rootCA.pem:ro
+    extra_hosts:
+      - "local.ping-devops.com:host-gateway"
 
   mcp-sample:
     restart: unless-stopped
