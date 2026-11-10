@@ -364,9 +364,11 @@ const PROBE_TIMEOUT_MS = 4000;
  * (PingFederate as redeemer) falls back to its OpenID configuration.
  */
 export async function probeBackends(s, mcpUrl, fetchImpl = outboundFetch) {
-  // The issuer, not just its origin: a hosted resource AS can live under a path
+  // The token endpoint's origin, not just the issuer: in Docker the issuer is the browser's URL
+  // (http://localhost:4721), which this server cannot reach; the token endpoint names the internal
+  // address (http://resource-as:9080). A hosted resource AS can live under a path
   // (https://host/resource-as), whose discovery and JWKS are served under that path.
-  const as = trimSlash(s.resourceAs.issuer || originOf(s.resourceAs.tokenEndpoint));
+  const as = trimSlash(originOf(s.resourceAs.tokenEndpoint) || s.resourceAs.issuer);
   const targets = [
     { id: 'idp', label: s.idp.name, urls: s.idp.issuer ? [`${trimSlash(s.idp.issuer)}/.well-known/openid-configuration`] : [] },
     { id: 'resource-as', label: s.resourceAs.name, urls: as ? [`${as}/.well-known/oauth-authorization-server`, `${as}/.well-known/openid-configuration`] : [] },

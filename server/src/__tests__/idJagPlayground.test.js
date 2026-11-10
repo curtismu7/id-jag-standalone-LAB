@@ -355,6 +355,15 @@ describe('backends', () => {
     expect(b.mcp.url).toBe('https://mcp.test/.well-known/oauth-protected-resource');
   });
 
+  it('probes the resource AS at the token endpoint origin, not the browser-facing issuer (Docker: localhost is unreachable)', async () => {
+    await setEnv({ ...PF_AS_ENV, RESOURCE_AS_TOKEN_ENDPOINT: 'http://resource-as:9080/token' });
+    const f = vi.fn(async () => reply(200, {}));
+    const b = byId(await probeBackends(settings('pf-as'), MCP, f));
+    expect(b['resource-as'].url).toBe('http://resource-as:9080/.well-known/oauth-authorization-server');
+    expect(f.mock.calls.every(([url]) => !url.startsWith(AS))).toBe(true);
+    expect(b['resource-as'].state).toBe('up');
+  });
+
   it('marks a backend down when it never answers', async () => {
     const f = vi.fn(async (url) => {
       if (url.startsWith('https://mcp.test')) throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
