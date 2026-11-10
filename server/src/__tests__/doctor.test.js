@@ -131,6 +131,10 @@ describe('individual checks', () => {
     const none = await doctor.checkIssuerJwks('j', 'https://pf.test', jwks([{ kty: 'RSA', n: 'a', e: 'AQAB' }]));
     expect(none).toMatchObject({ status: 'fail', message: expect.stringContaining('no RSA key with x5t') });
     expect((await doctor.checkIssuerJwks('j', 'https://pf.test', jwks([one, { ...one, n: 'b', x5t: 'u' }]))).status).toBe('warn');
+    // pf-as: resource-as picks the key by x5t, so several distinct keys pass; none with x5t still fails.
+    const picked = await doctor.checkIssuerJwks('j', 'https://pf.test', jwks([one, { ...one, n: 'b', x5t: 'u' }]), { pickedByX5t: true });
+    expect(picked).toMatchObject({ status: 'pass', message: expect.stringContaining('picks the right one by x5t') });
+    expect((await doctor.checkIssuerJwks('j', 'https://pf.test', jwks([{ kty: 'RSA', n: 'a', e: 'AQAB' }, { kty: 'RSA', n: 'b', e: 'AQAB' }]), { pickedByX5t: true })).status).toBe('fail');
     expect((await doctor.checkIssuerJwks('j', 'https://pf.test', jwks([], 500))).message).toContain('HTTP 500');
     const down = await doctor.checkIssuerJwks('j', 'https://pf.test', async () => { throw Object.assign(new Error('x'), { cause: { code: 'CERT_HAS_EXPIRED' } }); });
     expect(down).toMatchObject({ status: 'fail', message: expect.stringContaining('CERT_HAS_EXPIRED') });

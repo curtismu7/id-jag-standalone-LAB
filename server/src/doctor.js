@@ -120,17 +120,17 @@ export async function checkDiscovery(id, label, url, fetchImpl = outboundFetch) 
 }
 
 /** pf-as, live only (the mock PingFederate signs with an EC key): the issuer's /pf/JWKS must carry an RSA key with x5t (what ID-JAGs are signed with), and ideally only one. */
-export async function checkIssuerJwks(id, url, fetchImpl = outboundFetch, { label = 'PF_URL', fix = null } = {}) {
+export async function checkIssuerJwks(id, url, fetchImpl = outboundFetch, { label = 'PF_URL', fix = null, pickedByX5t = false } = {}) {
   const jwksUrl = `${url}/pf/JWKS`;
   try {
     const res = await fetchImpl(jwksUrl, { signal: AbortSignal.timeout(4000) });
     if (res.status < 200 || res.status >= 300) return r(id, 'fail', `${jwksUrl} answered HTTP ${res.status}`, `Check ${label} and that the server is up.`);
-    const v = issuerKeyCheck((await res.json().catch(() => ({}))).keys);
+    const v = issuerKeyCheck((await res.json().catch(() => ({}))).keys, { pickedByX5t });
     fix ??= 'Rerun npm run setup -- --mode=pf-local (it publishes the one ID-JAG signing key), or publish it yourself through a JWT access token manager and set a static JWKS.';
     if (v.status === 'fail') return r(id, 'fail', `${jwksUrl} has no RSA key with x5t, so nothing can verify an ID-JAG from this issuer`, fix);
     return v.status === 'warn'
       ? r(id, 'warn', `${jwksUrl} lists ${v.rsa} distinct RSA keys (${v.withX5t} with x5t): PingFederate's own JWT-bearer consumer may pick the wrong one`, fix)
-      : pass(id, `${jwksUrl} has one RSA key, with x5t`);
+      : pass(id, v.rsa > 1 ? `${jwksUrl} lists ${v.rsa} distinct RSA keys (${v.withX5t} with x5t); resource-as picks the right one by x5t` : `${jwksUrl} has one RSA key, with x5t`);
   } catch (err) {
     return r(id, 'fail', `could not read ${jwksUrl} (${err?.cause?.code || err?.message})`, `Check ${label}, the network, and PF_CA_FILE if PingFederate uses its own certificate.`);
   }
@@ -202,7 +202,7 @@ export async function runDoctor({ mode = 'mock', env = runtimeEnv(), fetchImpl =
       [checkEnvRequired(mode, env), checkSignin(), checkSessionSecret(env), checkRegistrationKey(env), checkAccess(env)],
       ...await Promise.all([
         guard('pf-discovery', async () => [await checkDiscovery('pf-discovery', 'PF_URL', c.pfUrl, fetchImpl)]),
-        mode === 'pf-as' && !isMock() ? guard('pf-jwks', async () => [await checkIssuerJwks('pf-jwks', c.pfUrl, fetchImpl)]) : [],
+        mode === 'pf-as' && !isMock() ? guard('pf-jwks', async () => [await checkIssuerJwks('pf-jwks', c.pfUrl, fetchImpl, { pickedByX5t: true })]) : [],
         mode === 'pf-pf' ? guard('acme-discovery', async () => [await checkDiscovery('acme-discovery', 'ACME_PF_URL', c.acmePfUrl, fetchImpl)]) : [],
         mode === 'pf-pf' && !isMock() ? guard('acme-jwks', async () => [await checkIssuerJwks('acme-jwks', c.acmePfUrl, fetchImpl, { label: 'ACME_PF_URL',
           fix: 'Acme\'s /pf/JWKS must list exactly one RSA key with x5t (its ID-JAG signing key). Ask the Acme owner; after Acme changes keys, rerun npm run setup -- --mode=pf-pf to restart your PingFederate (it caches Acme\'s keys forever).' })]) : [],

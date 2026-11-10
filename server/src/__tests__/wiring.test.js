@@ -199,7 +199,7 @@ describe('preflight', () => {
     expect(res.body.ok).toBe(true);
   });
 
-  describe('pf-as: the issuer\'s /pf/JWKS must hold one RSA key, with x5t', () => {
+  describe('pf-as: the issuer\'s /pf/JWKS must hold an RSA key with x5t (resource-as picks by x5t, so extra keys are fine)', () => {
     const jwks = (keys) => async (url) => reply(200, String(url).endsWith('/pf/JWKS') ? { keys } : { issuer: PF });
     const issueJwks = async (keys) => {
       fetchMock.mockImplementation(jwks(keys));
@@ -213,10 +213,14 @@ describe('preflight', () => {
       const c = await issueJwks([{ kty: 'RSA', n: 'a', e: 'AQAB', kid: 'dynamic' }]);
       expect(c).toEqual(expect.objectContaining({ status: 'fail', fix: expect.stringContaining('setup -- --mode=pf-local') }));
     });
-    it('warns when there is more than one distinct RSA key', async () => {
-      const c = await issueJwks([{ kty: 'RSA', n: 'a', e: 'AQAB', x5t: 't1' }, { kty: 'RSA', n: 'b', e: 'AQAB', x5t: 't2' }]);
-      expect(c.status).toBe('warn');
-      expect(c.detail).toContain('2 distinct RSA keys');
+    it('passes with several distinct RSA keys when one has x5t: resource-as picks the key by x5t', async () => {
+      const c = await issueJwks([{ kty: 'RSA', n: 'a', e: 'AQAB', x5t: 't1' }, { kty: 'RSA', n: 'b', e: 'AQAB', x5t: 't2' }, { kty: 'RSA', n: 'c', e: 'AQAB', kid: 'default' }]);
+      expect(c.status).toBe('pass');
+      expect(c.detail).toContain('3 distinct RSA');
+      expect(c.detail).toContain('by x5t');
+    });
+    it('still fails with several RSA keys and none with x5t', async () => {
+      expect((await issueJwks([{ kty: 'RSA', n: 'a', e: 'AQAB', kid: 'k1' }, { kty: 'RSA', n: 'b', e: 'AQAB', kid: 'k2' }])).status).toBe('fail');
     });
   });
 
