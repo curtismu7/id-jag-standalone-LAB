@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import express from 'express';
 import session from 'express-session';
 import request from 'supertest';
@@ -38,7 +41,10 @@ const post = (agent, p, body) => agent.post(p).set('Origin', ORIGIN).send(body);
 const creds = { username: 'demo', password: PW };
 const completed = (state) => reply(200, { id: 'flow_1234', status: 'COMPLETED', authorizeResponse: { code: CODE, state } });
 
+let dataDir;
 beforeEach(() => {
+  dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'idjag-hint-'));
+  vi.stubEnv('DATA_DIR', dataDir);
   vi.stubEnv('APP_ORIGIN', ORIGIN);
   vi.stubEnv('PF_URL', PF);
   vi.stubEnv('PF_EXCHANGE_CLIENT_ID', 'pf-exchange');
@@ -102,6 +108,36 @@ describe.each(KINDS)('pi.flow sign-in ($name)', (k) => {
     expect(res.status).toBe(502);
     expect(res.body).toEqual({ error: 'pi_flow_unavailable' });
     expect(await probe()).toEqual(expect.objectContaining({ [k.key]: false, flow: false }));
+  });
+
+  it('remembers the username only after a COMPLETED sign-in, and sends it as login_hint next time on either form', async () => {
+    const hintFile = path.join(dataDir, 'login-hint.json');
+    const { agent, probe } = await begin();
+    flow.posts.push(reply(400, { details: [{ code: 'CREDENTIAL_VALIDATION_FAILED' }] }));
+    await post(agent, k.creds, { username: 'typo', password: 'bad' });
+    expect(fs.existsSync(hintFile)).toBe(false); // a refused password never becomes the hint
+    flow.posts.push(completed((await probe()).state));
+    await post(agent, k.creds, creds);
+    expect(JSON.parse(fs.readFileSync(hintFile, 'utf8'))).toEqual({ username: 'demo' });
+    expect(fs.statSync(hintFile).mode & 0o777).toBe(0o600);
+    for (const other of KINDS) {
+      fetchMock.mockClear();
+      const fresh = request.agent(testApp());
+      if (other.mode) await fresh.get(`/probe/mode/${other.mode}`);
+      const res = await fresh.get(other.start);
+      expect(res.body.loginHint).toBe('demo');
+      expect(new URL(startCall()[0]).searchParams.get('login_hint')).toBe('demo');
+    }
+  });
+
+  it('ignores a corrupt or unsafe remembered username', async () => {
+    for (const bad of ['not json', JSON.stringify({ username: 'a\nb' }), JSON.stringify({ username: 'x'.repeat(300) })]) {
+      fs.writeFileSync(path.join(dataDir, 'login-hint.json'), bad);
+      fetchMock.mockClear();
+      const { res } = await begin();
+      expect(res.body.loginHint).toBeUndefined();
+      expect(new URL(startCall()[0]).searchParams.has('login_hint')).toBe(false);
+    }
   });
 
   it('completes: replays the cookie jar and returns the redirect with code and state', async () => {
@@ -301,6 +337,14 @@ describe('issuer start preconditions', () => {
     await anon.get('/probe/mode/pf-as');
     expect((await anon.get(`${start}?return_to=/`)).body.loginHint).toBeUndefined();
     expect(new URL(startCall()[0]).searchParams.has('login_hint')).toBe(false);
+  });
+
+  it('prefers the app user\'s username over the remembered one', async () => {
+    fs.writeFileSync(path.join(dataDir, 'login-hint.json'), JSON.stringify({ username: 'remembered' }));
+    const agent = request.agent(testApp());
+    await agent.get('/probe/mode/pf-as');
+    await agent.get('/probe/user/demouser');
+    expect((await agent.get(`${start}?return_to=/`)).body.loginHint).toBe('demouser');
   });
 
   it('409 not_configured when the mode lacks settings', async () => {
