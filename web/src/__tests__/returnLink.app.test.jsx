@@ -37,6 +37,16 @@ describe("return link", () => {
     await screen.findByRole("button", { name: "Sign in" });
   });
 
+  it("?from=ai-demo-standalone: the strip names AI Demo Standalone; behind the proxy Back goes to /ai-demo-standalone/", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, pathname: "/id-jag-kit/", search: "?from=ai-demo-standalone&uc=UC-LEARN9", assign });
+    window.history.replaceState(null, "", "/?from=ai-demo-standalone&uc=UC-LEARN9");
+    render(<AppShell><p>child</p></AppShell>);
+    expect(screen.getByRole("note", { name: "Opened from AI Demo Standalone" }).textContent).toContain("UC-LEARN9");
+    fireEvent.click(screen.getAllByRole("button", { name: /Back to AI Demo Standalone/ })[0]);
+    expect(assign).toHaveBeenCalledWith("/ai-demo-standalone/?returned=id-jag-standalone&uc=UC-LEARN9");
+  });
+
   it("no from, an unknown from or a bad id: no strip, no button", async () => {
     for (const q of ["/", "/?from=elsewhere&uc=UC40", "/?from=customer-agent&uc=a%20b", "/?from=customer-agent&uc=UC40&vertical=%3Cb%3E"]) {
       window.history.replaceState(null, "", q);
