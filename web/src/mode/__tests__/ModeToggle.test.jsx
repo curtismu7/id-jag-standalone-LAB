@@ -137,16 +137,17 @@ describe("when the server cannot be read", () => {
 });
 
 describe("on every page", () => {
-  it("the app shell carries the toggle and the banner, in presenter mode too", async () => {
+  it("the app shell carries the mode select and the banner, in presenter mode too", async () => {
     localStorage.setItem("idjag.present", "1");
     stub();
     render(<AppShell><p>any page</p></AppShell>);
-    await waitFor(() => expect(button("Mock")).toHaveAttribute("aria-pressed", "true"));
+    const select = await screen.findByRole("combobox", { name: "Mock or Real" });
+    await waitFor(() => expect(select).toHaveValue("mock"));
     expect(screen.getByTestId("mode-banner")).toHaveAttribute("data-state", "mock");
     expect(document.documentElement.dataset.present).toBe("1");
     expect(screen.getByRole("toolbar", { name: "Presenter controls" })).toBeInTheDocument();
     expect(screen.getByTestId("mode-banner").closest("[data-admin-only]")).toBeNull(); // presenter mode hides admin things, never this
-    expect(within(screen.getByRole("banner")).getByRole("group", { name: "Mock or live" })).toBeInTheDocument();
+    expect(within(screen.getByRole("banner")).getByRole("combobox", { name: "Mock or Real" })).toBeInTheDocument();
   });
 });
 

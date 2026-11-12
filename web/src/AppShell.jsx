@@ -7,9 +7,10 @@ import { useMe } from "./auth/useMe";
 import { signIn } from "./utils/signIn";
 import { CustomerProvider, useCustomer } from "./customer/CustomerConfig";
 import SignInModal from "./components/SignInModal";
-import { ModeProvider } from "./mode/ModeContext";
-import { ClaimBanner, ModeBanner, ModeToggle } from "./mode/ModeToggle";
-import { PresentBar, PresentProvider, PresentToggle } from "./present/PresentMode";
+import { ModeProvider, useAppMode } from "./mode/ModeContext";
+import { ClaimBanner, ModeBanner } from "./mode/ModeToggle";
+import { PresentBar, PresentProvider, usePresent } from "./present/PresentMode";
+import TopMenu from "./top-menu/TopMenu";
 import "./AppShell.css";
 
 const THEME_KEY = "idjag.theme";
@@ -32,6 +33,8 @@ function Shell({ children }) {
   const [theme, setTheme] = useState(initialTheme);
   const me = useMe();
   const customer = useCustomer();
+  const mode = useAppMode();
+  const present = usePresent();
   const here = currentPage();
   useEffect(() => { if (theme === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme; }, [theme]);
   const pickTheme = (next) => {
@@ -59,15 +62,24 @@ function Shell({ children }) {
             <button type="submit" className="shell-theme">Sign out</button>
           </form>
         )}
-        <ReturnLink app="id-jag-standalone" variant="header" />
-        <ShelfLink />
-        <ModeToggle />
-        <PresentToggle />
-        <label className="shell-theme">Theme
-          <select value={theme} onChange={(e) => pickTheme(e.target.value)} aria-label="Theme">
-            {THEMES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-          </select>
-        </label>
+        <span className="shell-right">
+          <TopMenu
+            mode={mode?.status === "ready" ? {
+              // the lab's mode id is "live"; TopMenu's select speaks "mock"/"real"
+              value: mode.mode === "live" ? "real" : "mock",
+              onChange: (v) => mode.choose(v === "real" ? "live" : "mock"),
+              realAvailable: mode.live?.ready,
+              realHint: mode.live?.ready ? undefined : `Live needs: ${(mode.live?.missing || []).join(", ")}`,
+            } : undefined}
+            theme={{ value: theme, onChange: pickTheme }}
+            present={{ active: present?.present, onToggle: () => present?.set(!present?.present), label: "Present" }}
+            help={{ href: "https://github.com/curtismu7/id-jag-standalone-LAB#readme" }}
+            version={mode?.version || null}
+            extra={<ReturnLink app="id-jag-standalone" variant="header" />}
+          >
+            <ShelfLink />
+          </TopMenu>
+        </span>
         {me === null && <button type="button" className="shell-theme shell-signin" onClick={() => signIn()}>Sign in</button>}
       </header>
       <ModeBanner />

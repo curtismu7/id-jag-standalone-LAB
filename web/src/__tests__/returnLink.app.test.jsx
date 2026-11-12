@@ -20,7 +20,7 @@ describe("return link", () => {
     const strip = screen.getByRole("note", { name: "Opened from Customer Agent LAB" });
     expect(strip).toHaveTextContent("UC40");
     expect((await screen.findByTestId("mode-banner")).nextElementSibling).toBe(strip);
-    expect(document.querySelector("header.shell-bar > button.return-link--header")).not.toBeNull();
+    expect(document.querySelector("header.shell-bar button.return-link--header")).not.toBeNull();
     const backs = screen.getAllByRole("button", { name: /Back to Customer Agent LAB/ });
     expect(backs).toHaveLength(2);
     fireEvent.click(backs[0]);

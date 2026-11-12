@@ -45,11 +45,11 @@ describe("app shell", () => {
     vi.stubGlobal("fetch", respond(401, '{"error":"not_signed_in"}'));
     render(<AppShell><p>child</p></AppShell>);
     expect(screen.getByTestId("claim-banner")).toHaveTextContent("Ping release claim (2026-11-02), UNVERIFIED on our tenant");
-    fireEvent.click(screen.getByRole("button", { name: "Present" }));
+    fireEvent.click(screen.getByTestId("presenter"));
     expect(document.documentElement.dataset.present).toBe("1");
     expect(screen.getByTestId("claim-banner")).toBeVisible();
     expect(screen.getByTestId("claim-banner")).not.toHaveAttribute("data-admin-only");
-    fireEvent.click(screen.getByRole("button", { name: "Present" }));
+    fireEvent.click(screen.getByTestId("presenter"));
     await screen.findByRole("button", { name: "Sign in" });
   });
 

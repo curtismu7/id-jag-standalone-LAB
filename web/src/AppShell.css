@@ -29,6 +29,7 @@
 :root[data-theme="dark"] { --th-accent-text: var(--brand-text-dark, var(--danger-text)); }
 
 .shell-bar {
+  position: relative; /* the TopMenu sign-in slot centers against this bar */
   display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
   padding: 0.65rem 1.25rem;
   background: var(--brand-header, var(--surface-2)); color: var(--brand-header-on, var(--text));

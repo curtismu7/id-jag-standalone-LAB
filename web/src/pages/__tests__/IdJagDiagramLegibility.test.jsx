@@ -206,8 +206,8 @@ describe("diagram text stays readable at every zoom the page allows", () => {
       const text = appStylesheets(web).css;
       expect(tooSmall(scanCardCss(text, card, KINDS), READABLE_MIN_ZOOM).map((f) => f.selector).sort()).toEqual([".ijx .cs", ".ijx .ct"]);
     });
-    it("the app's own stylesheets: all thirteen under src (with the vendored floating-dialog.css), none from node_modules", () => {
-      expect(cssFiles.filter((f) => f.endsWith(".css")).length).toBe(13);
+    it("the app's own stylesheets: all fourteen under src (with the vendored floating-dialog.css and top-menu.css), none from node_modules", () => {
+      expect(cssFiles.filter((f) => f.endsWith(".css")).length).toBe(14);
       expect(cssFiles).toContain("src/floating-dialog/floating-dialog.css");
       expect(cssFiles.every((f) => !f.includes("node_modules"))).toBe(true);
     });

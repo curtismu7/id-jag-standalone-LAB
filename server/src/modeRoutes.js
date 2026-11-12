@@ -1,6 +1,7 @@
 // GET /api/mode: the app's Mock/Live setting, whether Live can be chosen, and (in mock mode) the demo account.
 // POST /api/mode { mode: "mock" | "live" }: switch (same-origin only). Live needs the live settings; without them the answer is
 // 409 live_not_configured naming what to set. A switch ends every web session, because a session holds tokens of one mode only.
+import fs from 'node:fs';
 import express from 'express';
 import { sameOrigin } from './auth/oidc.js';
 import { refresh } from './health.js';
@@ -14,11 +15,14 @@ import { sessionStore } from './sessionStore.js';
 const router = express.Router();
 router.use(express.json({ limit: '1kb' }));
 
+const VERSION = (() => { try { return JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version || null; } catch { return null; } })();
+
 const view = (req) => {
   const mode = currentMode();
   const live = liveReadiness();
   const blocked = mode === 'mock' ? mockSigninProblem(req) : null;
   return {
+    version: VERSION,
     mode,
     live: { ready: live.ready, missing: live.ready ? [] : live.missing },
     // The demo account is public on purpose: it exists only inside the mock PingFederate.
