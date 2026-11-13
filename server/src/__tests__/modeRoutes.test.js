@@ -34,9 +34,11 @@ const configureLive = () => {
 describe('GET /api/mode', () => {
   it('in mock mode names the mode, what Live still needs, and the demo account', async () => {
     const res = await request(createApp()).get('/api/mode').expect(200);
+    // /api/mode also carries the app version for the TopMenu; the rule 19 fields are the contract.
     expect(res.body).toEqual({
       mode: 'mock', live: { ready: false, missing: ['PF_URL', 'PF_EXCHANGE_CLIENT_ID', 'PF_EXCHANGE_CLIENT_SECRET'] },
       mockUser: { username: MOCK_USER.username, password: MOCK_USER.password }, signin: { allowed: true },
+      version: expect.any(String),
     });
     expect(res.headers['cache-control']).toBe('no-store');
   });
