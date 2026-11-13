@@ -10,7 +10,7 @@ import SignInModal from "./components/SignInModal";
 import { ModeProvider, useAppMode } from "./mode/ModeContext";
 import { ClaimBanner, ModeBanner } from "./mode/ModeToggle";
 import { PresentBar, PresentProvider, usePresent } from "./present/PresentMode";
-import TopMenu from "./top-menu/TopMenu";
+import TopMenu, { applyFontSize } from "./top-menu/TopMenu.jsx";
 import "./AppShell.css";
 
 const THEME_KEY = "idjag.theme";
@@ -31,6 +31,8 @@ function initialTheme() {
 /** Brand frame: Core Dark bar, Ping Red rule, page nav, signed-in user, theme switch. */
 function Shell({ children }) {
   const [theme, setTheme] = useState(initialTheme);
+  const [fontStep, setFontStep] = useState(() => { try { return localStorage.getItem("idjag-font") || "M"; } catch { return "M"; } });
+  useEffect(() => { applyFontSize(fontStep); try { localStorage.setItem("idjag-font", fontStep); } catch { /* blocked */ } }, [fontStep]);
   const me = useMe();
   const customer = useCustomer();
   const mode = useAppMode();
@@ -72,6 +74,7 @@ function Shell({ children }) {
               realHint: mode.live?.ready ? undefined : `Live needs: ${(mode.live?.missing || []).join(", ")}`,
             } : undefined}
             theme={{ value: theme, onChange: pickTheme }}
+            fontSize={{ value: fontStep, onChange: setFontStep }}
             present={{ active: present?.present, onToggle: () => present?.set(!present?.present), label: "Present" }}
             help={{ href: "https://github.com/curtismu7/id-jag-standalone-LAB#readme" }}
             version={mode?.version || null}
