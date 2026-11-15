@@ -4,6 +4,7 @@ const { post } = vi.hoisted(() => ({ post: vi.fn() }));
 vi.mock("../../services/api", () => ({ default: { get: vi.fn(), post } }));
 
 import CimdTesterPage from "../CimdTesterPage";
+import { setJsonView } from "../../components/JsonPane.jsx";
 
 const SERVER = {
   issuer: "https://pf.mock.invalid",
@@ -22,6 +23,7 @@ const PROBE = {
 
 beforeEach(() => {
   post.mockReset();
+  setJsonView("raw"); // each check's value is a shared JsonPane: read its JSON view
 });
 
 describe("CIMD tester page", () => {
@@ -33,6 +35,10 @@ describe("CIMD tester page", () => {
     await waitFor(() => expect(screen.getByTestId("cimd-tester-server")).toBeInTheDocument());
     expect(screen.getAllByText(/Pass/).length).toBe(2);
     expect(screen.getByText(/pf\.mock\.invalid/)).toBeInTheDocument();
+    const values = screen.getByTestId("cimd-tester-server").querySelectorAll("li .jsonbox"); // each value is a JsonPane (Rule 24)
+    expect(values).toHaveLength(2);
+    expect(values[0]).toHaveTextContent("true");
+    expect(values[1].querySelector(".json--raw").textContent).toContain('"S256"');
     expect(post).toHaveBeenCalledWith("/api/cimd/tester/server");
   });
 

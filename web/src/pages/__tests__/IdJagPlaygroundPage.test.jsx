@@ -448,6 +448,9 @@ describe("ID-JAG playground page", () => {
     const table = await screen.findByTestId("ijp-checks");
     expect(table).toHaveTextContent("Spec check: 1 of 2 pass");
     expect(table).toHaveTextContent("Header typ");
+    const actual = table.querySelectorAll("tbody td:nth-child(4) .jsonbox"); // the Actual cells are JsonPanes (Rule 24)
+    expect(actual).toHaveLength(2);
+    expect(actual[1]).toHaveTextContent("3600s");
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/id-jag-playground/inspect", {}));
   });
 

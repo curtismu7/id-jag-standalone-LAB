@@ -985,7 +985,7 @@ export default function IdJagPlaygroundPage() {
                       <td>{c.label}</td>
                       <td>{c.status === "pass" ? "✅ pass" : c.status === "warn" ? "⚠️ warn" : "❌ fail"}</td>
                       <td>{String(c.expected ?? "")}</td>
-                      <td>{typeof c.actual === "object" ? JSON.stringify(c.actual) : String(c.actual ?? "")}</td>
+                      <td><Json value={c.actual} label={`Actual: ${c.label}`} hot={HOT} /></td>
                       <td className="ijp-cite">{c.cite}</td>
                     </tr>
                   ))}
