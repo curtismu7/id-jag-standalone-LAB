@@ -1,5 +1,6 @@
 import { useState } from "react";
 import api from "../services/api";
+import Json from "../components/JsonPane.jsx";
 import "./CimdTesterPage.css";
 
 // CIMD tester, after client.dev (stytchauth/client.dev, MIT): the same two sides, run against this kit's
@@ -76,7 +77,7 @@ export default function CimdTesterPage() {
               <h3>PingFederate at {server.issuer}</h3>
               <ul className="cimd__findings">
                 {server.checks.map((c) => (
-                  <li key={c.name} data-state={c.ok ? "ok" : "bad"}><strong>{c.ok ? "Pass" : "Fail"}</strong> {c.name} <code>{JSON.stringify(c.value)}</code></li>
+                  <li key={c.name} data-state={c.ok ? "ok" : "bad"}><strong>{c.ok ? "Pass" : "Fail"}</strong> {c.name} <Json value={c.value} label={`Value: ${c.name}`} /></li>
                 ))}
               </ul>
             </div>
