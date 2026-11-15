@@ -5,6 +5,7 @@ import "@xyflow/react/dist/style.css";
 import "./IdJagPlaygroundDiagramPage.css";
 import { PLAYGROUND_DIAGRAMS, PLAYGROUND_DIAGRAM_MODES, playgroundDiagramPath, stepParts, edgeBadges, stepLights, firstStepLighting, focusNode } from "../utils/idJagPlaygroundDiagrams";
 import { stepDetail } from "../utils/idJagStepDetail";
+import Json from "../components/JsonPane.jsx";
 import { pathFromPoints, labelPoint } from "../utils/orthoRoute";
 import { routeEdges } from "../utils/idJagPlaygroundRouting";
 import { placeLabels } from "../utils/idJagLabelPlacement";
@@ -123,7 +124,8 @@ export function useDraggableNodes(computed) {
 const SPEEDS = [{ id: "slow", label: "Slow", ms: 6000 }, { id: "normal", label: "Normal", ms: 3500 }, { id: "fast", label: "Fast", ms: 1500 }];
 
 const DETAIL_KIND = { rfc: "RFC", spec: "Spec", emerging: "Emerging" };
-const json = (o) => JSON.stringify(o, null, 2);
+// Wire text and mock tokens go through the shared JsonPane (Rule 24): full view, Form | JSON for JSON, wire text as text.
+const HOT = ["typ", "jti", "resource", "requested_token_type", "subject_token_type", "issued_token_type", "x5t", "kid"];
 /** Request on the wire, MOCK tokens and standards for one step. */
 function StepDetail({ detail }) {
   const { forms, tokens, refs } = detail;
@@ -133,7 +135,7 @@ function StepDetail({ detail }) {
         <>
           <h3>Request on the wire</h3>
           {forms.map((f) => (
-            <figure key={f.title} className="code"><figcaption>{f.title}</figcaption><pre><code>{f.code}</code></pre></figure>
+            <figure key={f.title} className="code"><figcaption>{f.title}</figcaption><Json value={f.code} label={f.title} hot={HOT} /></figure>
           ))}
         </>
       ) : null}
@@ -143,7 +145,8 @@ function StepDetail({ detail }) {
           <p className="muted">Teaching values only: not real tokens, not signed by anything.</p>
           {tokens.map((t) => (
             <figure key={t.note} className="code token"><figcaption>{t.note}</figcaption>
-              <pre><code>{t.header ? `// header\n${json(t.header)}\n// claims\n${json(t.claims)}` : json(t.claims)}</code></pre>
+              {t.header && <><p className="muted">header</p><Json value={t.header} label="header" hot={HOT} /><p className="muted">claims</p></>}
+              <Json value={t.claims} label="claims" hot={HOT} />
             </figure>
           ))}
         </>

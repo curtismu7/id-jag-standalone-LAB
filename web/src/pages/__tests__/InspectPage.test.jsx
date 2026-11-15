@@ -5,6 +5,7 @@ const { get, post } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("../../services/api", () => ({ default: { get, post } }));
 
 import InspectPage, { CHECK_TERMS } from "../InspectPage";
+import { setJsonView } from "../../components/JsonPane.jsx";
 
 const DECODED = {
   type: "id-jag", header: { typ: "oauth-id-jag+jwt" }, claims: { iss: "https://pf.test", jti: "j1" }, idp: { id: "pf", name: "SE PingFederate" },
@@ -57,9 +58,10 @@ describe("Inspector page", () => {
   });
 
   it("shows discovery JSON per backend, the profile-fields note and a down backend", async () => {
+    setJsonView("raw"); // the metadata is a shared JsonPane: read its JSON view
     render(<InspectPage />);
     fireEvent.click(screen.getByText("Backends (discovery metadata)"));
-    expect(await screen.findByText(/"issuer": "https:\/\/as.test"/)).toBeInTheDocument();
+    expect(await screen.findByLabelText("Resource AS metadata")).toHaveTextContent('"issuer": "https://as.test"');
     expect(screen.getByText(/no answer within 4 s/)).toBeInTheDocument();
     expect(screen.getByText((_, el) => el.tagName === "LI" && /scopes_supported.*not published/.test(el.textContent))).toBeInTheDocument();
   });

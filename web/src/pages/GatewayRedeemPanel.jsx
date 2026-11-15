@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../services/api";
+import JsonPane from "../components/JsonPane.jsx";
 import "./GatewayRedeemPanel.css";
 
 // The "gateway-redeem" playground mode: the Privilege MCP gateway exchanges the caller's token (leg 1) and, when a Redeem spec with a
@@ -36,12 +37,13 @@ const LEG2 = [
   { key: "KeyID", hint: "kid of the client assertion for private_key_jwt" },
 ];
 
-const pretty = (v) => JSON.stringify(v, null, 2);
 const errText = (e) => e.response?.data?.message || e.response?.data?.error || e.message;
 
-function Json({ value }) {
+// The shared JSON pane (Rule 24); nothing is shown for a missing value.
+const HOT = ["blocked", "issued_token_type", "requested_token_type", "resource", "typ", "jti"];
+function Json({ value, label }) {
   if (value === undefined || value === null) return null;
-  return <pre className="ijp-json">{pretty(value)}</pre>;
+  return <JsonPane value={value} label={label} hot={HOT} />;
 }
 
 /** A step section the story and presenter mode can jump to (id ijp-step-N), drawn like the playground's steps. */
@@ -156,8 +158,8 @@ function Hop({ h }) {
       <p className="ijp-cite">{h.from} to {h.to} · traceparent <code>{h.traceparent}</code>{h.note ? ` · ${h.note}` : ""}</p>
       {h.blocked && <p className="ijp-banner ijp-banner--error" role="note">The gateway did not send this: {h.blocked.reason}</p>}
       <div className="ijp-io">
-        <div><h4>Request</h4><Json value={h.request} /></div>
-        <div><h4>Response</h4><Json value={h.response ?? (h.blocked ? { blocked: h.blocked } : null)} /></div>
+        <div><h4>Request</h4><Json value={h.request} label="Request" /></div>
+        <div><h4>Response</h4><Json value={h.response ?? (h.blocked ? { blocked: h.blocked } : null)} label="Response" /></div>
       </div>
     </details>
   );
@@ -256,7 +258,7 @@ export default function GatewayRedeemPanel() {
         </div>
         {error && <div className="ijp-banner ijp-banner--error" role="alert">{error}</div>}
         {run && <Verdict run={run} />}
-        {run?.callerToken && <details className="gateway-redeem__hop"><summary>The caller token (mock-issued, shown raw)</summary><Json value={run.callerToken.decoded} /></details>}
+        {run?.callerToken && <details className="gateway-redeem__hop"><summary>The caller token (mock-issued, shown raw)</summary><Json value={run.callerToken.decoded} label="Caller token, decoded" /></details>}
         {refusal(refusalAt("caller"))}
       </Section>
 
@@ -271,10 +273,10 @@ export default function GatewayRedeemPanel() {
           <div className="gateway-redeem__result" data-testid="gr-leg1">
             <h3>Leg 1 as sent, and what came back</h3>
             <div className="ijp-io">
-              <div><h4>Request</h4><Json value={legs.one.request} /></div>
-              <div><h4>Response</h4><Json value={legs.one.response ?? (legs.one.blocked ? { blocked: legs.one.blocked } : null)} /></div>
+              <div><h4>Request</h4><Json value={legs.one.request} label="Request" /></div>
+              <div><h4>Response</h4><Json value={legs.one.response ?? (legs.one.blocked ? { blocked: legs.one.blocked } : null)} label="Response" /></div>
             </div>
-            {run.leg1 && <><h4>The ID-JAG, decoded <span className="ijp-cite">(mock-issued, issued_token_type {run.leg1.issuedTokenType})</span></h4><Json value={run.leg1.decoded} /></>}
+            {run.leg1 && <><h4>The ID-JAG, decoded <span className="ijp-cite">(mock-issued, issued_token_type {run.leg1.issuedTokenType})</span></h4><Json value={run.leg1.decoded} label="ID-JAG, decoded" /></>}
           </div>
         )}
         {refusal(refusalAt("leg1"))}
@@ -309,10 +311,10 @@ export default function GatewayRedeemPanel() {
           <div className="gateway-redeem__result" data-testid="gr-leg2">
             <h3>Leg 2 as sent, and what came back</h3>
             <div className="ijp-io">
-              <div><h4>Request</h4><Json value={legs.two.request} /></div>
-              <div><h4>Response</h4><Json value={legs.two.response ?? (legs.two.blocked ? { blocked: legs.two.blocked } : null)} /></div>
+              <div><h4>Request</h4><Json value={legs.two.request} label="Request" /></div>
+              <div><h4>Response</h4><Json value={legs.two.response ?? (legs.two.blocked ? { blocked: legs.two.blocked } : null)} label="Response" /></div>
             </div>
-            {run.leg2 && <><h4>The access token, decoded <span className="ijp-cite">(minted by the target app's issuer)</span></h4><Json value={run.leg2.decoded} /></>}
+            {run.leg2 && <><h4>The access token, decoded <span className="ijp-cite">(minted by the target app's issuer)</span></h4><Json value={run.leg2.decoded} label="Access token, decoded" /></>}
           </div>
         )}
         {refusal(refusalAt("leg2"))}
@@ -323,7 +325,7 @@ export default function GatewayRedeemPanel() {
           </div>
         )}
         {run?.targetIssuerEvents?.length > 0 && (
-          <details className="gateway-redeem__hop"><summary>What the target app's issuer recorded</summary><Json value={run.targetIssuerEvents} /></details>
+          <details className="gateway-redeem__hop"><summary>What the target app's issuer recorded</summary><Json value={run.targetIssuerEvents} label="Target issuer record" /></details>
         )}
       </Section>
 
@@ -331,7 +333,7 @@ export default function GatewayRedeemPanel() {
         {run?.target ? (
           <div className="gateway-redeem__result" data-testid="gr-target">
             <p className="ijp-status" data-state={run.target.status === 200 ? "ok" : "bad"}>The API answered {run.target.status}{run.target.body?.principal ? `: it sees ${run.target.body.principal.sub}${run.target.body.principal.act ? `, acting for ${run.target.body.principal.act.sub}` : ""}` : ""}.</p>
-            <Json value={run.target.body} />
+            <Json value={run.target.body} label="Target app body" />
           </div>
         ) : <p className="ijp-note">Run both legs to see the API's answer.</p>}
         {refusal(refusalAt("target"))}

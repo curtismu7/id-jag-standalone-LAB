@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import "./console.css";
 import terms from "../data/terms.json";
 import api from "../services/api";
+import Json from "../components/JsonPane.jsx";
 
 // Inspector: paste any token and see the spec checks, each backend's discovery metadata, and the resource AS's own
 // decision record. All of it comes from /api/inspect (server/src/inspectApi.js); nothing is stored.
@@ -18,7 +19,8 @@ export const CHECK_TERMS = {
 };
 const termName = (id) => terms.find((t) => t.id === id)?.term;
 const errText = (e) => e.response?.data?.message || e.response?.data?.error || e.message;
-const json = (v) => JSON.stringify(v, null, 2);
+// Every JSON pane is the shared JsonPane (Rule 24); these keys stand out on top of its defaults.
+const HOT = ["typ", "alg", "kid", "x5t", "jti", "resource", "authorization_grant_profiles_supported", "scopes_supported"];
 const FILTERS = [["All", null], ["Redeem", "accepted"], ["Denied", "refused"]];
 
 function Decode() {
@@ -90,8 +92,8 @@ function Decode() {
               </table>
             </div>
           )}
-          {result.header && <><h2>Header</h2><pre className="kc-code">{json(result.header)}</pre></>}
-          {result.claims && <><h2>Claims</h2><pre className="kc-code">{json(result.claims)}</pre></>}
+          {result.header && <><h2>Header</h2><Json value={result.header} label="Header" hot={HOT} /></>}
+          {result.claims && <><h2>Claims</h2><Json value={result.claims} label="Claims" hot={HOT} /></>}
           {result.assertion && <><h2>Assertion</h2><pre className="kc-code">{result.assertion.xml}</pre></>}
         </>
       )}
@@ -122,7 +124,7 @@ function Backends() {
           {b.error ? <div className="kc-banner kc-banner--error" role="alert">Could not fetch: {b.error}</div> : (
             <>
               <ul>{Object.entries(b.profileFields).map(([f, ok]) => <li key={f}><code>{f}</code>: {ok ? "✓ published" : "✕ not published"}</li>)}</ul>
-              <pre className="kc-code">{json(b.data)}</pre>
+              <Json value={b.data} label={`${b.label} metadata`} hot={HOT} />
             </>
           )}
         </div>

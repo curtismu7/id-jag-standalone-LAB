@@ -56,13 +56,11 @@
 .ijp-btn:disabled { opacity: 0.45; cursor: default; }
 .ijp-io { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0.75rem; margin-top: 0.75rem; }
 .ijp-io h4, .ijp-checks h4 { margin: 0 0 0.3rem; font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--th-text-muted); }
-.ijp-json, .ijp-form, .ijp-code { margin: 0; padding: 0.6rem; max-height: 320px; overflow: auto; border: 1px solid var(--th-border); border-radius: 6px; background: var(--th-bg); font-family: inherit; font-size: var(--font-size-2xs); }
-.ijp-json { white-space: pre-wrap; word-break: break-word; }
+.ijp-code { margin: 0; padding: 0.6rem; max-height: 320px; overflow: auto; border: 1px solid var(--th-border); border-radius: 6px; background: var(--th-bg); font-family: inherit; font-size: var(--font-size-2xs); }
 .ijp-kv { margin: 0; display: grid; grid-template-columns: minmax(6rem, max-content) 1fr; gap: 0.2rem 0.75rem; }
 .ijp-kv dt { color: var(--th-text-muted); font-weight: 600; }
 .ijp-kv dd { margin: 0; overflow-wrap: anywhere; color: var(--ijp-strong); }
 .ijp-kv .ijp-kv { padding-left: 0.6rem; border-left: 2px solid var(--th-border); }
-.ijp-kv-list { margin: 0; padding-left: 1.1rem; }
 .ijp-checks { margin-top: 0.9rem; overflow-x: auto; }
 .ijp-checks table, .ijp-vendors { width: 100%; border-collapse: collapse; font-size: var(--font-size-2xs); }
 .ijp-checks th, .ijp-checks td, .ijp-vendors th, .ijp-vendors td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--th-border); vertical-align: top; word-break: break-word; }
@@ -153,7 +151,7 @@
 .ijp-tabs__list button:hover { color: var(--th-text); background: var(--th-bg-card); }
 .ijp-tabs__list button[aria-selected="true"] { border-bottom-color: var(--ijp-red); color: var(--th-text); background: var(--th-bg-card); }
 .ijp-tabs__list button:focus-visible { outline-offset: -3px; }
-.ijp-tabs__panel { padding: 0.75rem; min-width: 0; overflow-x: auto; }
+.ijp-tabs__panel { padding: 0.75rem; min-width: 0; }
 .ijp-code { white-space: pre; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }
 
 /* Real clients panel in step 1. */
@@ -191,12 +189,6 @@
 }
 .ijp-btn:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
 
-/* Server-held secrets shown as masked tokens, not plain strings. */
-.ijp-masked { display: inline-block; padding: 0.05rem 0.5rem; border: 1px solid var(--th-border); border-radius: 4px; background: var(--th-bg-page); font-family: var(--font-mono); font-size: var(--font-size-2xs); }
-.ijp-masked__why { font-family: inherit; color: var(--th-text-muted); margin-left: 0.25rem; }
-
 /* "Open the resource AS" is an action, not prose: an external-link button. */
 a.ijp-extbtn { display: inline-block; padding: 0.3rem 0.8rem; margin: 0.25rem 0; border: 1px solid color-mix(in srgb, var(--ijp-red) 50%, var(--th-border)); border-radius: 6px; background: color-mix(in srgb, var(--ijp-red) 8%, var(--th-bg-page)); color: var(--th-text); font-weight: 600; text-decoration: none; box-shadow: 0 1px 2px var(--th-shadow); }
 a.ijp-extbtn:hover { background: color-mix(in srgb, var(--ijp-red) 16%, var(--th-bg-page)); border-color: var(--ijp-red); }
-.ijp-masked__eye { font: inherit; font-size: var(--font-size-2xs); padding: 0 0.35rem; border: 0; background: none; color: var(--th-text-muted); cursor: pointer; }
-.ijp-masked.is-shown { border-style: dashed; }

@@ -6,7 +6,8 @@ const open = (url) => {
   window.history.pushState({}, "", url);
   return render(<IdJagPlaygroundDiagramPage />);
 };
-const pressed = () => screen.getAllByRole("button", { pressed: true }).map((b) => b.textContent);
+// step buttons only: the JSON panes' Form | JSON toggles are pressed buttons too
+const pressed = () => screen.getAllByRole("button", { pressed: true }).filter((b) => !b.closest(".jsonbox__toggle")).map((b) => b.textContent);
 afterEach(() => window.history.pushState({}, "", "/"));
 
 describe("ID-JAG playground diagram data", () => {
