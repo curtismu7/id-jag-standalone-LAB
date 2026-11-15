@@ -18,6 +18,8 @@ The flow: get an ID-JAG from an IdP (RFC 8693 token exchange), check it against 
 
 **Gateway redeem (Ping release claim, mock only).** The playground mode **Gateway redeems the ID-JAG (mock only)** shows a feature of Ping's 2026-11-02 Privilege release: the MCP gateway, configured with an On-Behalf-Of spec, exchanges the caller's token at the exchange issuer (leg 1, RFC 8693) and, when a Redeem spec with a TokenURL is set, redeems the resulting ID-JAG at the target app's own issuer (leg 2, RFC 7523), so the target app sees the user with no shared credential. **Ping release claim (2026-11-02), UNVERIFIED on our tenant**: the release is not on our tenant, so everything runs against in-process mocks (a company IdP, a partner issuer the target does not trust, the target app's issuer and API, and the gateway). A banner on every page and in presenter mode says so. There is no Live form of this mode, and the Mock / Live toggle's note says why.
 
+**What Privilege did.** Under Run on the gateway-redeem page, the shared trace panel (Rule 25, vendored from AI-DEMO-Standalone `shared/gateway-trace`) shows the agent's call to the simulated gateway: the request, the response and the decisions the simulation computed (caller token, client authentication, the gateway's outgoing rules and the issuer's answer for each leg, the target API), each marked as checked. There is no real gateway here, so no decision is inferred or observed.
+
 **Live mode (owner-run)** is the same app against the real PingFederate servers named in your settings, plus the kit's own `resource-as` and `mcp-sample`. It needs the settings in [Settings file](#settings-file) and is not used for a standard demo. The simulation banner on every page says which mode you are in.
 
 ## Run from a clone

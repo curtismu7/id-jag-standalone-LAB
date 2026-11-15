@@ -4,6 +4,7 @@ const { get, post, put } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put:
 vi.mock("../../services/api", () => ({ default: { get, post, put, delete: vi.fn() } }));
 
 import GatewayRedeemPanel, { CLAIM, buildPatch } from "../GatewayRedeemPanel";
+import { setJsonView } from "../../components/JsonPane";
 
 const SWAGGER = "console swagger name, 2026-10-31, schema only";
 const masked = (set = true) => ({ set, writeOnly: true });
@@ -264,5 +265,42 @@ describe("a server without the API", () => {
     get.mockResolvedValue({ data: "<html></html>" });
     render(<GatewayRedeemPanel />);
     expect(await screen.findByRole("alert")).toHaveTextContent("does not have the gateway redeem API");
+  });
+});
+
+describe("What Privilege did (Rule 25)", () => {
+  const trace = () => ({
+    source: "mock",
+    request: { method: "POST", url: "https://gateway.mock.invalid/mcp", headers: { authorization: "Bearer eyJhbGciOiJF… (400 characters, shortened)" }, body: { jsonrpc: "2.0", method: "tools/call", params: { name: "ledger_entries" } } },
+    response: { status: 200, headers: {}, body: null },
+    decisions: [
+      { id: "caller", label: "Caller token", outcome: "pass", basis: "checked", evidence: "the gateway verified the caller token" },
+      { id: "leg2-answer", label: "Leg 2: the target issuer's answer", outcome: "fail", basis: "checked", evidence: "HTTP 400: invalid_grant, check: audience" },
+    ],
+    record: null,
+  });
+
+  it("shows only the empty prompt before a run, then the request, the response and the decisions of the run", async () => {
+    setJsonView("raw"); // the pane's Form | JSON choice is module state; the JSON text is what these assertions read
+    mount({ runs: { happy: run({ trace: trace() }) } });
+    await ready();
+    expect(screen.getByTestId("gateway-trace-empty")).toBeInTheDocument();
+    expect(screen.queryByTestId("trace-1")).toBeNull();
+    fireEvent.click(screen.getByTestId("gr-run-happy"));
+    const ex = await screen.findByTestId("trace-1");
+    expect(ex).toHaveTextContent("Agent call: tools/call ledger_entries");
+    expect(ex).toHaveTextContent("HTTP 200");
+    expect(screen.getByTestId("trace-1-decisions")).toHaveTextContent("check: audience");
+    expect(screen.getByTestId("trace-1-request-head")).toHaveTextContent("POST https://gateway.mock.invalid/mcp");
+    expect(screen.getByTestId("gateway-trace-basis")).toHaveTextContent("Simulated");
+    expect(screen.queryByTestId("gateway-trace-empty")).toBeNull();
+  });
+
+  it("a response without a trace (an older server) draws no exchange rather than an invented one", async () => {
+    mount();
+    await ready();
+    fireEvent.click(screen.getByTestId("gr-run-happy"));
+    await screen.findByTestId("gr-verdict");
+    expect(screen.queryByTestId("trace-1")).toBeNull();
   });
 });

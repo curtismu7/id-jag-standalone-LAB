@@ -15,6 +15,7 @@ import { ORIGINS } from './mock/env.js';
 import { AUTH_METHODS, CLIENT_ASSERTION_TYPE, GATEWAY_RESOURCE, TOKEN_TYPES, runWith } from './mock/gatewayWorld.js';
 import { outboundFetch } from './outbound.js';
 import { decodeJwt } from './tokenChecks.js';
+import { gatewayRunTrace } from './gatewayRedeemTrace.js';
 import { childTraceparent, newTraceparent } from './trace/traceparent.js';
 
 export { AUTH_METHODS, TOKEN_TYPES };
@@ -405,6 +406,8 @@ export async function runScenario(id, spec) {
     request: { authentication: 'Bearer (mock token, shown raw)', headers: { authorization: `Bearer ${callerToken}` }, body: { jsonrpc: '2.0', method: 'tools/call', params: { name: 'ledger_entries' } } }, status: null, note: 'in-process: the gateway is part of this server' });
   const result = await runWith({ fault: scenario.fault ?? null }, () => gatewayCall(ctx, run, callerToken));
   ctx.hops[0].status = result.callerOk ? 200 : 401;
+  // "What Privilege did" (Rule 25): built now, from the hops the gateway itself made (the replay and the controls below are the lab's own calls).
+  const trace = gatewayRunTrace({ callerToken, result, hops: [...ctx.hops], redeemSet: Boolean(run.OBO.Redeem?.TokenURL) });
 
   let replay = null;
   if (scenario.replay && result.leg1?.token) {
@@ -429,6 +432,7 @@ export async function runScenario(id, spec) {
     callerToken: { token: callerToken, decoded: view(callerToken) },
     controls,
     traceparent: ctx.traceparent,
+    trace,
     hops: ctx.hops,
     targetIssuerEvents: world.target.events.list().slice(0, 5),
   };
