@@ -55,12 +55,14 @@ vi.mock("../../utils/idJagDetail/mock.js", () => ({
 }));
 
 import IdJagPlaygroundDiagramPage from "../IdJagPlaygroundDiagramPage";
+import { setJsonView } from "../../components/JsonPane.jsx";
 
 const d = PLAYGROUND_DIAGRAMS["pf-as"];
 const open = (url) => { window.history.pushState({}, "", url); return render(<IdJagPlaygroundDiagramPage />); };
 const badge = (id) => screen.getByTestId(`pgd-badge-${id}`);
 const label = (id) => document.querySelector(`[data-edge="${id}"]`);
-const pressed = () => screen.getAllByRole("button", { pressed: true }).map((b) => b.textContent);
+// step buttons only: the JSON panes' Form | JSON toggles are pressed buttons too
+const pressed = () => screen.getAllByRole("button", { pressed: true }).filter((b) => !b.closest(".jsonbox__toggle")).map((b) => b.textContent);
 afterEach(() => { window.history.pushState({}, "", "/"); vi.useRealTimers(); });
 
 // pf-as edges by file order: e0 sign-in, e1 code, e2 button presses (steps 2-5), e3 exchange (2, 5), e4 redeem, e5 registry read,
@@ -114,6 +116,7 @@ describe("numbered arrows", () => {
 
 describe("step detail panel", () => {
   it("renders the wire form, MOCK tokens and standards for a step with data", () => {
+    setJsonView("raw"); // the token panes are the shared JsonPane: read its JSON view
     open("/diagram/mock?step=2");
     const det = screen.getByTestId("pgd-detail");
     expect(within(det).getByText("Request on the wire")).toBeInTheDocument();

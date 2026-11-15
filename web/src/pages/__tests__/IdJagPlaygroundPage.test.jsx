@@ -496,12 +496,13 @@ describe("ID-JAG playground page", () => {
     const { container } = mount(config());
     fireEvent.click(screen.getByRole("button", { name: "Request ID-JAG" }));
     await screen.findByTestId("ijp-checks", {}, slow);
-    expect(container.querySelector(".ijp-json")).toBeNull();
-    expect(container.querySelector(".ijp-kv dt")).not.toBeNull();
+    // The panes are the shared JsonPane (Rule 24); the toolbar's View sets their view.
+    expect(container.querySelector('.jsonbox[data-view="raw"]')).toBeNull();
+    expect(container.querySelector('.jsonbox[data-view="form"] .jform__k')).not.toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "JSON" }));
-    expect(container.querySelector(".ijp-form")).toBeNull();
-    expect(container.querySelector(".ijp-json").textContent).toContain('"grant_type"');
+    fireEvent.click(within(screen.getByRole("group", { name: "Data view" })).getByRole("button", { name: "JSON" }));
+    expect(container.querySelector('.jsonbox[data-view="form"]')).toBeNull();
+    expect(container.querySelector('.jsonbox[data-view="raw"] .json--raw').textContent).toContain('"grant_type"');
     expect(localStorage.getItem("idjag.playground.view")).toBe("json");
   });
 

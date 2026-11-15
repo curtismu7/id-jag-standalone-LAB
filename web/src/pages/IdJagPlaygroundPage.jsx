@@ -1,4 +1,4 @@
-import { createContext, Fragment, useContext, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import api from "../services/api";
 import { MOCK_AS_RECORD, MOCK_CONFIG, mockApi } from "../utils/idJagPlaygroundMock";
 import { PLAYGROUND_DIAGRAMS, playgroundDiagramPath } from "../utils/idJagPlaygroundDiagrams";
@@ -13,6 +13,7 @@ import { mcpcCommand, vscodeMcpJson, vscodeSettings } from "../utils/realClients
 import terms from "../data/terms.json";
 import { useAppMode } from "../mode/ModeContext";
 import StoryPanel from "../story/StoryPanel";
+import Json, { setJsonView } from "../components/JsonPane.jsx";
 import "./IdJagPlaygroundPage.css";
 
 // The real PingFederate ID-JAG flow, one step at a time (after Okta's xaa.dev), with a
@@ -124,48 +125,12 @@ export const STEP_TERMS = {
 };
 const TERM = Object.fromEntries(terms.map((t) => [t.id, t]));
 
-const ViewContext = createContext("form");
-const TIME_CLAIMS = new Set(["exp", "iat", "nbf", "auth_time"]);
+// Every JSON pane is the shared JsonPane (Rule 24). The toolbar's View (Form | JSON) sets the panes' view too.
+const HOT = ["typ", "jti", "resource", "requested_token_type", "subject_token_type", "issued_token_type", "token_type", "assertion"];
 
-function Fields({ value, name }) {
-  if (Array.isArray(value)) {
-    if (value.every((v) => v === null || typeof v !== "object")) return <span>{value.map(String).join(", ") || "(empty)"}</span>;
-    return <ol className="ijp-kv-list">{value.map((v, i) => <li key={i}><Fields value={v} /></li>)}</ol>;
-  }
-  if (value && typeof value === "object") {
-    return (
-      <dl className="ijp-kv">
-        {Object.entries(value).filter(([, v]) => v !== undefined).map(([k, v]) => (
-          <Fragment key={k}><dt>{k}</dt><dd><Fields value={v} name={k} /></dd></Fragment>
-        ))}
-      </dl>
-    );
-  }
-  if (TIME_CLAIMS.has(name) && typeof value === "number") return <span>{value} <span className="ijp-cite">({new Date(value * 1000).toLocaleString()})</span></span>;
-  // Server-held secrets arrive as bracketed placeholders (e.g. "[your session token, never sent to the browser]");
-  // show them as masked tokens with a show/hide eye, not plain strings.
-  const s = String(value);
-  if (s.startsWith("[") && s.endsWith("]")) return <MaskedValue text={s.slice(1, -1)} title={s} />;
-  return <span>{s}</span>;
-}
-
-/** A masked placeholder value with an eye to reveal why it is hidden (the value itself never leaves the server). */
-function MaskedValue({ text, title }) {
-  const [shown, setShown] = useState(false);
-  return (
-    <span className={`ijp-masked${shown ? " is-shown" : ""}`}>
-      <button type="button" className="ijp-masked__eye" aria-pressed={shown} aria-label={shown ? "Hide why the value is held back" : "Show why the value is held back"}
-        title={shown ? "Hide" : "Show"} onClick={() => setShown((v) => !v)}>{shown ? "🔓" : "🔐"}</button>
-      {" "}<span className="ijp-masked__why">{shown ? text : "held back — never sent to the browser"}</span>
-    </span>
-  );
-}
-
-function Data({ value }) {
-  const view = useContext(ViewContext);
+function Data({ value, label }) {
   if (value === undefined || value === null) return null;
-  if (view === "json") return <pre className="ijp-json">{JSON.stringify(value, null, 2)}</pre>;
-  return <div className="ijp-form"><Fields value={value} /></div>;
+  return <Json value={value} label={label} hot={HOT} />;
 }
 
 function Segmented({ label, options, value, onPick, disabled }) {
@@ -296,7 +261,7 @@ function StepTabs({ title, request, response, decoded, xml, labels = {}, initial
         ))}
       </div>
       <div className="ijp-tabs__panel" role="tabpanel" aria-label={`${title}: ${tabs.find(([k]) => k === tab)[1]}`}>
-        {tab === "code" ? <pre className="ijp-code">{codeSnippet(value)}</pre> : tab === "xml" ? <pre className="ijp-code">{value}</pre> : <Data value={value} />}
+        {tab === "code" ? <pre className="ijp-code">{codeSnippet(value)}</pre> : tab === "xml" ? <pre className="ijp-code">{value}</pre> : <Data value={value} label={`${title}: ${tabs.find(([k]) => k === tab)[1]}`} />}
       </div>
     </div>
   );
@@ -705,6 +670,7 @@ export default function IdJagPlaygroundPage() {
   };
 
   const pickView = (v) => { store(VIEW_KEY, v); setView(v); };
+  useEffect(() => { setJsonView(view === "json" ? "raw" : "form"); }, [view]); // the JSON panes follow the View toggle
   const pickResource = (r) => { store(RESOURCE_KEY, r); setResourceKind(r); };
   const pickProtocol = (p) => { if (p === (saml ? "saml" : "oidc")) return; store(PROTOCOL_KEY, p); clearResults(); setError(null); setProtocol(p); };
 
@@ -867,7 +833,7 @@ export default function IdJagPlaygroundPage() {
     : `${config?.signedIn ? "Signed in" : "Not signed in"} at ${config?.idp?.name || "the issuer PingFederate"}.`;
 
   return (
-    <ViewContext.Provider value={view}>
+    <>
       <main className={`ijp${isMock ? " ijp--mock" : ""}`} data-testid="id-jag-playground">
         <header className="ijp-hero">
           <div>
@@ -1136,7 +1102,7 @@ export default function IdJagPlaygroundPage() {
             <button type="button" className="ijp-btn" onClick={() => openResource("id-jag")} disabled={!hasIdJag || !!busy}>Try with the raw ID-JAG</button>
             {gateAt("resource")}
             {errorAt("resource")}
-            {resource && (view === "json" ? <Data value={resource} /> : <ResourcePage r={resource} />)}
+            {resource && (view === "json" ? <Data value={resource} label="Protected resource" /> : <ResourcePage r={resource} />)}
             </div>
           )}
         </Step>
@@ -1206,6 +1172,6 @@ export default function IdJagPlaygroundPage() {
         </section>
         </>)}
       </main>
-    </ViewContext.Provider>
+    </>
   );
 }

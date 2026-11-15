@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../services/api";
+import JsonPane from "../components/JsonPane.jsx";
 import "./AgentCorePanel.css";
 
 // The "aws-agentcore" playground mode: the exchange issuer turns the caller token into an ID-JAG (leg 1, RFC 8693), the
@@ -31,12 +32,13 @@ const LEG2 = [
   { key: "Scope", hint: "narrows the access token; empty keeps all the ID-JAG grants" },
 ];
 
-const pretty = (v) => JSON.stringify(v, null, 2);
 const errText = (e) => e.response?.data?.message || e.response?.data?.error || e.message;
 
-function Json({ value }) {
+// The shared JSON pane (Rule 24); nothing is shown for a missing value.
+const HOT = ["blocked", "wid", "workloadIdentity", "issued_token_type", "requested_token_type", "resource", "typ", "jti"];
+function Json({ value, label }) {
   if (value === undefined || value === null) return null;
-  return <pre className="ijp-json">{pretty(value)}</pre>;
+  return <JsonPane value={value} label={label} hot={HOT} />;
 }
 
 /** A step section the story and presenter mode can jump to (id ijp-step-N), drawn like the playground's steps. */
@@ -148,8 +150,8 @@ function Hop({ h }) {
       <p className="ijp-cite">{h.from} to {h.to} · traceparent <code>{h.traceparent}</code>{h.note ? ` · ${h.note}` : ""}</p>
       {h.blocked && <p className="ijp-banner ijp-banner--error" role="note">The runner did not send this: {h.blocked.reason}</p>}
       <div className="ijp-io">
-        <div><h4>Request</h4><Json value={h.request} /></div>
-        <div><h4>Response</h4><Json value={h.response ?? (h.blocked ? { blocked: h.blocked } : null)} /></div>
+        <div><h4>Request</h4><Json value={h.request} label="Request" /></div>
+        <div><h4>Response</h4><Json value={h.response ?? (h.blocked ? { blocked: h.blocked } : null)} label="Response" /></div>
       </div>
     </details>
   );
@@ -283,10 +285,10 @@ export default function AgentCorePanel() {
         {run?.runtime && (
           <div className="agentcore__result" data-testid="ac-runtime">
             <h4>The runtime's answer, decoded <span className="ijp-cite">({run.live ? "the real AgentCore runtime idjag_whoami" : "the mock runtime"})</span></h4>
-            <Json value={run.runtime.decoded ?? run.runtime} />
+            <Json value={run.runtime.decoded ?? run.runtime} label="Runtime answer" />
           </div>
         )}
-        {run?.callerToken && <details className="agentcore__hop"><summary>The caller token (mock-issued, shown raw)</summary><Json value={run.callerToken.decoded} /></details>}
+        {run?.callerToken && <details className="agentcore__hop"><summary>The caller token (mock-issued, shown raw)</summary><Json value={run.callerToken.decoded} label="Caller token, decoded" /></details>}
       </Section>
 
       <Section n={2} title="Leg 1: the runner exchanges the caller token for an ID-JAG" note="Exchange spec. RFC 8693 token exchange at Exchange.TokenURL; the result is an ID-JAG addressed to Exchange.Resource.">
@@ -300,10 +302,10 @@ export default function AgentCorePanel() {
           <div className="agentcore__result" data-testid="ac-leg1">
             <h3>Leg 1 as sent, and what came back</h3>
             <div className="ijp-io">
-              <div><h4>Request</h4><Json value={hops.one.request} /></div>
-              <div><h4>Response</h4><Json value={hops.one.response ?? (hops.one.blocked ? { blocked: hops.one.blocked } : null)} /></div>
+              <div><h4>Request</h4><Json value={hops.one.request} label="Request" /></div>
+              <div><h4>Response</h4><Json value={hops.one.response ?? (hops.one.blocked ? { blocked: hops.one.blocked } : null)} label="Response" /></div>
             </div>
-            {run.leg1 && <><h4>The ID-JAG, decoded <span className="ijp-cite">({run.live ? "real PingFederate, " : "mock-issued, "}issued_token_type {run.leg1.issuedTokenType}{run.leg1.isIdJag ? ", typ oauth-id-jag+jwt" : ", NOT an ID-JAG"})</span></h4><Json value={run.leg1.decoded} /></>}
+            {run.leg1 && <><h4>The ID-JAG, decoded <span className="ijp-cite">({run.live ? "real PingFederate, " : "mock-issued, "}issued_token_type {run.leg1.issuedTokenType}{run.leg1.isIdJag ? ", typ oauth-id-jag+jwt" : ", NOT an ID-JAG"})</span></h4><Json value={run.leg1.decoded} label="ID-JAG, decoded" /></>}
           </div>
         )}
         {refusal(refusalAt("leg1"))}
@@ -331,10 +333,10 @@ export default function AgentCorePanel() {
           <div className="agentcore__result" data-testid="ac-leg2">
             <h3>Leg 2 as sent, and what came back</h3>
             <div className="ijp-io">
-              <div><h4>Request</h4><Json value={hops.two.request} /></div>
-              <div><h4>Response</h4><Json value={hops.two.response ?? (hops.two.blocked ? { blocked: hops.two.blocked } : null)} /></div>
+              <div><h4>Request</h4><Json value={hops.two.request} label="Request" /></div>
+              <div><h4>Response</h4><Json value={hops.two.response ?? (hops.two.blocked ? { blocked: hops.two.blocked } : null)} label="Response" /></div>
             </div>
-            {run.leg2 && <><h4>The runtime's access token, decoded <span className="ijp-cite">({run.live ? "minted by the kit's resource-as (real)" : "minted by the AgentCore target issuer"})</span></h4><Json value={run.leg2.decoded} /></>}
+            {run.leg2 && <><h4>The runtime's access token, decoded <span className="ijp-cite">({run.live ? "minted by the kit's resource-as (real)" : "minted by the AgentCore target issuer"})</span></h4><Json value={run.leg2.decoded} label="Runtime access token, decoded" /></>}
           </div>
         )}
         {refusal(refusalAt("leg2"))}
@@ -345,7 +347,7 @@ export default function AgentCorePanel() {
           </div>
         )}
         {run?.targetIssuerEvents?.length > 0 && (
-          <details className="agentcore__hop"><summary>What the target issuer recorded</summary><Json value={run.targetIssuerEvents} /></details>
+          <details className="agentcore__hop"><summary>What the target issuer recorded</summary><Json value={run.targetIssuerEvents} label="Target issuer record" /></details>
         )}
       </Section>
 
@@ -353,7 +355,7 @@ export default function AgentCorePanel() {
         {run?.runtime ? (
           <div className="agentcore__result" data-testid="ac-runtime">
             <p className="ijp-status" data-state={run.runtime.status === 200 ? "ok" : "bad"}>The runtime answered {run.runtime.status}{run.runtime.body?.principal ? `: it sees ${run.runtime.body.principal.sub}${run.runtime.body.principal.act ? `, acting for ${run.runtime.body.principal.act.sub}` : ""}` : ""}{run.runtime.body?.workloadIdentity ? ` · workload identity ${run.runtime.body.workloadIdentity}` : ""}.</p>
-            <Json value={run.runtime.body} />
+            <Json value={run.runtime.body} label="Runtime body" />
           </div>
         ) : run?.live ? <p className="ijp-note" data-testid="ac-live-runtime-note">The live run stops here: {run.refusal?.description || "no live runtime is deployed yet"}.</p> : <p className="ijp-note">Run all three hops to see the runtime's answer.</p>}
         {refusal(refusalAt("runtime"))}
