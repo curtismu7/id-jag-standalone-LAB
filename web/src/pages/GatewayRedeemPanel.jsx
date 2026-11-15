@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../services/api";
 import JsonPane from "../components/JsonPane.jsx";
+import GatewayTrace from "../gateway-trace/GatewayTrace.jsx";
 import "./GatewayRedeemPanel.css";
 
 // The "gateway-redeem" playground mode: the Privilege MCP gateway exchanges the caller's token (leg 1) and, when a Redeem spec with a
@@ -223,6 +224,9 @@ export default function GatewayRedeemPanel() {
     for (const s of state.scenarios) { if (!(await runScenario(s.id))) break; }
   };
 
+  // "What Privilege did" (Rule 25): the last run's call to the simulated gateway. Nothing is shown until a run has returned one.
+  const exchanges = useMemo(() => (run?.trace ? [{ step: 1, title: `Agent call: tools/call ledger_entries (${run.label})`, status: run.trace.response?.status ?? null, trace: run.trace }] : []), [run]);
+
   const legs = useMemo(() => ({ one: leg(run, "Leg 1"), two: leg(run, "Leg 2"), api: run?.hops?.find((h) => h.label.startsWith("Call the target")) }), [run]);
 
   if (error && !state) return <div className="ijp-banner ijp-banner--error" role="alert">{error}</div>;
@@ -260,6 +264,7 @@ export default function GatewayRedeemPanel() {
         {run && <Verdict run={run} />}
         {run?.callerToken && <details className="gateway-redeem__hop"><summary>The caller token (mock-issued, shown raw)</summary><Json value={run.callerToken.decoded} label="Caller token, decoded" /></details>}
         {refusal(refusalAt("caller"))}
+        <GatewayTrace exchanges={exchanges} source="mock" />
       </Section>
 
       <Section n={2} title="Leg 1: the gateway exchanges the caller token for an ID-JAG" note="OBO spec (modelMcpOBOSpec). RFC 8693 token exchange at OBO.TokenURL; the result is an ID-JAG addressed to OBO.Resource.">

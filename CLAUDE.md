@@ -56,6 +56,10 @@ Owner-run, never by an agent: anything at the shared Acme PingFederate. Docker +
 
 Mock-only playground mode `gateway-redeem`: the gateway exchanges the caller token (leg 1) and redeems it at the target app's own issuer (leg 2, only when `Redeem.TokenURL` is set). Engine `server/src/gatewayRedeem.js`, mocks `server/src/mock/gatewayWorld.js`, routes `server/src/gatewayRedeemRoutes.js`, panel `web/src/pages/GatewayRedeemPanel.jsx`. Live answers 409. `ClientSecret` and `PrivateKeyPEM` are write-only: never in a response, trace or error (routes scrub every answer); a test posts recognisable values and greps every answer. Every editable spec field has one mutation test (a coverage test fails when a field has none). The gateway calls only allow-listed https hosts and sends `redirect: 'error'`. Tag every claim as console swagger name (2026-10-31, schema only), lab reading or lab-invented (`CLAIMS`). Say "P1 Privilege Agent App" for the app an agent calls.
 
+## What Privilege did (Rule 25)
+
+The gateway-redeem Run page shows the shared `GatewayTrace` panel under Run. It is vendored byte-for-byte from `AI-DEMO-Standalone/shared/gateway-trace` (`web/src/gateway-trace/`, `server/src/gatewayTrace.js`) and pinned in `web/src/gateway-trace/gateway-trace.sha256` (`scripts/gateway-trace.test.mjs` fails on a drifted copy): never hand-edit it, re-vendor and re-pin. `server/src/gatewayRedeemTrace.js` builds `trace` on the `/run` reply from what `gatewayCall` stored (hops, refusal, the target API's `verified` list). Honesty rule: this lab's gateway is its own simulation, so every decision is `checked` and only for a check the code evaluated (a check not reached is `skipped`, never passed); a real gateway reports no per-check detail, so a real trace may only be `inferred` or `observed`. This lab has no real hop (live answers 409), so there is no real trace.
+
 ## Rules that bite
 
 - Mock mode works with no configuration. Live PingFederate use is owner-run.
