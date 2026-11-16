@@ -83,7 +83,7 @@ function Decode() {
                     return (
                       <tr key={c.id}>
                         <td><span className={`kc-badge kc-badge--${cls}`}>{text}</span></td>
-                        <td>{c.label}</td><td>{String(c.expected ?? "")}</td><td>{String(c.actual ?? "")}</td><td>{c.cite}</td>
+                        <td>{c.label}</td><td>{String(c.expected ?? "")}</td><td><Json value={c.actual} label={`Actual: ${c.label}`} hot={HOT} /></td><td>{c.cite}</td>
                         <td>{term && <a href={`/learn#term-${term}`}>{termName(term)}</a>}</td>
                       </tr>
                     );
