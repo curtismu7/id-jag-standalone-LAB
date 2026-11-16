@@ -1,4 +1,5 @@
 import ShelfLink from "./components/ShelfLink.jsx";
+import VerifyMark from "./components/VerifyMark.jsx";
 // Opened from Customer Agent LAB (UC-LEARN8, UC-LEARN9, UC25 and UC40 route here): strip + header Back only. Those use cases are
 // the whole playground, not one of its settings, so nothing is preselected.
 import ReturnLink from "./return-link/ReturnLink.jsx";
@@ -81,6 +82,7 @@ function Shell({ children }) {
             extra={<ReturnLink app="id-jag-standalone" variant="header" />}
           >
             <ShelfLink />
+            <VerifyMark id="id-jag-standalone" />
           </TopMenu>
         </span>
         {me === null && <button type="button" className="shell-theme shell-signin" onClick={() => signIn()}>Sign in</button>}
