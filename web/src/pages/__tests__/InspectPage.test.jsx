@@ -45,6 +45,9 @@ describe("Inspector page", () => {
     expect(screen.getByText("Header typ")).toBeInTheDocument();
     expect(screen.getByText(/Warning/)).toBeInTheDocument();
     expect(screen.getByText(/Fail/)).toBeInTheDocument();
+    const actual = document.querySelectorAll(".kc-table tbody td:nth-child(4) .jsonbox"); // the Actual cells are JsonPanes (Rule 24)
+    expect(actual).toHaveLength(3);
+    expect(actual[2]).toHaveTextContent("already accepted");
     expect(screen.getByRole("link", { name: "ID-JAG" })).toHaveAttribute("href", "/learn#term-id-jag");
     expect(screen.getByRole("link", { name: "jti replay protection" })).toHaveAttribute("href", "/learn#term-jti-replay");
   });
