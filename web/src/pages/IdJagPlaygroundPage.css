@@ -7,7 +7,7 @@
   --ijp-ok: var(--th-ok);
   --ijp-info: var(--th-info);
   --ijp-warn: var(--th-warn);
-  max-width: 1180px; margin: 0 auto; padding: 1rem 1.25rem 3rem; color: var(--th-text);
+  max-width: 2200px; margin: 0 auto; padding: 1rem 1.25rem 3rem; color: var(--th-text);
 }
 .ijp h1, .ijp h2, .ijp h3 { color: var(--ijp-strong); }
 .ijp-hero { display: flex; gap: 1rem; align-items: flex-start; }

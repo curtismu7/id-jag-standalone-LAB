@@ -5,7 +5,7 @@
   --kc-strong: var(--text);
   --kc-ok: var(--th-ok);
   --kc-warn: var(--th-warn);
-  max-width: 1080px; margin: 0 auto; padding: 1.25rem 1.25rem 3rem; color: var(--th-text);
+  max-width: 2200px; margin: 0 auto; padding: 1.25rem 1.25rem 3rem; color: var(--th-text);
 }
 .kc h1, .kc h2, .kc h3 { color: var(--kc-strong); }
 .kc a { color: inherit; font-weight: 600; text-decoration-color: var(--kc-red); text-underline-offset: 3px; }
