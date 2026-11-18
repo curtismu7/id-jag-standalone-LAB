@@ -2,6 +2,7 @@
 // Tokens and secrets are never in the snippet (the server redacts real ones, and mock mode's raw ones are replaced here):
 // they become placeholders the reader fills in from their own run.
 
+import { decodeSegment } from "../components/JsonPane.jsx";
 const PLACEHOLDER = { subject_token: "SUBJECT_TOKEN", token: "SUBJECT_TOKEN", assertion: "ID_JAG", client_secret: "CLIENT_SECRET", client_id: "CLIENT_ID" };
 // Any field named like a credential, any [redacted] label and any JWT-looking value becomes a placeholder, even if
 // the request handed in carries a real one (subject_token_type and token_type_hint are not credentials).
@@ -21,7 +22,9 @@ function bearer(authorization) {
 function jwtType(authorization) {
   try {
     const header = /^Bearer\s+(eyJ[\w-]*)\./i.exec(authorization)?.[1];
-    return header ? JSON.parse(atob(header.replace(/-/g, "+").replace(/_/g, "/"))).typ : null;
+    if (!header) return null;
+    const [h] = header.split(".");
+    return decodeSegment(h)?.typ ?? null;
   } catch { return null; }
 }
 
