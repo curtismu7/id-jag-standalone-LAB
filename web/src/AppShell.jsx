@@ -12,6 +12,8 @@ import { ModeProvider, useAppMode } from "./mode/ModeContext";
 import { ClaimBanner, ModeBanner } from "./mode/ModeToggle";
 import { PresentBar, PresentProvider, usePresent } from "./present/PresentMode";
 import TopMenu, { applyFontSize } from "./top-menu/TopMenu.jsx";
+import TalkTrackDialog from "./talk-track/TalkTrackDialog.jsx";
+import { pageTalkSteps } from "./story/StoryPanel";
 import "./AppShell.css";
 
 const THEME_KEY = "idjag.theme";
@@ -38,6 +40,7 @@ function Shell({ children }) {
   const customer = useCustomer();
   const mode = useAppMode();
   const present = usePresent();
+  const [talkOpen, setTalkOpen] = useState(false);
   const here = currentPage();
   useEffect(() => { if (theme === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme; }, [theme]);
   const pickTheme = (next) => {
@@ -77,6 +80,7 @@ function Shell({ children }) {
             theme={{ value: theme, onChange: pickTheme }}
             fontSize={{ value: fontStep, onChange: setFontStep }}
             present={{ active: present?.present, onToggle: () => present?.set(!present?.present), label: "Present" }}
+            talkTrack={{ active: talkOpen, onToggle: () => setTalkOpen((v) => !v) }}
             help={{ href: "https://github.com/curtismu7/id-jag-standalone-LAB#readme" }}
             version={mode?.version || null}
             extra={<ReturnLink app="id-jag-standalone" variant="header" />}
@@ -93,6 +97,8 @@ function Shell({ children }) {
       <PresentBar />
       {children}
       <SignInModal />
+      <TalkTrackDialog isOpen={talkOpen} onClose={() => setTalkOpen(false)} talk={pageTalkSteps()} />
+
     </div>
   );
 }
