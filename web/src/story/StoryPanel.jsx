@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { usePresent } from "../present/PresentMode";
-import { VERTICALS, storyForMode, verticalById } from "./stories";
+import { STORIES, VERTICALS, storyForMode, verticalById } from "./stories";
 import { fillAll } from "./fill";
 import { useCustomer } from "../customer/CustomerConfig";
 import "./StoryPanel.css";
@@ -87,4 +87,18 @@ export default function StoryPanel({ mode }) {
       )}
     </section>
   );
+}
+
+
+/** The page's stories flattened into TalkTrackDialog steps (owner 2026-11-17: one pop-out talk track per page). */
+export function pageTalkSteps() {
+  const vertical = verticalById((() => { try { return localStorage.getItem(KEYS.vertical); } catch { return null; } })() || "generic");
+  return STORIES.flatMap((raw) => {
+    const story = fillAll(raw, vertical);
+    return [
+      { id: `${story.id}-goal`, title: `${story.id}: ${story.title}`, say: `${story.goal} Obstacle: ${story.obstacle} Control: ${story.control}` },
+      ...story.steps.map((s) => ({ id: `${story.id}-${s.n}`, title: `${story.id}.${s.n} ${s.title}`, say: `${s.say} ${s.why}` })),
+      { id: `${story.id}-proof`, title: `${story.id} proof`, say: story.proof ? `${story.proof.happy || ""} Takeaway: "${story.say}"` : story.say },
+    ];
+  });
 }
