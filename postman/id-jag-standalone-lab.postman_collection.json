@@ -1,0 +1,552 @@
+{
+  "info": {
+    "name": "ID-JAG Standalone LAB",
+    "description": "API collection for ID-JAG Standalone LAB: inspect tokens, run the playground's negative tests, and drive the live flow (issue ID-JAG by RFC 8693 exchange, redeem by RFC 7523, call the MCP server). Sign-in-gated steps need a browser sign-in session first (the pi.flow precondition folder); in Live mode the server keeps the tokens and returns decoded claims only.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "be92809a-3bb9-4022-92dc-39777b977bad"
+  },
+  "item": [
+    {
+      "name": "Sanity",
+      "description": "Lab liveness and backend reachability.",
+      "item": [
+        {
+          "name": "Health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "/* Assertions for this request */",
+                  "pm.response.to.have.status(200);",
+                  "const b = pm.response.json(); pm.expect(b.state).to.be.oneOf(['ready', 'needs-setup']);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{LAB_BASE}}/api/health",
+              "host": [
+                "{{LAB_BASE}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Backends",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "/* Assertions for this request */",
+                  "pm.response.to.have.status(200);",
+                  "pm.expect(pm.response.json().backends).to.be.an('array');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{LAB_BASE}}/api/id-jag-playground/backends",
+              "host": [
+                "{{LAB_BASE}}"
+              ],
+              "path": [
+                "api",
+                "id-jag-playground",
+                "backends"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Inspect (no sign-in needed)",
+      "description": "Decode and check a pasted token. Works without a session; never sends the token anywhere except the lab's own checker.",
+      "item": [
+        {
+          "name": "Decode a token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "/* Assertions for this request */",
+                  "pm.response.to.have.status(200);",
+                  "pm.expect(pm.response.json().type).to.be.a('string');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "http://localhost:4720"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{SAMPLE_TOKEN}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{LAB_BASE}}/api/inspect/decode",
+              "host": [
+                "{{LAB_BASE}}"
+              ],
+              "path": [
+                "api",
+                "inspect",
+                "decode"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "BYO inspect a pasted ID-JAG (invalid sample, negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "/* Assertions for this request */",
+                  "pm.expect(pm.response.code).to.eql(400);",
+                  "pm.expect(pm.response.json()).to.have.property('error');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "http://localhost:4720"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"not-a-jwt\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{LAB_BASE}}/api/id-jag-playground/byo/inspect",
+              "host": [
+                "{{LAB_BASE}}"
+              ],
+              "path": [
+                "api",
+                "id-jag-playground",
+                "byo",
+                "inspect"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "pi.flow sign-in (browser-assisted precondition)",
+      "description": "Live-mode issue/redeem/call act on the browser sign-in session's tokens. Start the sign-in in a browser at /api/id-jag-playground, complete pi.flow, then run the flow folders. These requests show the shape; they cannot replace the browser step.",
+      "item": [
+        {
+          "name": "Sign-in config",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "/* Assertions for this request */",
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{LAB_BASE}}/api/customer-config",
+              "host": [
+                "{{LAB_BASE}}"
+              ],
+              "path": [
+                "api",
+                "customer-config"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Credentials POST shape (will 409 pi_flow_not_started without a browser start)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "/* Assertions for this request */",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 401, 403, 409]);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "http://localhost:4720"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{PF_USERNAME}}\",\n  \"password\": \"{{PF_PASSWORD}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{LAB_BASE}}/auth/pi-flow/credentials",
+              "host": [
+                "{{LAB_BASE}}"
+              ],
+              "path": [
+                "auth",
+                "pi-flow",
+                "credentials"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Flow (signed-in session required)",
+      "description": "The live ID-JAG flow against the servers named in the environment: issue (RFC 8693 token exchange), redeem (RFC 7523 JWT bearer), and call the MCP server with the redeemed access token. Each answers 409 with the missing prerequisite when a step was skipped.",
+      "item": [
+        {
+          "name": "Issue an ID-JAG (exchange)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "/* Assertions for this request */",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 401, 403, 409, 422]);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "http://localhost:4720"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"pf-pf\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{LAB_BASE}}/api/id-jag-playground/issue",
+              "host": [
+                "{{LAB_BASE}}"
+              ],
+              "path": [
+                "api",
+                "id-jag-playground",
+                "issue"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Redeem the ID-JAG (JWT bearer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "/* Assertions for this request */",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 400, 409, 422, 502]);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "http://localhost:4720"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{LAB_BASE}}/api/id-jag-playground/redeem",
+              "host": [
+                "{{LAB_BASE}}"
+              ],
+              "path": [
+                "api",
+                "id-jag-playground",
+                "redeem"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Call the MCP server (tools/list)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "/* Assertions for this request */",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 409, 422, 502]);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "http://localhost:4720"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{LAB_BASE}}/api/id-jag-playground/call",
+              "host": [
+                "{{LAB_BASE}}"
+              ],
+              "path": [
+                "api",
+                "id-jag-playground",
+                "call"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Redeem before issue (negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "/* Assertions for this request */",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 400, 409, 422, 502]);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "http://localhost:4720"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{LAB_BASE}}/api/id-jag-playground/redeem",
+              "host": [
+                "{{LAB_BASE}}"
+              ],
+              "path": [
+                "api",
+                "id-jag-playground",
+                "redeem"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Negative tests catalog",
+      "description": "The playground's negative tests, each with its expected OAuth error. GET lists them; POST runs one (needs a signed-in session and an issued ID-JAG; skipped answers pass:null with a note).",
+      "item": [
+        {
+          "name": "List negative tests",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "/* Assertions for this request */",
+                  "pm.response.to.have.status(200);",
+                  "const b = pm.response.json(); pm.expect(b.length).to.be.above(0); pm.expect(b[0]).to.have.property('expect');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{LAB_BASE}}/api/id-jag-playground/negative",
+              "host": [
+                "{{LAB_BASE}}"
+              ],
+              "path": [
+                "api",
+                "id-jag-playground",
+                "negative"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Run the replay test (skipped without a redeemed ID-JAG)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "/* Assertions for this request */",
+                  "pm.response.to.have.status(200);",
+                  "const b = pm.response.json(); pm.expect(b).to.have.property('pass');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "http://localhost:4720"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{LAB_BASE}}/api/id-jag-playground/negative/replay",
+              "host": [
+                "{{LAB_BASE}}"
+              ],
+              "path": [
+                "api",
+                "id-jag-playground",
+                "negative",
+                "replay"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "LAB_BASE",
+      "value": "http://localhost:4720"
+    },
+    {
+      "key": "SAMPLE_TOKEN",
+      "value": "not-a-real-token-set-a-jwt-here"
+    }
+  ]
+}

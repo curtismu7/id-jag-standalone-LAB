@@ -1,0 +1,47 @@
+{
+  "name": "ID-JAG Standalone LAB — Live (example)",
+  "values": [
+    {
+      "key": "PF_URL",
+      "value": "Issuer PingFederate base URL",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "PF_EXCHANGE_CLIENT_ID",
+      "value": "OAuth client allowed to perform the RFC 8693 token exchange",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "PF_EXCHANGE_CLIENT_SECRET",
+      "value": "Secret for the exchange client",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "ID_JAG_RESOURCE",
+      "value": "Resource/audience the ID-JAG is issued for",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "RESOURCE_AS_ISSUER",
+      "value": "Issuer of the resource authorization server that redeems the ID-JAG",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "RESOURCE_AS_CLIENT_SECRET",
+      "value": "Secret of the client that redeems the ID-JAG (RFC 7523 JWT bearer)",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "MCP_URL",
+      "value": "Token endpoint or MCP server URL the redeemed access token is used against",
+      "enabled": true,
+      "type": "secret"
+    }
+  ]
+}
