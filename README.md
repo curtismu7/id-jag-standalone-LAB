@@ -85,6 +85,27 @@ In Live mode on the host, the helper services `resource-as` and `mcp-sample` def
 - **The AWS AgentCore leg has no Live form yet.** Live answers 409 `live_unavailable` for its routes and the mode is disabled in the picker with the reason. The AWS side is a lab simulation; wiring a real AgentCore runtime is a separate, owner-run setup (see the roadmap).
 - **Live**: the servers named in your settings. It can be chosen only when `PF_URL`, `PF_EXCHANGE_CLIENT_ID` and `PF_EXCHANGE_CLIENT_SECRET` (or the Acme set) are present; otherwise the Live button is disabled and the banner names what is missing.
 
+## Postman collection and MCP server
+
+The lab ships a Postman collection (`postman/id-jag-standalone-lab.postman_collection.json`): sanity, token inspect (no sign-in needed), the browser-assisted pi.flow sign-in precondition, the live flow (issue → redeem → MCP call, each accepting the 401/403/409 prerequisite answers so the collection never false-fails), and the negative-test catalog.
+
+```
+node ../../shared/postman/generator.mjs --spec postman/spec.json            # regenerate (never hand-edit the output)
+node ../../shared/postman/fill-env.mjs  --spec postman/spec.json            # owner machine: fills postman/id-jag-standalone-lab.live.environment.json from ~/Development/.env (git-ignored)
+npx newman run postman/id-jag-standalone-lab.postman_collection.json -e postman/id-jag-standalone-lab.live.environment.json
+```
+
+The committed example environment carries placeholders only. The two sign-in variables `PF_USERNAME` / `PF_PASSWORD` are deliberate Postman variables, not env keys: user credentials belong to the browser sign-in, not to a file. The flow folders cannot replace the browser step — issue/redeem/call act on the lab's server-side session, which only a real pi.flow sign-in creates.
+
+`mcp/server.mjs` is a stdio MCP server proxying a running lab as eight tools: `idjag_health`, `idjag_backends`, `idjag_decode_token`, `idjag_negative_catalog`, `idjag_negative_run`, `idjag_issue`, `idjag_redeem`, `idjag_call_mcp`. It holds no state; point it at the lab with `IDJAG_LAB_BASE` (default `http://localhost:4720`):
+
+```
+npm install --prefix mcp
+IDJAG_LAB_BASE=http://localhost:4720 node mcp/server.mjs
+```
+
+The two existing PingFederate setup/demo collections from idjag-runner-LAB (`web/public/*.postman_collection.json`) configure PingFederate itself; this collection drives the lab.
+
 ## Health, doctor and reset
 
 ```sh

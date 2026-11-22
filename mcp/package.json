@@ -1,0 +1,11 @@
+{
+  "name": "id-jag-standalone-lab-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ID-JAG Standalone LAB companion MCP server (stdio): the lab's routes exposed as MCP tools. Proxies a running lab; no state of its own.",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  }
+}

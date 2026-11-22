@@ -1,0 +1,193 @@
+{
+  "name": "ID-JAG Standalone LAB",
+  "slug": "id-jag-standalone-lab",
+  "description": "API collection for ID-JAG Standalone LAB: inspect tokens, run the playground's negative tests, and drive the live flow (issue ID-JAG by RFC 8693 exchange, redeem by RFC 7523, call the MCP server). Sign-in-gated steps need a browser sign-in session first (the pi.flow precondition folder); in Live mode the server keeps the tokens and returns decoded claims only.",
+  "baseUrl": "http://localhost:4720",
+  "env": {
+    "PF_URL": "Issuer PingFederate base URL",
+    "PF_EXCHANGE_CLIENT_ID": "OAuth client allowed to perform the RFC 8693 token exchange",
+    "PF_EXCHANGE_CLIENT_SECRET": "Secret for the exchange client",
+    "ID_JAG_RESOURCE": "Resource/audience the ID-JAG is issued for",
+    "RESOURCE_AS_ISSUER": "Issuer of the resource authorization server that redeems the ID-JAG",
+    "RESOURCE_AS_CLIENT_SECRET": "Secret of the client that redeems the ID-JAG (RFC 7523 JWT bearer)",
+    "MCP_URL": "Token endpoint or MCP server URL the redeemed access token is used against"
+  },
+  "variables": {
+    "SAMPLE_TOKEN": "not-a-real-token-set-a-jwt-here"
+  },
+  "folders": [
+    {
+      "name": "Sanity",
+      "description": "Lab liveness and backend reachability.",
+      "requests": [
+        {
+          "name": "Health",
+          "method": "GET",
+          "path": "/api/health",
+          "tests": [
+            "pm.response.to.have.status(200);",
+            "const b = pm.response.json(); pm.expect(b.state).to.be.oneOf(['ready', 'needs-setup']);"
+          ]
+        },
+        {
+          "name": "Backends",
+          "method": "GET",
+          "path": "/api/id-jag-playground/backends",
+          "tests": [
+            "pm.response.to.have.status(200);",
+            "pm.expect(pm.response.json().backends).to.be.an('array');"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Inspect (no sign-in needed)",
+      "description": "Decode and check a pasted token. Works without a session; never sends the token anywhere except the lab's own checker.",
+      "requests": [
+        {
+          "name": "Decode a token",
+          "method": "POST",
+          "path": "/api/inspect/decode",
+          "headers": {
+            "Origin": "http://localhost:4720"
+          },
+          "body": {
+            "token": "{{SAMPLE_TOKEN}}"
+          },
+          "tests": [
+            "pm.response.to.have.status(200);",
+            "pm.expect(pm.response.json().type).to.be.a('string');"
+          ]
+        },
+        {
+          "name": "BYO inspect a pasted ID-JAG (invalid sample, negative)",
+          "method": "POST",
+          "path": "/api/id-jag-playground/byo/inspect",
+          "headers": {
+            "Origin": "http://localhost:4720"
+          },
+          "body": {
+            "token": "not-a-jwt"
+          },
+          "tests": [
+            "pm.expect(pm.response.code).to.eql(400);",
+            "pm.expect(pm.response.json()).to.have.property('error');"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pi.flow sign-in (browser-assisted precondition)",
+      "description": "Live-mode issue/redeem/call act on the browser sign-in session's tokens. Start the sign-in in a browser at /api/id-jag-playground, complete pi.flow, then run the flow folders. These requests show the shape; they cannot replace the browser step.",
+      "requests": [
+        {
+          "name": "Sign-in config",
+          "method": "GET",
+          "path": "/api/customer-config",
+          "tests": [
+            "pm.response.to.have.status(200);"
+          ]
+        },
+        {
+          "name": "Credentials POST shape (will 409 pi_flow_not_started without a browser start)",
+          "method": "POST",
+          "path": "/auth/pi-flow/credentials",
+          "headers": {
+            "Origin": "http://localhost:4720"
+          },
+          "body": {
+            "username": "{{PF_USERNAME}}",
+            "password": "{{PF_PASSWORD}}"
+          },
+          "tests": [
+            "pm.expect(pm.response.code).to.be.oneOf([200, 401, 403, 409]);"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Flow (signed-in session required)",
+      "description": "The live ID-JAG flow against the servers named in the environment: issue (RFC 8693 token exchange), redeem (RFC 7523 JWT bearer), and call the MCP server with the redeemed access token. Each answers 409 with the missing prerequisite when a step was skipped.",
+      "requests": [
+        {
+          "name": "Issue an ID-JAG (exchange)",
+          "method": "POST",
+          "path": "/api/id-jag-playground/issue",
+          "headers": {
+            "Origin": "http://localhost:4720"
+          },
+          "body": {
+            "mode": "pf-pf"
+          },
+          "tests": [
+            "pm.expect(pm.response.code).to.be.oneOf([200, 401, 403, 409, 422]);"
+          ]
+        },
+        {
+          "name": "Redeem the ID-JAG (JWT bearer)",
+          "method": "POST",
+          "path": "/api/id-jag-playground/redeem",
+          "headers": {
+            "Origin": "http://localhost:4720"
+          },
+          "body": {},
+          "tests": [
+            "pm.expect(pm.response.code).to.be.oneOf([200, 400, 409, 422, 502]);"
+          ]
+        },
+        {
+          "name": "Call the MCP server (tools/list)",
+          "method": "POST",
+          "path": "/api/id-jag-playground/call",
+          "headers": {
+            "Origin": "http://localhost:4720"
+          },
+          "body": {},
+          "tests": [
+            "pm.expect(pm.response.code).to.be.oneOf([200, 409, 422, 502]);"
+          ]
+        },
+        {
+          "name": "Redeem before issue (negative)",
+          "method": "POST",
+          "path": "/api/id-jag-playground/redeem",
+          "headers": {
+            "Origin": "http://localhost:4720"
+          },
+          "body": {},
+          "tests": [
+            "pm.expect(pm.response.code).to.be.oneOf([200, 400, 409, 422, 502]);"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Negative tests catalog",
+      "description": "The playground's negative tests, each with its expected OAuth error. GET lists them; POST runs one (needs a signed-in session and an issued ID-JAG; skipped answers pass:null with a note).",
+      "requests": [
+        {
+          "name": "List negative tests",
+          "method": "GET",
+          "path": "/api/id-jag-playground/negative",
+          "tests": [
+            "pm.response.to.have.status(200);",
+            "const b = pm.response.json(); pm.expect(b.length).to.be.above(0); pm.expect(b[0]).to.have.property('expect');"
+          ]
+        },
+        {
+          "name": "Run the replay test (skipped without a redeemed ID-JAG)",
+          "method": "POST",
+          "path": "/api/id-jag-playground/negative/replay",
+          "headers": {
+            "Origin": "http://localhost:4720"
+          },
+          "body": {},
+          "tests": [
+            "pm.response.to.have.status(200);",
+            "const b = pm.response.json(); pm.expect(b).to.have.property('pass');"
+          ]
+        }
+      ]
+    }
+  ]
+}
