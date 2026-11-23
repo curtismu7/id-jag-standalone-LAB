@@ -3,43 +3,43 @@
   "values": [
     {
       "key": "PF_URL",
-      "value": "Issuer PingFederate base URL",
+      "value": "",
       "enabled": true,
       "type": "secret"
     },
     {
       "key": "PF_EXCHANGE_CLIENT_ID",
-      "value": "OAuth client allowed to perform the RFC 8693 token exchange",
+      "value": "",
       "enabled": true,
       "type": "secret"
     },
     {
       "key": "PF_EXCHANGE_CLIENT_SECRET",
-      "value": "Secret for the exchange client",
+      "value": "",
       "enabled": true,
       "type": "secret"
     },
     {
       "key": "ID_JAG_RESOURCE",
-      "value": "Resource/audience the ID-JAG is issued for",
+      "value": "",
       "enabled": true,
       "type": "secret"
     },
     {
       "key": "RESOURCE_AS_ISSUER",
-      "value": "Issuer of the resource authorization server that redeems the ID-JAG",
+      "value": "",
       "enabled": true,
       "type": "secret"
     },
     {
       "key": "RESOURCE_AS_CLIENT_SECRET",
-      "value": "Secret of the client that redeems the ID-JAG (RFC 7523 JWT bearer)",
+      "value": "",
       "enabled": true,
       "type": "secret"
     },
     {
       "key": "MCP_URL",
-      "value": "Token endpoint or MCP server URL the redeemed access token is used against",
+      "value": "",
       "enabled": true,
       "type": "secret"
     }

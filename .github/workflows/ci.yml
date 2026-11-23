@@ -60,3 +60,24 @@ jobs:
           ./gitleaks version
       - name: Scan history
         run: ./gitleaks detect --source . --redact --no-banner -v
+
+
+  postman:
+    # The Postman collection against the lab's own server: boots on a spare
+    # port, runs newman with the committed placeholder environment, fails on
+    # any assertion. Regenerate with shared/postman/generator.mjs.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check out the family shared directory
+        uses: actions/checkout@v5
+        with:
+          repository: curtismu7/AI-DEMO-Standalone
+          ref: main
+          path: family
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+      - run: npm ci
+      - run: npm run build --if-present
+      - run: bash family/shared/postman/ci-check.sh id-jag-standalone-lab /api/health ALLOW_MOCK_SIGNIN=1 npm start
