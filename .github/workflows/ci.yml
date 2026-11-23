@@ -80,4 +80,7 @@ jobs:
           node-version: 26
       - run: npm ci
       - run: npm run build --if-present
-      - run: bash family/shared/postman/ci-check.sh id-jag-standalone-lab /api/health ALLOW_MOCK_SIGNIN=1 npm start
+      - name: Run the collection
+        env:
+          ALLOW_MOCK_SIGNIN: '1'
+        run: bash family/shared/postman/ci-check.sh id-jag-standalone-lab /api/health npm start
