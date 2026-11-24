@@ -18,11 +18,13 @@ const layerOf = (id) => {
   return 'agent';
 };
 
-// Only a policy point is allowed or refused: the target API's own checks. The caller check is credential verification (the gateway verified
-// the caller token), and the gateway's outgoing rules are its own security stop when they fail (blocked). Client authentication, the
-// issuer's answers, the caller check and the skipped steps are information.
+// Only a policy point is allowed or refused: the target API's own checks and the issuer's answer on a redeem leg (an invalid_grant,
+// expired, wrong-audience or bad-signature refusal is the issuer's decision, and it is the refusal the run banner reports). The caller
+// check is credential verification (the gateway verified the caller token), and the gateway's outgoing rules are its own security stop
+// when they fail (blocked). Client authentication, the caller check and the skipped steps are information.
 const outcomeOf = (d) => {
   if (d.id === 'target') return d.outcome === 'pass' ? 'allowed' : d.outcome === 'fail' ? 'refused' : 'info';
+  if (/^leg\d-answer$/.test(d.id)) return d.outcome === 'fail' ? 'refused' : 'info';
   if (/^leg\d-rules$/.test(d.id)) return d.outcome === 'fail' ? 'blocked' : 'info';
   return 'info';
 };

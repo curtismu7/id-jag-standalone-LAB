@@ -70,6 +70,19 @@ describe('the record for one gateway-redeem run', () => {
     expect(line).not.toMatch(/ x=1/);
   });
 
+  it('a redeem leg the issuer refused is a refused row, not info', async () => {
+    // The expired scenario ends here: the target issuer answers 400 invalid_grant, check: expiry, and the run banner says refused at leg2.
+    const REFUSED_AT_LEG2 = [
+      d('caller', 'pass'), d('leg1-auth', 'pass'), d('leg1-rules', 'pass'), d('leg1-answer', 'pass'),
+      d('leg2-auth', 'pass'), d('leg2-rules', 'pass'), d('leg2-answer', 'fail', 'Leg 2: the target issuer\'s answer', 'HTTP 400: invalid_grant, check: expiry'),
+      d('target', 'skipped'),
+    ];
+    const record = await buildRunRecord({ runId: 'gr-test-refused', decisions: REFUSED_AT_LEG2, at: AT, write: () => {} });
+    expect(assertRunObservability(record)).toEqual([]);
+    expect(record.rows.find((r) => r.detail?.step === 'leg2-answer')).toMatchObject({ outcome: 'refused' });
+    expect(record.summary).toMatchObject({ refused: 1 });
+  });
+
   it('run ids are unique across calls', () => {
     const ids = new Set(Array.from({ length: 50 }, () => newRunId()));
     expect(ids.size).toBe(50);
