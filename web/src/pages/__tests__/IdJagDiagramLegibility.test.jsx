@@ -206,8 +206,9 @@ describe("diagram text stays readable at every zoom the page allows", () => {
       const text = appStylesheets(web).css;
       expect(tooSmall(scanCardCss(text, card, KINDS), READABLE_MIN_ZOOM).map((f) => f.selector).sort()).toEqual([".ijx .cs", ".ijx .ct"]);
     });
-    it("the app's own stylesheets: all seventeen under src (with the vendored floating-dialog.css, top-menu.css, JsonPane.css, gateway-trace.css and VerifyMark.css), none from node_modules", () => {
-      expect(cssFiles.filter((f) => f.endsWith(".css")).length).toBe(17);
+    it("the app's own stylesheets: all eighteen under src (with the vendored floating-dialog.css, top-menu.css, JsonPane.css, gateway-trace.css, run-observability.css and VerifyMark.css), none from node_modules", () => {
+      expect(cssFiles.filter((f) => f.endsWith(".css")).length).toBe(18);
+      expect(cssFiles).toContain("src/run-observability/run-observability.css");
       expect(cssFiles).toContain("src/components/VerifyMark.css");
       expect(cssFiles).toContain("src/floating-dialog/floating-dialog.css");
       expect(cssFiles).toContain("src/components/JsonPane.css");
