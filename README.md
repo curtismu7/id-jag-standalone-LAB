@@ -130,7 +130,7 @@ The gateway-redeem run (Mock) shows the panel under its result: one run in time 
 - **Where the lines live:** the lab process's stdout, one line per decision (`... id-jag-standalone decision step=... layer=... result=... run=...`). With Docker, `docker logs` on the lab container.
 - **Where they stream:** nowhere today. The shared collector (`shared/ping-log-collector`) does not list this lab's container, so no SIEM index receives these lines.
 - **Not logged, and why:** person (gateway redeem has no sign-in step: the mock minted the caller token), Authorize (no PingOne Authorize step in this mode) and Privilege (no Privilege policy, AI Guard or approval step in this mode). The panel says so.
-- **Time:** the time the mock computed the run. All rows of one run share one stamp, because the mock computes its decisions together.
+- **Time:** the time the mock computed the run, plus one millisecond per decision (its index in the mock's list). The mock computes its decisions together and has no clock per decision, so the offsets give the order the mock decided them, not measured times.
 - **Real mode:** no record. Live answers 409 for gateway redeem, so no live run is shown. The vendored panel and its pin are in `web/src/run-observability/` and `server/src/runObservability.js` (canonical in AI-DEMO-Standalone `shared/run-observability/`; never edit them here).
 
 ## Tests

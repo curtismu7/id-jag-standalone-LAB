@@ -18,10 +18,11 @@ const layerOf = (id) => {
   return 'agent';
 };
 
-// Only a policy point is allowed or refused: the caller check and the target API's own checks. The gateway's outgoing rules are its own
-// security stop when they fail (blocked). Client authentication, the issuer's answers and the skipped steps are information.
+// Only a policy point is allowed or refused: the target API's own checks. The caller check is credential verification (the gateway verified
+// the caller token), and the gateway's outgoing rules are its own security stop when they fail (blocked). Client authentication, the
+// issuer's answers, the caller check and the skipped steps are information.
 const outcomeOf = (d) => {
-  if (d.id === 'caller' || d.id === 'target') return d.outcome === 'pass' ? 'allowed' : d.outcome === 'fail' ? 'refused' : 'info';
+  if (d.id === 'target') return d.outcome === 'pass' ? 'allowed' : d.outcome === 'fail' ? 'refused' : 'info';
   if (/^leg\d-rules$/.test(d.id)) return d.outcome === 'fail' ? 'blocked' : 'info';
   return 'info';
 };
@@ -37,6 +38,13 @@ const WHY = {
   resource: 'The target API was not reached in this run.',
 };
 
+// The run's stamp plus the decision's index in milliseconds. The mock computes its decisions together and has no clock per decision, so the
+// offset is an order, not a measured time: it keeps the panel's stable time sort in the order the mock decided them.
+export function stampOf(at, index) {
+  const t = Date.parse(at);
+  return Number.isFinite(t) ? new Date(t + index).toISOString() : at;
+}
+
 // One timestamped line per decision: the step, its layer, the result and the run. Never a token, a message or a reason.
 export function decisionLine(at, d, runId) {
   return `${at} ${SERVICE} decision step=${clean(d.id)} layer=${clean(layerOf(d.id))} result=${RESULT[d.outcome] ?? 'unclear'} run=${clean(runId)}`;
@@ -51,15 +59,15 @@ export function newRunId(clock = Date.now) {
  * one stdout line per decision. Each line write has its own try, so one failed write drops only that line; the record is unaffected.
  */
 export async function buildRunRecord({ runId, decisions, at, write = () => {}, clock = Date.now }) {
-  const rows = decisions.map((d) => ({ d, layer: layerOf(d.id), outcome: outcomeOf(d) }));
-  for (const { d } of rows) {
-    try { write(decisionLine(at, d, runId)); } catch (e) { process.stderr.write(`run-record: a stdout line was dropped (${e?.code || 'write_failed'})\n`); }
+  const rows = decisions.map((d, i) => ({ d, i, at: stampOf(at, i), layer: layerOf(d.id), outcome: outcomeOf(d) }));
+  for (const r of rows) {
+    try { write(decisionLine(r.at, r.d, runId)); } catch (e) { process.stderr.write(`run-record: a stdout line was dropped (${e?.code || 'write_failed'})\n`); }
   }
   const layers = LAYERS.map((layer) => ({
     layer,
     products: [],
     reason: WHY[layer],
-    simulated: rows.filter((r) => r.layer === layer).map((r) => ({ at, outcome: r.outcome, message: `${r.d.label}: ${r.d.evidence}`, detail: { step: r.d.id, result: r.d.outcome } })),
+    simulated: rows.filter((r) => r.layer === layer).map((r) => ({ at: r.at, outcome: r.outcome, message: `${r.d.label}: ${r.d.evidence}`, detail: { step: r.d.id, result: r.d.outcome } })),
   }));
-  return createRunObservability({ clock }).collectRun({ runId, startedAt: at, endedAt: at, source: 'mock', layers });
+  return createRunObservability({ clock }).collectRun({ runId, startedAt: at, endedAt: stampOf(at, Math.max(0, decisions.length - 1)), source: 'mock', layers });
 }

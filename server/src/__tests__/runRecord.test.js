@@ -28,12 +28,20 @@ describe('the record for one gateway-redeem run', () => {
     // one simulated row per decision, plus one not-logged row for each of the three layers this mode never touches
     const simulated = record.rows.filter((r) => r.origin === 'simulated');
     expect(simulated).toHaveLength(DECISIONS.length);
-    expect(simulated.every((r) => r.at === AT)).toBe(true);
+    // each decision gets the run's stamp plus its index in milliseconds, so the panel's time sort keeps the mock's decision order
+    expect(simulated.map((r) => r.at)).toEqual(DECISIONS.map((_, i) => new Date(Date.parse(AT) + i).toISOString()));
     expect(record.rows.filter((r) => r.origin === 'not-logged')).toHaveLength(3);
-    // caller pass is allowed, the target fail is refused, the blocked outgoing rules are a blocked row; issuance and skips are info.
-    expect(record.summary).toMatchObject({ allowed: 1, refused: 1, blocked: 1, info: 3 });
+    // the caller check is credential verification (info), the target fail is refused, the blocked outgoing rules are a blocked row; the rest is info.
+    expect(record.summary).toMatchObject({ allowed: 0, refused: 1, blocked: 1, info: 4 });
     expect(record.coverage).toMatchObject({ gateway: 'simulated', resource: 'simulated', agent: 'simulated', person: 'not-logged', authorize: 'not-logged', privilege: 'not-logged' });
     expect(record.reasons.person).toMatch(/no sign-in step/);
+  });
+
+  it('the panel rows come out in the order the mock decided them, and the caller check is info', async () => {
+    const record = await buildRunRecord({ runId: 'gr-test-order', decisions: DECISIONS, at: AT, write: () => {} });
+    const steps = record.rows.filter((r) => r.origin === 'simulated').map((r) => r.detail.step);
+    expect(steps).toEqual(DECISIONS.map((x) => x.id));
+    expect(record.rows.find((r) => r.detail?.step === 'caller')).toMatchObject({ outcome: 'info' });
   });
 
   it('writes one stdout line per decision, and every line passes the shared classifier with no matcher word', async () => {
@@ -45,6 +53,7 @@ describe('the record for one gateway-redeem run', () => {
       expect(line).not.toMatch(SERVICE_WORDS);
     }
     expect(lines[0]).toBe(`${AT} id-jag-standalone decision step=caller layer=gateway result=passed run=gr-test-2`);
+    expect(lines[1]).toBe(`${new Date(Date.parse(AT) + 1).toISOString()} id-jag-standalone decision step=leg1-auth layer=agent result=passed run=gr-test-2`);
   });
 
   it('a throwing line writer drops only its own line and leaves the record identical to a healthy writer', async () => {

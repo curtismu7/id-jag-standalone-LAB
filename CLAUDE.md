@@ -78,4 +78,4 @@ The gateway-redeem Run page shows the shared `GatewayTrace` panel under Run. It 
 
 ## Run observability (Rule 27)
 - `web/src/run-observability/`, `server/src/runObservability.js` and `scripts/run-observability-checkPin.mjs` are vendored from AI-DEMO-Standalone `shared/run-observability/` (canonical). Never hand-edit them: change the canonical first, then re-vendor. The pin check is `scripts/run-observability.pin.test.mjs`.
-- This lab reads no logs (no `RUN_OBS_*` variable exists anywhere): the record comes from the gateway-redeem mock's own decisions (`server/src/runRecord.js`).
+- This lab reads no logs: no `RUN_OBS_*` name appears in `web/src` or `server/src` outside the pinned vendored files (the one exemption, listed in `web/src/run-observability/run-observability.sha256`; `scripts/run-observability.pin.test.mjs` enforces it). The record comes from the gateway-redeem mock's own decisions (`server/src/runRecord.js`).

@@ -219,7 +219,7 @@ export default function GatewayRedeemPanel() {
       const { data } = await api.post(`${BASE}/run`, { scenario: id });
       setRun(data); setResults((r) => ({ ...r, [id]: data.verdict }));
       return data;
-    } catch (e) { setError(errText(e)); return null; } finally { setBusy(""); }
+    } catch (e) { setError(errText(e)); setRun(null); return null; } finally { setBusy(""); }
   };
   const runAll = async () => {
     for (const s of state.scenarios) { if (!(await runScenario(s.id))) break; }
