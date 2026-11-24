@@ -123,6 +123,16 @@ docker compose -f deploy/docker-compose.yml up --build -d
 
 It publishes to 127.0.0.1 only: 4720 (playground), 4721 (resource-as) and 4722 (mcp-sample). Mock mode works with no configuration, and the compose file turns on the mock demo account. Stop it with `docker compose -f deploy/docker-compose.yml down`. On a Mac use OrbStack.
 
+## What each layer logged for this run (Rule 27)
+
+The gateway-redeem run (Mock) shows the panel under its result: one run in time order across the six layers, each row tagged **simulated** (the mock computed it for this run).
+
+- **Where the lines live:** the lab process's stdout, one line per decision (`... id-jag-standalone decision step=... layer=... result=... run=...`). With Docker, `docker logs` on the lab container.
+- **Where they stream:** nowhere today. The shared collector (`shared/ping-log-collector`) does not list this lab's container, so no SIEM index receives these lines.
+- **Not logged, and why:** person (gateway redeem has no sign-in step: the mock minted the caller token), Authorize (no PingOne Authorize step in this mode) and Privilege (no Privilege policy, AI Guard or approval step in this mode). The panel says so.
+- **Time:** the time the mock computed the run, plus one millisecond per decision (its index in the mock's list). The mock computes its decisions together and has no clock per decision, so the offsets give the order the mock decided them, not measured times.
+- **Real mode:** no record. Live answers 409 for gateway redeem, so no live run is shown. The vendored panel and its pin are in `web/src/run-observability/` and `server/src/runObservability.js` (canonical in AI-DEMO-Standalone `shared/run-observability/`; never edit them here).
+
 ## Tests
 
 ```sh

@@ -5,6 +5,7 @@ vi.mock("../../services/api", () => ({ default: { get, post, put, delete: vi.fn(
 
 import GatewayRedeemPanel, { CLAIM, buildPatch } from "../GatewayRedeemPanel";
 import { setJsonView } from "../../components/JsonPane";
+import { mockRecord } from "../../run-observability/fixtures";
 
 const SWAGGER = "console swagger name, 2026-10-31, schema only";
 const masked = (set = true) => ({ set, writeOnly: true });
@@ -302,5 +303,19 @@ describe("What Privilege did (Rule 25)", () => {
     fireEvent.click(screen.getByTestId("gr-run-happy"));
     await screen.findByTestId("gr-verdict");
     expect(screen.queryByTestId("trace-1")).toBeNull();
+  });
+});
+
+describe("a failed run never keeps the last record on screen (Rule 27)", () => {
+  it("clears the earlier run's observability record when the next run fails", async () => {
+    mount({ runs: { happy: run({ scenario: "happy", observability: mockRecord }) } });
+    await ready();
+    fireEvent.click(screen.getByTestId("gr-run-happy"));
+    await screen.findByTestId("ro-legend");
+    post.mockImplementation((url) => (url.endsWith("/run") ? Promise.reject(Object.assign(new Error("boom"), { response: { status: 500, data: {} } })) : Promise.resolve({ data: {} })));
+    await waitFor(() => expect(screen.getByTestId("gr-run-happy")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("gr-run-happy"));
+    await screen.findByRole("alert");
+    expect(screen.queryByTestId("ro-legend")).toBeNull();
   });
 });

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../services/api";
 import JsonPane from "../components/JsonPane.jsx";
 import GatewayTrace from "../gateway-trace/GatewayTrace.jsx";
+import RunObservability from "../run-observability/RunObservability.jsx";
 import "./GatewayRedeemPanel.css";
 
 // The "gateway-redeem" playground mode: the Privilege MCP gateway exchanges the caller's token (leg 1) and, when a Redeem spec with a
@@ -218,7 +219,7 @@ export default function GatewayRedeemPanel() {
       const { data } = await api.post(`${BASE}/run`, { scenario: id });
       setRun(data); setResults((r) => ({ ...r, [id]: data.verdict }));
       return data;
-    } catch (e) { setError(errText(e)); return null; } finally { setBusy(""); }
+    } catch (e) { setError(errText(e)); setRun(null); return null; } finally { setBusy(""); }
   };
   const runAll = async () => {
     for (const s of state.scenarios) { if (!(await runScenario(s.id))) break; }
@@ -375,6 +376,9 @@ export default function GatewayRedeemPanel() {
             <summary>Trace: every hop of the last run, one trace id {run.traceparent.split("-")[1]}</summary>
             {run.hops.map((h) => <Hop key={h.n} h={h} />)}
           </details>
+        )}
+        {run?.observability && (
+          <RunObservability record={run.observability} source="mock" streams={[{ product: "id-jag-standalone (mock)", lives: "this lab's stdout only (one line per decision)", streams: "nowhere today: the shared collector does not list this lab's container" }]} />
         )}
         <details className="gateway-redeem__trace" data-testid="gr-claims">
           <summary>Where every claim on this page comes from</summary>
