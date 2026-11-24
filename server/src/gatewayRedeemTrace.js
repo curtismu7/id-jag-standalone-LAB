@@ -42,7 +42,7 @@ function legDecisions({ n, stage, who, hop, refusal, ok }) {
     return out;
   }
   out.push(d(rulesId, rulesLabel, 'pass', 'the destination is an allow-listed https host, the answer was not a redirect and fit in 64 KB'));
-  if (r) out.push(d(answerId, answerLabel, 'fail', oauthText(r)));
+  if (r) out.push({ ...d(answerId, answerLabel, 'fail', oauthText(r)), check: r.check ?? null });
   else out.push(d(answerId, answerLabel, 'pass', ok));
   return out;
 }

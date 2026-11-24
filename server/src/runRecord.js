@@ -22,9 +22,13 @@ const layerOf = (id) => {
 // expired, wrong-audience or bad-signature refusal is the issuer's decision, and it is the refusal the run banner reports). The caller
 // check is credential verification (the gateway verified the caller token), and the gateway's outgoing rules are its own security stop
 // when they fail (blocked). Client authentication, the caller check and the skipped steps are information.
+// Owner decision (2026-11-24): at a redeem leg only policy stops are refused. The issuer's refusals for an expired token (expiry) or a
+// scope the caller may not use (scope) are policy stops. Every other issuer refusal is a credential or binding check (signature, bearer,
+// typ, issuer, audience, replay, client authentication) and is information. An unknown check is information.
+const POLICY_STOP_CHECKS = new Set(['expiry', 'scope']);
 const outcomeOf = (d) => {
   if (d.id === 'target') return d.outcome === 'pass' ? 'allowed' : d.outcome === 'fail' ? 'refused' : 'info';
-  if (/^leg\d-answer$/.test(d.id)) return d.outcome === 'fail' ? 'refused' : 'info';
+  if (/^leg\d-answer$/.test(d.id)) return d.outcome === 'fail' && POLICY_STOP_CHECKS.has(d.check) ? 'refused' : 'info';
   if (/^leg\d-rules$/.test(d.id)) return d.outcome === 'fail' ? 'blocked' : 'info';
   return 'info';
 };
@@ -49,7 +53,7 @@ export function stampOf(at, index) {
 
 // One timestamped line per decision: the step, its layer, the result and the run. Never a token, a message or a reason.
 export function decisionLine(at, d, runId) {
-  return `${at} ${SERVICE} decision step=${clean(d.id)} layer=${clean(layerOf(d.id))} result=${RESULT[d.outcome] ?? 'unclear'} run=${clean(runId)}`;
+  return `${at} ${SERVICE} decision step=${clean(d.id)} layer=${clean(layerOf(d.id))} result=${d.outcome === 'fail' && !['refused', 'blocked'].includes(outcomeOf(d)) ? 'unclear' : (RESULT[d.outcome] ?? 'unclear')} run=${clean(runId)}`;
 }
 
 export function newRunId(clock = Date.now) {
