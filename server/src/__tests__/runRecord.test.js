@@ -25,8 +25,11 @@ describe('the record for one gateway-redeem run', () => {
     const record = await buildRunRecord({ runId: 'gr-test-1', decisions: DECISIONS, at: AT, write: () => {} });
     expect(assertRunObservability(record)).toEqual([]);
     expect(record.source).toBe('mock');
-    expect(record.rows).toHaveLength(DECISIONS.length);
-    expect(record.rows.every((r) => r.origin === 'simulated' && r.at === AT)).toBe(true);
+    // one simulated row per decision, plus one not-logged row for each of the three layers this mode never touches
+    const simulated = record.rows.filter((r) => r.origin === 'simulated');
+    expect(simulated).toHaveLength(DECISIONS.length);
+    expect(simulated.every((r) => r.at === AT)).toBe(true);
+    expect(record.rows.filter((r) => r.origin === 'not-logged')).toHaveLength(3);
     // caller pass is allowed, the target fail is refused, the blocked outgoing rules are a blocked row; issuance and skips are info.
     expect(record.summary).toMatchObject({ allowed: 1, refused: 1, blocked: 1, info: 3 });
     expect(record.coverage).toMatchObject({ gateway: 'simulated', resource: 'simulated', agent: 'simulated', person: 'not-logged', authorize: 'not-logged', privilege: 'not-logged' });
@@ -74,7 +77,7 @@ describe('POST /api/gateway-redeem/run answers the record', () => {
       expect(obs).toBeTruthy();
       expect(assertRunObservability(obs)).toEqual([]);
       expect(obs.source).toBe('mock');
-      expect(obs.rows.length).toBe(res.body.trace.decisions.length);
+      expect(obs.rows.filter((r) => r.origin === 'simulated').length).toBe(res.body.trace.decisions.length);
       const printed = spy.mock.calls.map((c) => String(c[0])).filter((l) => l.includes(' id-jag-standalone decision '));
       expect(printed).toHaveLength(res.body.trace.decisions.length);
     } finally {
