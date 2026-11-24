@@ -125,7 +125,7 @@ It publishes to 127.0.0.1 only: 4720 (playground), 4721 (resource-as) and 4722 (
 
 ## What each layer logged for this run (Rule 27)
 
-The gateway-redeem run (Mock) shows the panel under its result: one run in time order across the six layers, each row tagged **simulated** (the mock computed it for this run).
+The gateway-redeem run (Mock) shows the panel under its result: one run in time order across the six layers, each row tagged **simulated** (the mock computed it for this run). Before a run there is no panel at all: it appears only after a run has happened. An expired assertion is a refused row at leg 2 (the target issuer's invalid_grant, check: expiry, "the ID-JAG has expired"), counted as refused 1, because the target issuer's refusal is a policy point. The panel's chain (User -> Agent -> Scopes -> Policies) shows the run's caller token subject, the agent client id and the scopes the exchange granted; the policy step is not logged (no Privilege or P1AZ decision in this mode).
 
 - **Where the lines live:** the lab process's stdout, one line per decision (`... id-jag-standalone decision step=... layer=... result=... run=...`). With Docker, `docker logs` on the lab container.
 - **Where they stream:** nowhere today. The shared collector (`shared/ping-log-collector`) does not list this lab's container, so no SIEM index receives these lines.

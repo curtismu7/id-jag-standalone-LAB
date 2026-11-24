@@ -4,6 +4,7 @@ import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app.js';
 import { assertRunObservability, classify } from '../runObservability.js';
+import { getSpec, runScenario } from '../gatewayRedeem.js';
 import { buildRunRecord, decisionLine, newRunId } from '../runRecord.js';
 import { API, post, useMockMode } from './mockHelpers.js';
 
@@ -95,9 +96,42 @@ describe('the record for one gateway-redeem run', () => {
     expect(record.summary).toMatchObject({ refused: 0 });
   });
 
+  it('the expired scenario is a refused leg-2 row that says the token expired, and the run counts refused 1', async () => {
+    // The mock computed this run once (runScenario); the record and the stdout line come from those decisions only.
+    const result = await runScenario('expired', getSpec('default'));
+    const lines = [];
+    const record = await buildRunRecord({ runId: 'gr-test-expired', decisions: result.trace.decisions, at: AT, write: (l) => lines.push(l) });
+    expect(assertRunObservability(record)).toEqual([]);
+    expect(record.summary).toMatchObject({ refused: 1, allowed: 0, blocked: 0 });
+    const row = record.rows.find((r) => r.detail?.step === 'leg2-answer');
+    expect(row).toMatchObject({ outcome: 'refused' });
+    expect(row.message).toMatch(/expired/);
+    expect(lines.find((l) => l.includes('step=leg2-answer'))).toMatch(/result=stopped /);
+  });
+
   it('run ids are unique across calls', () => {
     const ids = new Set(Array.from({ length: 50 }, () => newRunId()));
     expect(ids.size).toBe(50);
+  });
+
+  it('chain detail keys land on the caller and target rows, and the chain builds (user, agent, scopes; no policy step)', async () => {
+    const record = await buildRunRecord({
+      runId: 'gr-test-chain', decisions: DECISIONS, at: AT, write: () => {},
+      chain: { user: 'alice@mock.example', agent: 'agent-app', scopes: ['ledger:read', 'ledger:write'] },
+    });
+    expect(assertRunObservability(record)).toEqual([]);
+    expect(record.chain).toBeTruthy();
+    expect(record.chain.chains).toHaveLength(1);
+    const c = record.chain.chains[0];
+    expect(c.agent).toMatchObject({ value: 'agent-app', linkable: true, origin: 'simulated' });
+    expect(c.user).toMatchObject({ value: '<email>', origin: 'simulated' }); // the masker masks the person's address, as row text is masked
+    expect(c.user.linkable ?? true).toBeTruthy();
+    expect(c.scopes).toMatchObject({ values: ['ledger:read', 'ledger:write'], origin: 'simulated' });
+    expect(c.policies).toEqual([]); // no Privilege or P1AZ decision in gateway redeem
+    expect(c.links.userAgent).toBe(true);
+    // no chain keys: the chain is absent, not an empty one
+    const bare = await buildRunRecord({ runId: 'gr-test-nochain', decisions: DECISIONS, at: AT, write: () => {} });
+    expect(bare.chain).toBeNull();
   });
 });
 
