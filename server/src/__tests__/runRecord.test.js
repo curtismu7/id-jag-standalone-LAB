@@ -70,17 +70,29 @@ describe('the record for one gateway-redeem run', () => {
     expect(line).not.toMatch(/ x=1/);
   });
 
-  it('a redeem leg the issuer refused is a refused row, not info', async () => {
+  it('an expired token refused by the issuer is a refused row (a policy stop)', async () => {
     // The expired scenario ends here: the target issuer answers 400 invalid_grant, check: expiry, and the run banner says refused at leg2.
     const REFUSED_AT_LEG2 = [
       d('caller', 'pass'), d('leg1-auth', 'pass'), d('leg1-rules', 'pass'), d('leg1-answer', 'pass'),
-      d('leg2-auth', 'pass'), d('leg2-rules', 'pass'), d('leg2-answer', 'fail', 'Leg 2: the target issuer\'s answer', 'HTTP 400: invalid_grant, check: expiry'),
+      d('leg2-auth', 'pass'), d('leg2-rules', 'pass'), { ...d('leg2-answer', 'fail', 'Leg 2: the target issuer\'s answer', 'HTTP 400: invalid_grant, check: expiry'), check: 'expiry' },
       d('target', 'skipped'),
     ];
     const record = await buildRunRecord({ runId: 'gr-test-refused', decisions: REFUSED_AT_LEG2, at: AT, write: () => {} });
     expect(assertRunObservability(record)).toEqual([]);
     expect(record.rows.find((r) => r.detail?.step === 'leg2-answer')).toMatchObject({ outcome: 'refused' });
     expect(record.summary).toMatchObject({ refused: 1 });
+  });
+
+  it('a credential check the issuer refuses (bad signature) is information, not a refusal', async () => {
+    const CREDENTIAL_AT_LEG2 = [
+      d('caller', 'pass'), d('leg1-auth', 'pass'), d('leg1-rules', 'pass'), d('leg1-answer', 'pass'),
+      d('leg2-auth', 'pass'), d('leg2-rules', 'pass'), { ...d('leg2-answer', 'fail', 'Leg 2: the target issuer\'s answer', 'HTTP 400: invalid_grant, check: signature'), check: 'signature' },
+      d('target', 'skipped'),
+    ];
+    const record = await buildRunRecord({ runId: 'gr-test-credential', decisions: CREDENTIAL_AT_LEG2, at: AT, write: () => {} });
+    expect(assertRunObservability(record)).toEqual([]);
+    expect(record.rows.find((r) => r.detail?.step === 'leg2-answer')).toMatchObject({ outcome: 'info' });
+    expect(record.summary).toMatchObject({ refused: 0 });
   });
 
   it('run ids are unique across calls', () => {
