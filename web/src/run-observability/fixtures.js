@@ -24,6 +24,49 @@ export const mockRecord = {
   summary: { allowed: 2, refused: 1, blocked: 1, info: 1, unverified: 0 },
 };
 
+// Chain (SPEC-chain-view-2026-11-24): two agents. agent-client-42 has a token with scopes and a Privilege and a P1AZ decision that share its
+// identifier, so its steps are linked. agent-client-77 has a token with no scope claim and no decision, so its scopes link is not drawn.
+// Mock mode: every step is simulated. The P1AZ decision has no decision id, so the id is shown missing.
+export const chainRecord = {
+  runId: 'run-chain-1', window: WINDOW, source: 'mock', excerpt: true, truncated: false,
+  rows: [
+    { id: 'r1', at: t(1), atExact: t(1), layer: 'person', product: 'lab mock IdP', outcome: 'allowed', message: 'Mock sign-in of user-7 for agent-client-42', origin: 'simulated', detail: { user: 'user-7', agent: 'agent-client-42' } },
+    { id: 'r2', at: t(2), atExact: t(2), layer: 'agent', product: 'lab mock IdP', outcome: 'allowed', message: 'Token issued to agent-client-42 with pay.read and tuition.read', origin: 'simulated', detail: { user: 'user-7', agent: 'agent-client-42', scopes: ['pay.read', 'tuition.read'] } },
+    { id: 'r3', at: t(3), atExact: t(3), layer: 'privilege', product: 'lab mock Privilege', outcome: 'allowed', message: 'Policy permit for agent-client-42', origin: 'simulated', detail: { agent: 'agent-client-42', policy: { product: 'privilege', decision: 'PERMIT', id: 'pol-1' } } },
+    { id: 'r4', at: t(4), atExact: t(4), layer: 'authorize', product: 'lab mock Authorize', outcome: 'allowed', message: 'P1AZ permit for agent-client-42', origin: 'simulated', detail: { agent: 'agent-client-42', policy: { product: 'p1az', decision: 'PERMIT' } } },
+    { id: 'r5', at: t(5), atExact: t(5), layer: 'person', product: 'lab mock IdP', outcome: 'allowed', message: 'Mock sign-in of user-8 for agent-client-77', origin: 'simulated', detail: { user: 'user-8', agent: 'agent-client-77' } },
+    { id: 'r6', at: t(6), atExact: t(6), layer: 'agent', product: 'lab mock IdP', outcome: 'allowed', message: 'Token issued to agent-client-77', origin: 'simulated', detail: { user: 'user-8', agent: 'agent-client-77' } },
+    { id: 'n-gateway', at: null, layer: 'gateway', product: 'none', outcome: 'info', message: 'The lab mock produced no event for this layer.', origin: 'not-logged' },
+    { id: 'n-resource', at: null, layer: 'resource', product: 'none', outcome: 'info', message: 'The lab mock produced no event for this layer.', origin: 'not-logged' },
+  ],
+  coverage: { person: 'simulated', agent: 'simulated', authorize: 'simulated', privilege: 'simulated', gateway: 'not-logged', resource: 'not-logged' },
+  reasons: { gateway: 'The lab mock produced no event for this layer.', resource: 'The lab mock produced no event for this layer.' },
+  summary: { allowed: 6, refused: 0, blocked: 0, info: 0, unverified: 0 },
+  chain: {
+    chains: [
+      {
+        agent: { value: 'agent-client-42', linkable: true, origin: 'simulated', at: t(1) },
+        user: { value: 'user-7', origin: 'simulated', at: t(1), more: 0 },
+        scopes: { values: ['pay.read', 'tuition.read'], origin: 'simulated', at: t(2) },
+        noScopeClaim: false,
+        policies: [
+          { product: 'privilege', decision: 'PERMIT', id: 'pol-1', outcome: 'allowed', origin: 'simulated', at: t(3) },
+          { product: 'p1az', decision: 'PERMIT', id: null, outcome: 'allowed', origin: 'simulated', at: t(4) },
+        ],
+        links: { userAgent: true, agentScopes: true, scopesPolicy: true },
+      },
+      {
+        agent: { value: 'agent-client-77', linkable: true, origin: 'simulated', at: t(5) },
+        user: { value: 'user-8', origin: 'simulated', at: t(5), more: 0 },
+        scopes: null,
+        noScopeClaim: true,
+        policies: [],
+        links: { userAgent: true, agentScopes: false, scopesPolicy: false },
+      },
+    ],
+  },
+};
+
 // Real mode: logged rows with their own timestamps, a layer the product did not log, and one that could not be read.
 export const realRecord = {
   runId: 'run-real-1', window: WINDOW, source: 'real', excerpt: true, truncated: false,

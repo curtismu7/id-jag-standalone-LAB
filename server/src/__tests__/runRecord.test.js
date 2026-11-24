@@ -101,6 +101,26 @@ describe('the record for one gateway-redeem run', () => {
     const ids = new Set(Array.from({ length: 50 }, () => newRunId()));
     expect(ids.size).toBe(50);
   });
+
+  it('chain detail keys land on the caller and target rows, and the chain builds (user, agent, scopes; no policy step)', async () => {
+    const record = await buildRunRecord({
+      runId: 'gr-test-chain', decisions: DECISIONS, at: AT, write: () => {},
+      chain: { user: 'alice@mock.example', agent: 'agent-app', scopes: ['ledger:read', 'ledger:write'] },
+    });
+    expect(assertRunObservability(record)).toEqual([]);
+    expect(record.chain).toBeTruthy();
+    expect(record.chain.chains).toHaveLength(1);
+    const c = record.chain.chains[0];
+    expect(c.agent).toMatchObject({ value: 'agent-app', linkable: true, origin: 'simulated' });
+    expect(c.user).toMatchObject({ value: '<email>', origin: 'simulated' }); // the masker masks the person's address, as row text is masked
+    expect(c.user.linkable ?? true).toBeTruthy();
+    expect(c.scopes).toMatchObject({ values: ['ledger:read', 'ledger:write'], origin: 'simulated' });
+    expect(c.policies).toEqual([]); // no Privilege or P1AZ decision in gateway redeem
+    expect(c.links.userAgent).toBe(true);
+    // no chain keys: the chain is absent, not an empty one
+    const bare = await buildRunRecord({ runId: 'gr-test-nochain', decisions: DECISIONS, at: AT, write: () => {} });
+    expect(bare.chain).toBeNull();
+  });
 });
 
 describe('POST /api/gateway-redeem/run answers the record', () => {

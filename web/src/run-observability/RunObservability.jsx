@@ -27,6 +27,8 @@ import "./run-observability.css";
   "response" = a decision the lab already holds as an API response (a PingOne Authorize permit or deny and its policy): real, but it was NOT
   read from a log, so it is never tagged or counted as logged.
   "not-logged" = no line was found: the panel says so and never claims one. An "info" row is never counted as passed.
+  chain (optional): { chains: [{ agent, user, scopes, noScopeClaim, policies, links }] } built by the core from rows whose detail carries user,
+  agent, scopes and policy. Null or absent = this lab does not record the chain for the run; the panel says so.
   Any JSON is drawn by the shared JsonPane (Rule 24): the lab vendors it at web/src/components/JsonPane.jsx.
 */
 
@@ -137,6 +139,85 @@ const LEGEND = [
   ["not-logged", "no line was found; nothing is claimed"],
 ];
 
+// The chain for the run (SPEC-chain-view-2026-11-24): User, Agent, Scopes, Policies. A link is drawn only where the rows share an agent identifier
+// (the record says so); a missing link reads "not correlated in this run". A missing step reads "not logged" with the lane's reason.
+const POLICY_NAME = { privilege: "Privilege", p1az: "P1AZ" };
+function NotLogged({ reason }) {
+  return <span className="ro-chain-missing">not logged{reason ? `: ${txt(reason)}` : ""}</span>;
+}
+function Link({ i, name, linked, text }) {
+  return (
+    <li className="ro-chain-link" data-testid={`ro-chain-link-${i}-${name}`} data-linked={linked ? "true" : "false"}>
+      {linked ? text.linked : "not correlated in this run"}
+    </li>
+  );
+}
+function ChainRun({ c, i, reasons }) {
+  const policies = Array.isArray(c.policies) ? c.policies : [];
+  const links = c.links || {};
+  return (
+    <article className="ro-chain-run" data-testid={`ro-chain-run-${i}`} aria-label={c.agent ? `Chain for agent ${txt(c.agent.value)}` : "Chain for rows with no agent id"}>
+      <ol className="ro-chain-steps">
+        <li className="ro-chain-step" data-testid={`ro-chain-step-${i}-user`}>
+          <span className="ro-chain-label">User</span>
+          {c.user
+            ? <><span className="ro-chain-value">{txt(c.user.value)}</span>{c.user.more > 0 && <span className="ro-tag">+{c.user.more} more</span>} <span className="ro-chip" data-origin={c.user.origin}>{ORIGIN_LABEL[c.user.origin] || txt(c.user.origin)}</span></>
+            : <NotLogged reason={reasons?.person} />}
+        </li>
+        <Link i={i} name="userAgent" linked={links.userAgent} text={{ linked: "linked on the same agent id" }} />
+        <li className="ro-chain-step" data-testid={`ro-chain-step-${i}-agent`}>
+          <span className="ro-chain-label">Agent</span>
+          {c.agent
+            ? <><span className="ro-chain-value">{txt(c.agent.value)}</span>{!c.agent.linkable && <span className="ro-tag">masked id: no link</span>} <span className="ro-chip" data-origin={c.agent.origin}>{ORIGIN_LABEL[c.agent.origin] || txt(c.agent.origin)}</span></>
+            : <NotLogged reason={reasons?.agent} />}
+        </li>
+        <Link i={i} name="agentScopes" linked={links.agentScopes} text={{ linked: "linked on the same agent id" }} />
+        <li className="ro-chain-step" data-testid={`ro-chain-step-${i}-scopes`}>
+          <span className="ro-chain-label">Scopes</span>
+          {c.scopes
+            ? <><span className="ro-chain-value">{c.scopes.values.map((v) => txt(v)).join(", ")}</span> <span className="ro-chip" data-origin={c.scopes.origin}>{ORIGIN_LABEL[c.scopes.origin] || txt(c.scopes.origin)}</span></>
+            : c.noScopeClaim ? <span className="ro-chain-missing">no scope claim in this run</span> : <NotLogged reason={reasons?.agent} />}
+        </li>
+        <Link i={i} name="scopesPolicy" linked={links.scopesPolicy} text={{ linked: "linked on the same agent id" }} />
+        <li className="ro-chain-step" data-testid={`ro-chain-step-${i}-policies`}>
+          <span className="ro-chain-label">Policies</span>
+          {policies.length === 0
+            ? <NotLogged reason={reasons?.privilege || reasons?.authorize} />
+            : (
+              <ul className="ro-chain-policies">
+                {policies.map((p, k) => (
+                  <li key={k} className="ro-chain-policy" data-testid={`ro-chain-policy-${i}-${k}`} data-outcome={p.outcome} data-origin={p.origin}>
+                    <span className="ro-chain-label">{POLICY_NAME[p.product] || txt(p.product) || "Policy"}</span>{" "}
+                    <span className="ro-chain-value">{txt(p.decision)}</span>{" "}
+                    <span className="ro-chip" data-outcome={p.outcome}>{OUTCOME_LABEL[p.outcome] || txt(p.outcome)}</span>{" "}
+                    {p.id ? <span className="ro-chain-value">id {txt(p.id)}</span> : <span className="ro-chain-missing">policy id not logged</span>}{" "}
+                    <span className="ro-chip" data-origin={p.origin}>{ORIGIN_LABEL[p.origin] || txt(p.origin)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+        </li>
+      </ol>
+    </article>
+  );
+}
+function Chain({ chain, reasons }) {
+  const list = Array.isArray(chain?.chains) ? chain.chains : [];
+  return (
+    <section className="ro-chain" data-testid="ro-chain" aria-label="The chain for this run">
+      <h3>The chain for this run</h3>
+      {list.length === 0
+        ? <p className="ro-muted" data-testid="ro-chain-none">This lab does not record the chain for this run.</p>
+        : (
+          <>
+            <p className="ro-muted">A step is linked to the next only when both rows carry the same agent identifier. A name never links two steps.</p>
+            {list.map((c, i) => <ChainRun key={i} c={c} i={i} reasons={reasons} />)}
+          </>
+        )}
+    </section>
+  );
+}
+
 function Legend() {
   return (
     <ul className="ro-legend" data-testid="ro-legend" aria-label="What the origin tags mean">
@@ -225,6 +306,7 @@ function Panel({ record, source: given, streams, title = "What each layer logged
             : `${n("allowed")} allowed, ${n("refused")} refused, ${n("blocked")} blocked, ${info} for information (information is not a pass${unverified ? `; ${unverified} UNVERIFIED-shape ${unverified === 1 ? "row is" : "rows are"} counted here whatever outcome ${unverified === 1 ? "it carries" : "they carry"}` : ""}).`}
           {" "}Window {txt(record.window?.from)} to {txt(record.window?.to)}.
         </p>
+        <Chain chain={record.chain} reasons={record.reasons} />
         <Legend />
         <ol className="ro-lanes" data-testid="ro-lanes" aria-label="Layers">
           {LAYERS.map((l) => (
