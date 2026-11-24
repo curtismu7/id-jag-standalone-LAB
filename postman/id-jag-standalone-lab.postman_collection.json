@@ -3,7 +3,7 @@
     "name": "ID-JAG Standalone LAB",
     "description": "API collection for ID-JAG Standalone LAB: inspect tokens, run the playground's negative tests, and drive the live flow (issue ID-JAG by RFC 8693 exchange, redeem by RFC 7523, call the MCP server). Sign-in-gated steps need a browser sign-in session first (the pi.flow precondition folder); in Live mode the server keeps the tokens and returns decoded claims only.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_postman_id": "be92809a-3bb9-4022-92dc-39777b977bad"
+    "_postman_id": "postman-id-jag-standalone-lab"
   },
   "item": [
     {
@@ -18,9 +18,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "const b = pm.response.json(); pm.expect(b.state).to.be.oneOf(['ready', 'needs-setup']);"
+                  "pm.test(\"Health\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json(); pm.expect(b.state).to.be.oneOf(['ready', 'needs-setup']);",
+                  "});"
                 ]
               }
             }
@@ -50,9 +51,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "pm.expect(pm.response.json().backends).to.be.an('array');"
+                  "pm.test(\"Backends\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().backends).to.be.an('array');",
+                  "});"
                 ]
               }
             }
@@ -89,9 +91,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "pm.expect(pm.response.json().type).to.be.a('string');"
+                  "pm.test(\"Decode a token\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().type).to.be.a('string');",
+                  "});"
                 ]
               }
             }
@@ -136,9 +139,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.eql(400);",
-                  "pm.expect(pm.response.json()).to.have.property('error');"
+                  "pm.test(\"BYO inspect a pasted ID-JAG (invalid sample, negative)\", function () {",
+                  "  pm.expect(pm.response.code).to.eql(400);",
+                  "  pm.expect(pm.response.json()).to.have.property('error');",
+                  "});"
                 ]
               }
             }
@@ -190,8 +194,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);"
+                  "pm.test(\"Sign-in config\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
                 ]
               }
             }
@@ -221,8 +226,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([200, 401, 403, 409]);"
+                  "pm.test(\"Credentials POST shape (will 409 pi_flow_not_started without a browser start)\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 401, 403, 409]);",
+                  "});"
                 ]
               }
             }
@@ -273,8 +279,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([200, 401, 403, 409, 422]);"
+                  "pm.test(\"Issue an ID-JAG (exchange)\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 401, 403, 409, 422]);",
+                  "});"
                 ]
               }
             }
@@ -319,8 +326,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([200, 400, 409, 422, 502]);"
+                  "pm.test(\"Redeem the ID-JAG (JWT bearer)\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 409, 422, 502]);",
+                  "});"
                 ]
               }
             }
@@ -365,8 +373,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([200, 409, 422, 502]);"
+                  "pm.test(\"Call the MCP server (tools/list)\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 409, 422, 502]);",
+                  "});"
                 ]
               }
             }
@@ -411,8 +420,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([200, 400, 409, 422, 502]);"
+                  "pm.test(\"Redeem before issue (negative)\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 409, 422, 502]);",
+                  "});"
                 ]
               }
             }
@@ -463,9 +473,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "const b = pm.response.json(); pm.expect(b.length).to.be.above(0); pm.expect(b[0]).to.have.property('expect');"
+                  "pm.test(\"List negative tests\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json(); pm.expect(b.length).to.be.above(0); pm.expect(b[0]).to.have.property('expect');",
+                  "});"
                 ]
               }
             }
@@ -496,9 +507,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "const b = pm.response.json(); pm.expect(b).to.have.property('pass');"
+                  "pm.test(\"Run the replay test (skipped without a redeemed ID-JAG)\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json(); pm.expect(b).to.have.property('pass');",
+                  "});"
                 ]
               }
             }

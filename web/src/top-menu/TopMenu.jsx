@@ -37,6 +37,13 @@ import ReleaseNotes from "./ReleaseNotes.jsx";
  *   onVersion       fn — what the version button does when clicked. Omit it and the button opens the shared
  *                     release-notes dialog (ReleaseNotes.jsx) by itself; a lab-specific action replaces that
  *   onReset          fn; when given renders the Reset button
+ *   postman          { repo, slug } — renders the "Postman" button that downloads the lab's API
+ *                      collection AND its environment (variables) file from the lab repo's postman/
+ *                      folder on GitHub (raw.githubusercontent.com, main branch). repo is
+ *                      "owner/name" (the lab's own GitHub repo), slug is the postman spec slug
+ *                      (the collection file is postman/<slug>.postman_collection.json and the
+ *                      variables file postman/<slug>.live.environment.example.json). Omit for
+ *                      labs without a collection.
  *   showSignIn       bool — true only when Real mode is active and the lab needs auth
  *   signedIn         { subject, onSignIn, onSignOut } — when signed in shows "Signed in as <subject>" + Sign out
  *   extra            optional node (lab-specific buttons, workspace switch, …)
@@ -60,6 +67,7 @@ export default function TopMenu({
   version,
   onVersion,
   onReset,
+  postman,
   showSignIn = false,
   signedIn,
   extra,
@@ -146,6 +154,32 @@ export default function TopMenu({
           ))}
         {version && (
           <button type="button" data-testid="version" title="About this lab" onClick={onVersionClick}>{version}</button>
+        )}
+        {postman?.repo && postman?.slug && (
+          <button
+            type="button"
+            data-testid="postman-download"
+            title="Download this lab's Postman collection and its variables file"
+            onClick={async () => {
+              const base = `https://raw.githubusercontent.com/${postman.repo}/main/postman`;
+              const files = [`${postman.slug}.postman_collection.json`, `${postman.slug}.live.environment.example.json`];
+              for (const f of files) {
+                // fetch + blob: a.download is ignored for cross-origin URLs, so download via a blob URL
+                const res = await fetch(`${base}/${f}`);
+                if (!res.ok) { console.error(`postman download failed: ${f} (${res.status})`); continue; }
+                const blob = new Blob([await res.text()], { type: "application/json" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = f;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(a.href);
+              }
+            }}
+          >
+            Postman
+          </button>
         )}
         {onReset && (
           <button type="button" data-testid="reset" onClick={onReset}>Reset</button>

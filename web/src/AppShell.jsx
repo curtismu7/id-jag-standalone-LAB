@@ -70,6 +70,7 @@ function Shell({ children }) {
         )}
         <span className="shell-right">
           <TopMenu
+          postman={{ repo: "curtismu7/id-jag-standalone-LAB", slug: "id-jag-standalone-lab" }}
             mode={mode?.status === "ready" ? {
               // the lab's mode id is "live"; TopMenu's select speaks "mock"/"real"
               value: mode.mode === "live" ? "real" : "mock",
