@@ -16,6 +16,7 @@ import { gatewayWorld } from './mock/index.js';
 import { ORIGINS } from './mock/env.js';
 import { CALLER_CLIENT_ID, CALLER_USER } from './mock/gatewayWorld.js';
 import { currentWorkspace } from './workspace.js';
+import { buildRunRecord, newRunId } from './runRecord.js';
 
 const router = express.Router();
 
@@ -59,11 +60,22 @@ router.post('/spec/reset', (req, res) => {
 router.post('/run', async (req, res) => {
   const id = typeof req.body?.scenario === 'string' ? req.body.scenario : 'happy';
   if (!Object.hasOwn(SCENARIOS, id)) return reply(req, res, 404, { error: 'unknown_scenario', message: 'No such scenario.', scenarios: Object.keys(SCENARIOS) });
+  let result;
   try {
-    return reply(req, res, 200, await runScenario(id, getSpec(currentWorkspace())));
+    result = await runScenario(id, getSpec(currentWorkspace()));
   } catch {
     return reply(req, res, 500, { error: 'run_failed', message: 'The run failed inside the mock.' });
   }
+  // Rule 27: the run's record and one stdout line per decision, from the decisions the mock computed for this run (stamped once here).
+  const runId = newRunId();
+  const at = new Date().toISOString();
+  let observability = null;
+  try {
+    observability = await buildRunRecord({ runId, decisions: result.trace?.decisions ?? [], at, write: (line) => process.stdout.write(`${line}\n`) });
+  } catch (e) {
+    process.stderr.write(`run-record: no record for this run (${e?.code || 'record_failed'})\n`);
+  }
+  return reply(req, res, 200, { ...result, observability });
 });
 
 router.post('/reset', (req, res) => {
