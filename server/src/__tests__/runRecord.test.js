@@ -4,6 +4,7 @@ import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app.js';
 import { assertRunObservability, classify } from '../runObservability.js';
+import { getSpec, runScenario } from '../gatewayRedeem.js';
 import { buildRunRecord, decisionLine, newRunId } from '../runRecord.js';
 import { API, post, useMockMode } from './mockHelpers.js';
 
@@ -81,6 +82,19 @@ describe('the record for one gateway-redeem run', () => {
     expect(assertRunObservability(record)).toEqual([]);
     expect(record.rows.find((r) => r.detail?.step === 'leg2-answer')).toMatchObject({ outcome: 'refused' });
     expect(record.summary).toMatchObject({ refused: 1 });
+  });
+
+  it('the expired scenario is a refused leg-2 row that says the token expired, and the run counts refused 1', async () => {
+    // The mock computed this run once (runScenario); the record and the stdout line come from those decisions only.
+    const result = await runScenario('expired', getSpec('default'));
+    const lines = [];
+    const record = await buildRunRecord({ runId: 'gr-test-expired', decisions: result.trace.decisions, at: AT, write: (l) => lines.push(l) });
+    expect(assertRunObservability(record)).toEqual([]);
+    expect(record.summary).toMatchObject({ refused: 1, allowed: 0, blocked: 0 });
+    const row = record.rows.find((r) => r.detail?.step === 'leg2-answer');
+    expect(row).toMatchObject({ outcome: 'refused' });
+    expect(row.message).toMatch(/expired/);
+    expect(lines.find((l) => l.includes('step=leg2-answer'))).toMatch(/result=stopped /);
   });
 
   it('run ids are unique across calls', () => {
