@@ -59,9 +59,15 @@ export function newRunId(clock = Date.now) {
 /**
  * The run record for one gateway-redeem run. `decisions` is the trace's decision list (computed once by the mock); `write` receives
  * one stdout line per decision. Each line write has its own try, so one failed write drops only that line; the record is unaffected.
+ * `chain` carries what the mock knows for the chain view (user, agent, scopes) — only where a decision row already shows it; this lab
+ * has no Privilege or P1AZ policy step, so no row carries `detail.policy` and the chain's policy step stays "not logged".
  */
-export async function buildRunRecord({ runId, decisions, at, write = () => {}, clock = Date.now }) {
+export async function buildRunRecord({ runId, decisions, at, chain, write = () => {}, clock = Date.now }) {
   const rows = decisions.map((d, i) => ({ d, i, at: stampOf(at, i), layer: layerOf(d.id), outcome: outcomeOf(d) }));
+  const chainDetail = chain && typeof chain === 'object'
+    ? { ...(chain.user ? { user: chain.user } : {}), ...(chain.agent ? { agent: chain.agent } : {}), ...(Array.isArray(chain.scopes) && chain.scopes.length ? { scopes: chain.scopes } : {}) }
+    : {};
+  const withChain = (r) => (Object.keys(chainDetail).length && ['caller', 'target'].includes(r.d.id) ? { ...chainDetail } : {});
   for (const r of rows) {
     try { write(decisionLine(r.at, r.d, runId)); } catch (e) { process.stderr.write(`run-record: a stdout line was dropped (${e?.code || 'write_failed'})\n`); }
   }
@@ -69,7 +75,7 @@ export async function buildRunRecord({ runId, decisions, at, write = () => {}, c
     layer,
     products: [],
     reason: WHY[layer],
-    simulated: rows.filter((r) => r.layer === layer).map((r) => ({ at: r.at, outcome: r.outcome, message: `${r.d.label}: ${r.d.evidence}`, detail: { step: r.d.id, result: r.d.outcome } })),
+    simulated: rows.filter((r) => r.layer === layer).map((r) => ({ at: r.at, outcome: r.outcome, message: `${r.d.label}: ${r.d.evidence}`, detail: { step: r.d.id, result: r.d.outcome, ...withChain(r) } })),
   }));
   return createRunObservability({ clock }).collectRun({ runId, startedAt: at, endedAt: stampOf(at, Math.max(0, decisions.length - 1)), source: 'mock', layers });
 }

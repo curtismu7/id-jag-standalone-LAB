@@ -426,6 +426,69 @@ export function defaultLayers() {
 }
 export const saasLayer = (layer, responses = []) => ({ layer, products: [], reason: SAAS, responses });
 
+// ---- The chain (SPEC-chain-view-2026-11-24): User -> Agent -> Scopes -> Policies --------------------------------------------------------------
+// A row carries the chain's keys in its detail: user (the subject), agent (the agent client id or name), scopes (an array) and policy
+// ({ product, decision, id }). Rows are grouped by the agent identifier. A link is drawn between two steps only when their rows share that
+// identifier AND the masker left it unchanged (a masked identifier is shown masked and links nothing). Nothing is inferred from a name.
+const CHAIN_VALUE = 200;
+const chainPart = (raw, mask, keep) => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const text = (v) => {
+    if (typeof v !== 'string' || v === '') return null;
+    const s = v.slice(0, CHAIN_VALUE);
+    const shown = mask(s, keep);
+    const declared = keep ? s.replace(keep, (m) => short(m)) : s;
+    return { value: shown, linkable: shown !== '' && shown === declared && !shown.includes('***') };
+  };
+  const agent = text(raw.agent);
+  const user = text(raw.user);
+  const scopes = Array.isArray(raw.scopes) ? raw.scopes.filter((x) => typeof x === 'string' && x !== '').slice(0, 20).map((x) => mask(x.slice(0, CHAIN_VALUE), keep)) : [];
+  const p = raw.policy && typeof raw.policy === 'object' && !Array.isArray(raw.policy) ? raw.policy : null;
+  const decision = p && typeof p.decision === 'string' && p.decision !== '' ? mask(p.decision.slice(0, 40), keep) : null;
+  const policy = decision ? {
+    product: typeof p.product === 'string' && p.product !== '' ? mask(p.product.slice(0, 40), keep) : null,
+    decision,
+    id: text(p.id)?.value ?? null,
+  } : null;
+  if (!agent && !user && !scopes.length && !policy) return null;
+  // agentKey is the raw identifier: rows are grouped by it, so two ids that mask to the same placeholder stay two chains (never shown).
+  return { agent, agentKey: agent ? raw.agent : null, user, scopes: scopes.length ? scopes : null, policy };
+};
+// One chain: the steps of one agent's rows, in time order. Each step names its row's origin; a missing step is null.
+const chainOf = (items) => {
+  const first = (f) => items.find((i) => f(i.part));
+  const agentItem = first((p) => p.agent);
+  const agent = agentItem ? { value: agentItem.part.agent.value, linkable: agentItem.part.agent.linkable, origin: agentItem.row.origin, at: agentItem.row.at } : null;
+  const linkable = Boolean(agent && agent.linkable);
+  const userItem = first((p) => p.user);
+  const users = new Set(items.filter((i) => i.part.user).map((i) => i.part.user.value));
+  const user = userItem ? { value: userItem.part.user.value, origin: userItem.row.origin, at: userItem.row.at, more: users.size - 1 } : null;
+  const scopeItems = items.filter((i) => i.part.scopes);
+  const scopes = scopeItems.length ? { values: [...new Set(scopeItems.flatMap((i) => i.part.scopes))].slice(0, 20), origin: scopeItems[0].row.origin, at: scopeItems[0].row.at } : null;
+  const policies = items.filter((i) => i.part.policy).map((i) => ({ product: i.part.policy.product, decision: i.part.policy.decision, id: i.part.policy.id, outcome: i.row.outcome, origin: i.row.origin, at: i.row.at }));
+  return {
+    agent, user, scopes,
+    noScopeClaim: !scopes && items.some((i) => i.part.user || i.part.agent),
+    policies,
+    links: { userAgent: linkable && Boolean(user), agentScopes: linkable && Boolean(scopes), scopesPolicy: linkable && Boolean(scopes) && policies.length > 0 },
+  };
+};
+// items: [{ row: { origin, outcome, at }, part }] in time order. null when no row carries a chain key (a record then says so, and validates).
+const buildChain = (items) => {
+  const parts = items.filter((i) => i.part);
+  if (!parts.length) return null;
+  const order = []; const byAgent = new Map(); const noAgent = [];
+  for (const it of parts) {
+    if (!it.part.agent) { noAgent.push(it); continue; }
+    const k = it.part.agentKey;
+    if (!byAgent.has(k)) { byAgent.set(k, []); order.push(k); }
+    byAgent.get(k).push(it);
+  }
+  const groups = order.map((k) => byAgent.get(k));
+  if (noAgent.length) groups.push(noAgent);
+  return { chains: groups.map(chainOf) };
+};
+
 const iso = (ms) => new Date(ms).toISOString();
 const toMs = (v, what, code = 'bad_window') => {
   const ms = typeof v === 'number' ? v : typeof v === 'string' ? Date.parse(v) : NaN;
@@ -496,10 +559,14 @@ export function createRunObservability({ readers = [], masker = createMasker(), 
       return cache.get(line);
     };
     let seq = 0;
+    const partOf = new WeakMap();
+    const partOfDetail = (d) => chainPart(d, mask, keep);
     const rowFrom = (e, layer, origin) => {
       const ms = toMs(e?.at, `The time of a ${origin} ${layer} row`, `bad_${origin}_row`);
       if (!OUTCOMES.includes(e?.outcome) || typeof e.message !== 'string' || !e.message) throw new RunObsError(`bad_${origin}_row`, `A ${origin} ${layer} row needs at (ISO or epoch ms), outcome (${OUTCOMES.join('/')}) and a message string.`);
-      return { seq: seq++, at: ms, atExact: typeof e.at === 'string' && ISO_RE.test(e.at) ? e.at : iso(ms), layer, product: cap(e.product || (origin === 'simulated' ? 'lab mock' : 'API response')), outcome: e.outcome, message: cap(e.message), origin, detail: e.detail === undefined ? undefined : detailOf(e.detail) };
+      const row = { seq: seq++, at: ms, atExact: typeof e.at === 'string' && ISO_RE.test(e.at) ? e.at : iso(ms), layer, product: cap(e.product || (origin === 'simulated' ? 'lab mock' : 'API response')), outcome: e.outcome, message: cap(e.message), origin, detail: e.detail === undefined ? undefined : detailOf(e.detail) };
+      partOf.set(row, partOfDetail(e.detail));
+      return row;
     };
     const rows = []; const coverage = {}; const reasons = {}; const partial = {};
 
@@ -537,11 +604,13 @@ export function createRunObservability({ readers = [], masker = createMasker(), 
             const c = classified(line);
             if (!c || c.layer !== s.layer || !Number.isFinite(line.at) || line.at < from || line.at > to) continue;
             const first = String(line.message ?? '').slice(0, LIMITS.maxLine).split('\n', 1)[0];
-            rows.push({
+            const row = {
               seq: seq++, at: line.at, atExact: ISO_RE.test(line.atExact) ? line.atExact : iso(line.at), layer: s.layer, product: p, outcome: c.outcome, message: cap(c.message), origin: 'logged', basis: c.basis,
               matchedBy: want.some((re) => re.test(`${first} ${line.requestId || ''}`)) ? 'id' : 'window', matcher: c.matcher, detail: detailOf(c.detail),
               ...(c.multiline ? { multiline: true } : {}), ...(line.host ? { host: cap(line.host) } : {}),
-            });
+            };
+            partOf.set(row, partOfDetail(c.detail));
+            rows.push(row);
             got += 1;
           }
         }
@@ -589,6 +658,7 @@ export function createRunObservability({ readers = [], masker = createMasker(), 
       if (!lost) break;
     }
     kept.sort(byTime);
+    const chain = buildChain(kept.map((r) => ({ row: { origin: r.origin, outcome: r.outcome, at: iso(r.at) }, part: partOf.get(r) ?? null })));
     const out = kept.map(({ seq: _s, ...r }, i) => ({ id: `r${i + 1}`, ...r, at: iso(r.at) }));
     for (const s of specs) {
       if (placeholder.has(s.layer) && coverage[s.layer] === 'not-logged') {
@@ -603,7 +673,7 @@ export function createRunObservability({ readers = [], masker = createMasker(), 
     }
     return {
       runId: cap(runId ?? ''), window: { from: iso(from), to: iso(to) }, source, excerpt: true, truncated, rows: out, coverage,
-      reasons: Object.fromEntries(Object.entries(reasons).map(([k, v]) => [k, cap(v, LIMITS.maxReason)])), partial, summary,
+      reasons: Object.fromEntries(Object.entries(reasons).map(([k, v]) => [k, cap(v, LIMITS.maxReason)])), partial, summary, chain,
     };
   }
 
@@ -715,6 +785,23 @@ export function assertRunObservability(r) {
   }
   if (r.summary) {
     for (const k of Object.keys(count)) if (r.summary[k] !== count[k]) bad.push(`summary.${k} is ${r.summary[k]} but the rows say ${count[k]} (an info row, or a row with an unverified shape, must never be counted as allowed, refused or blocked)`);
+  }
+  if (r.chain !== undefined && r.chain !== null) {
+    if (typeof r.chain !== 'object' || !Array.isArray(r.chain.chains)) bad.push('chain must be null or { chains: [...] }');
+    else {
+      for (const [i, c] of r.chain.chains.entries()) {
+        const w = `chain ${i}`;
+        if (!c || typeof c !== 'object' || !c.links || typeof c.links !== 'object') { bad.push(`${w} needs links`); continue; }
+        const linkable = Boolean(c.agent && c.agent.linkable === true);
+        const need = { userAgent: Boolean(c.user), agentScopes: Boolean(c.scopes), scopesPolicy: Boolean(c.scopes) && Array.isArray(c.policies) && c.policies.length > 0 };
+        for (const k of Object.keys(need)) {
+          if (typeof c.links[k] !== 'boolean') bad.push(`${w}: link ${k} must be true or false`);
+          else if (c.links[k] && (!linkable || !need[k])) bad.push(`${w}: a link (${k}) is drawn with no shared, linkable agent identifier`);
+        }
+        if (c.scopes && c.noScopeClaim) bad.push(`${w}: a scope claim and "no scope claim" cannot both be set`);
+        for (const p of Array.isArray(c.policies) ? c.policies : []) if (!ORIGINS.includes(p?.origin)) bad.push(`${w}: a policy node has origin ${p?.origin}`);
+      }
+    }
   }
   scan(r, bad);
   return [...new Set(bad)];

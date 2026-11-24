@@ -4,7 +4,7 @@ import { render, screen, within, fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, test } from "vitest";
 import RunObservability from "./RunObservability";
 import { setJsonView } from "../components/JsonPane";
-import { mockRecord, realRecord, longRecord, emptyRecord, partialRecord, errorRecord, streams } from "./fixtures";
+import { mockRecord, realRecord, longRecord, emptyRecord, partialRecord, errorRecord, streams, chainRecord } from "./fixtures";
 
 beforeEach(() => setJsonView("raw"));
 
@@ -243,5 +243,66 @@ describe("RunObservability", () => {
       expect(container.textContent).not.toMatch(/Bearer\s+[A-Za-z0-9._-]{8,}|eyJ[\w-]{8,}\.|client_secret|\b\d{1,3}(\.\d{1,3}){3}\b/);
       unmount();
     }
+  });
+});
+
+// ---- The chain section (SPEC-chain-view-2026-11-24) ----
+describe("RunObservability chain", () => {
+  test("the chain section sits above the layer lanes and names User, Agent, Scopes and Policies", () => {
+    render(<RunObservability record={chainRecord} source="mock" />);
+    const chain = screen.getByTestId("ro-chain");
+    const lanes = screen.getByTestId("ro-lanes");
+    expect(chain.compareDocumentPosition(lanes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const run = screen.getByTestId("ro-chain-run-0");
+    expect(within(run).getByTestId("ro-chain-step-0-user")).toHaveTextContent("user-7");
+    expect(within(run).getByTestId("ro-chain-step-0-agent")).toHaveTextContent("agent-client-42");
+    expect(within(run).getByTestId("ro-chain-step-0-scopes")).toHaveTextContent("pay.read");
+    expect(within(run).getByTestId("ro-chain-policy-0-0")).toHaveTextContent("Privilege");
+    expect(within(run).getByTestId("ro-chain-policy-0-1")).toHaveTextContent("P1AZ");
+  });
+
+  test("a linked step says so on the same identifier; a step with no shared identifier says not correlated in this run", () => {
+    render(<RunObservability record={chainRecord} source="mock" />);
+    expect(screen.getByTestId("ro-chain-link-0-agentScopes")).toHaveAttribute("data-linked", "true");
+    expect(screen.getByTestId("ro-chain-link-0-agentScopes")).toHaveTextContent(/linked on the same agent id/);
+    expect(screen.getByTestId("ro-chain-link-1-agentScopes")).toHaveAttribute("data-linked", "false");
+    expect(screen.getByTestId("ro-chain-link-1-agentScopes")).toHaveTextContent("not correlated in this run");
+  });
+
+  test("a token with no scope claim says so; a P1AZ decision with no id says the id is missing", () => {
+    render(<RunObservability record={chainRecord} source="mock" />);
+    expect(screen.getByTestId("ro-chain-step-1-scopes")).toHaveTextContent("no scope claim in this run");
+    expect(screen.getByTestId("ro-chain-policy-0-1")).toHaveTextContent("policy id not logged");
+  });
+
+  test("a step with no rows says not logged and gives the lane reason", () => {
+    const rec = { ...chainRecord, chain: { chains: [{ ...chainRecord.chain.chains[1], user: null }] } };
+    render(<RunObservability record={rec} source="mock" />);
+    expect(screen.getByTestId("ro-chain-step-0-user")).toHaveTextContent("not logged");
+  });
+
+  test("a simulated value is labelled simulated in the chain too", () => {
+    render(<RunObservability record={chainRecord} source="mock" />);
+    expect(screen.getByTestId("ro-chain-step-0-agent")).toHaveTextContent("simulated");
+  });
+
+  test("a run with no chain shows the section with the no-chain line and nothing else", () => {
+    render(<RunObservability record={mockRecord} source="mock" />);
+    expect(screen.getByTestId("ro-chain")).toHaveTextContent("This lab does not record the chain for this run");
+    expect(screen.queryByTestId("ro-chain-run-0")).toBeNull();
+  });
+
+  test("an identifier the masker changed is shown masked, with no link drawn", () => {
+    const rec = structuredClone(chainRecord);
+    rec.chain.chains[0].agent = { value: "<email>", linkable: false, origin: "simulated", at: rec.chain.chains[0].agent.at };
+    rec.chain.chains[0].links = { userAgent: false, agentScopes: false, scopesPolicy: false };
+    const { container } = render(<RunObservability record={rec} source="mock" />);
+    expect(screen.getByTestId("ro-chain-link-0-agentScopes")).toHaveAttribute("data-linked", "false");
+    expect(container.textContent).not.toMatch(/ops\.agent@corp-example\.com/);
+  });
+
+  test("the outcome summary is unchanged by the chain section", () => {
+    render(<RunObservability record={chainRecord} source="mock" />);
+    expect(screen.getByTestId("ro-summary")).toHaveTextContent("6 allowed, 0 refused, 0 blocked, 0 for information");
   });
 });

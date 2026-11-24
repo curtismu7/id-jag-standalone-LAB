@@ -71,7 +71,15 @@ router.post('/run', async (req, res) => {
   const at = new Date().toISOString();
   let observability = null;
   try {
-    observability = await buildRunRecord({ runId, decisions: result.trace?.decisions ?? [], at, write: (line) => process.stdout.write(`${line}\n`) });
+    // The chain view's known steps: the caller token's subject and client and the scopes the exchange granted (the run's own facts,
+    // computed once with the run). No policy step: this lab has no Privilege or P1AZ decision in gateway redeem.
+    const chain = {
+      user: result.callerToken?.decoded?.claims?.sub ?? undefined,
+      agent: CALLER_CLIENT_ID,
+      scopes: (result.leg2?.scope ?? getSpec(currentWorkspace())?.OBO?.Scope ?? '')
+        .split(/[\s]+/).filter(Boolean).slice(0, 20),
+    };
+    observability = await buildRunRecord({ runId, decisions: result.trace?.decisions ?? [], at, chain, write: (line) => process.stdout.write(`${line}\n`) });
   } catch (e) {
     process.stderr.write(`run-record: no record for this run (${e?.code || 'record_failed'})\n`);
   }
