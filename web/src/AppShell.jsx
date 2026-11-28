@@ -13,6 +13,8 @@ import { ClaimBanner, ModeBanner } from "./mode/ModeToggle";
 import { PresentBar, PresentProvider, usePresent } from "./present/PresentMode";
 import TopMenu, { applyFontSize } from "./top-menu/TopMenu.jsx";
 import TalkTrackDialog from "./talk-track/TalkTrackDialog.jsx";
+import HelpDialog from "./help-dialog/HelpDialog.jsx";
+import { HELP_SECTIONS } from "./helpContent";
 import { pageTalkSteps } from "./story/StoryPanel";
 import "./AppShell.css";
 
@@ -41,6 +43,7 @@ function Shell({ children }) {
   const mode = useAppMode();
   const present = usePresent();
   const [talkOpen, setTalkOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const here = currentPage();
   useEffect(() => { if (theme === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme; }, [theme]);
   const pickTheme = (next) => {
@@ -82,7 +85,7 @@ function Shell({ children }) {
             fontSize={{ value: fontStep, onChange: setFontStep }}
             present={{ active: present?.present, onToggle: () => present?.set(!present?.present), label: "Present" }}
             talkTrack={{ active: talkOpen, onToggle: () => setTalkOpen((v) => !v) }}
-            help={{ href: "https://github.com/curtismu7/id-jag-standalone-LAB#readme" }}
+            help={{ onClick: () => setHelpOpen(true), title: "What this lab is, and what is simulated" }}
             version={mode?.version || null}
             extra={<ReturnLink app="id-jag-standalone" variant="header" />}
           >
@@ -99,6 +102,7 @@ function Shell({ children }) {
       {children}
       <SignInModal />
       <TalkTrackDialog isOpen={talkOpen} onClose={() => setTalkOpen(false)} talk={pageTalkSteps()} />
+      <HelpDialog isOpen={helpOpen} onClose={() => setHelpOpen(false)} sections={HELP_SECTIONS} docsUrl="https://github.com/curtismu7/id-jag-standalone-LAB#readme" />
 
     </div>
   );
